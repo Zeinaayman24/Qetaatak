@@ -39,6 +39,12 @@ Hand the case to a human (action "escalate") when: the customer asks for a perso
 Use action "resolved" only when the customer clearly says the problem is solved.
 Reply with ONLY a JSON object: {"reply": "...", "quick_replies": ["up to 3 short Arabic buttons"], "action": null | "escalate" | "resolved"}`;
 
+const BRIEF = `You write hand-over briefs for customer-service agents at Qetaatak (Egyptian car spare-parts marketplace).
+You get the full chat of a complaint (customer, assistant, events) and facts about the order, shop and customer history.
+Write in clear Egyptian Arabic, 4 to 6 short lines, no greeting: what the problem is, what the assistant already told the customer,
+what the customer wants now, how the customer feels, and the best next step for the agent. Use only the given facts.
+Reply with ONLY a JSON object: {"summary": "..."}`;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const key = Deno.env.get('ANTHROPIC_API_KEY');
@@ -56,8 +62,8 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 600,
-      system: (input.mode === 'support' ? SUPPORT : SYSTEM) + '\n\nContext (JSON): ' + JSON.stringify(input.context ?? {}),
-      messages: messages.map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })),
+      system: (input.mode === 'support' ? SUPPORT : input.mode === 'brief' ? BRIEF : SYSTEM) + '\n\nContext (JSON): ' + JSON.stringify(input.context ?? {}),
+      messages: messages.map((m) => ({ role: m.role, content: m.content.slice(0, input.mode === 'brief' ? 8000 : 2000) })),
     }),
   });
   if (!res.ok) return json({ configured: true, error: 'ai_unavailable', status: res.status }, 502);
@@ -66,12 +72,14 @@ Deno.serve(async (req) => {
   const match = text.match(/\{[\s\S]*\}/);
   try {
     const out = JSON.parse(match ? match[0] : text);
+    if (input.mode === 'brief') return json({ configured: true, summary: String(out.summary ?? '') });
     if (input.mode === 'support') {
       const action = out.action === 'escalate' || out.action === 'resolved' ? out.action : null;
       return json({ configured: true, reply: String(out.reply ?? ''), quick_replies: Array.isArray(out.quick_replies) ? out.quick_replies.slice(0, 3) : [], action });
     }
     return json({ configured: true, reply: String(out.reply ?? ''), quick_replies: Array.isArray(out.quick_replies) ? out.quick_replies.slice(0, 4) : [], draft: out.draft ?? null, ready: !!out.ready });
   } catch {
+    if (input.mode === 'brief') return json({ configured: true, summary: text.slice(0, 1500) });
     if (input.mode === 'support') return json({ configured: true, reply: text.slice(0, 600), quick_replies: [], action: null });
     return json({ configured: true, reply: text.slice(0, 600), quick_replies: [], draft: null, ready: false });
   }

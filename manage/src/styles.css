@@ -55,7 +55,7 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 .page-head p { margin: 4px 0 0; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-.ticket-layout { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
+.ticket-layout { display: grid; grid-template-columns: 1fr 380px; gap: 18px; align-items: start; }
 .side { display: flex; flex-direction: column; gap: 18px; }
 
 /* ---------- blocks */
@@ -158,3 +158,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .chat-banner.good { background: var(--good-soft); color: var(--good); }
 .conversation { height: calc(100vh - 150px); min-height: 480px; overflow: hidden; }
 .chat-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 4px 2px; }
+.brief { border-color: var(--ink); }
+.brief-headline { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.6; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.brief-block { display: flex; flex-direction: column; gap: 4px; }
+.brief-block > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.brief-block p { margin: 0; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+.brief-block ul { margin: 0; padding-inline-start: 18px; font-size: 14px; line-height: 1.7; }
+.brief-block.suggest { background: var(--fill); border-radius: 12px; padding: 10px 12px; }
+.brief-block.ai { background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; }
+.btn.small { padding: 6px 12px; font-size: 13px; }

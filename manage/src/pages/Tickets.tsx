@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
+import { buildBrief } from '../brief';
 import { CATEGORY, PRIORITY, TICKET_STATUS, ago, memberId, needsPeople, ticketId } from '../lib';
 
 export default function Tickets() {
@@ -45,7 +46,7 @@ export default function Tickets() {
                   <td className="mono strong">{ticketId(t.ticket_no)}</td>
                   <td>{p?.is_shop ? all.priv[t.reporter_id]?.name : p?.full_name}<div className="mono small muted">{memberId(p)}</div></td>
                   <td>{CATEGORY[t.category]}</td>
-                  <td className="small"><div className="clamp">{t.body}</div></td>
+                  <td className="small"><div className="clamp">{t.body}</div>{(() => { const tags = buildBrief(t, [], all).tags.filter((x) => x.label !== 'أولوية عاجلة'); return tags.length ? <div className="tags" style={{ marginTop: 6 }}>{tags.slice(0, 3).map((x) => <Pill key={x.label} tone={x.tone}>{x.label}</Pill>)}</div> : null; })()}</td>
                   <td><Pill tone={t.priority === 'high' ? 'bad' : t.priority === 'low' ? 'plain' : 'dark'}>{PRIORITY[t.priority]}</Pill></td>
                   <td className="small">{t.assigned_to ? staff.find((s) => s.id === t.assigned_to)?.full_name || 'موظف' : '—'}</td>
                   <td><Pill tone={t.status === 'resolved' ? 'good' : t.status === 'open' ? 'wait' : t.status === 'bot' ? 'plain' : 'dark'}>{TICKET_STATUS[t.status]}</Pill></td>

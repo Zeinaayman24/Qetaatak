@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Field, Page, Pill, useData } from '../App';
-import { CATEGORY, PRIORITY, REQUEST_STATUS, RESOLVED_BY, TICKET_STATUS, dateTime, memberId, must, orderId, supabase, ticketId, useLive, type TicketMessage } from '../lib';
+import { buildBrief, type Brief } from '../brief';
+import { CATEGORY, PRIORITY, RESOLVED_BY, TICKET_STATUS, dateTime, memberId, must, orderId, supabase, ticketId, useLive, type TicketMessage } from '../lib';
 
 /**
  * One complaint as one live conversation: what the customer said to the assistant, the hand-over,
@@ -52,6 +53,7 @@ export default function TicketDetail() {
   }
 
   const hasTranscript = (msgs ?? []).some((m) => m.kind === 'bot');
+  const brief = buildBrief(t, msgs ?? [], all);
   const banner =
     t.status === 'bot' ? { tone: 'plain', text: 'المساعد الآلي لسه بيتعامل مع العميل. تقدر تستلم المحادثة منه في أي وقت.' } :
     t.status === 'open' ? { tone: 'wait', text: 'المساعد حوّل المحادثة لخدمة العملاء والعميل مستني حد يرد عليه.' } :
@@ -110,6 +112,7 @@ export default function TicketDetail() {
         </section>
 
         <aside className="side">
+          <BriefPanel brief={brief} ticket={t} msgs={msgs ?? []} />
           <section className="panel">
             <h2>المحادثة</h2>
             <div className="fields">
@@ -129,27 +132,56 @@ export default function TicketDetail() {
             </div>
           </section>
           <section className="panel">
-            <h2>{isShop ? 'المحل' : 'العميل'}</h2>
+            <h2>{isShop ? 'المحل' : 'العميل'} وتاريخه</h2>
             <div className="fields">
               <Field label="الرقم"><Link className="mono" to={isShop ? `/shops/${t.reporter_id}` : `/customers/${t.reporter_id}`}>{memberId(p)}</Link></Field>
               <Field label="الاسم">{reporterName}</Field>
               <Field label="الموبايل"><span className="mono" dir="ltr">{isShop ? all.priv[t.reporter_id]?.phone : p?.phone}</span></Field>
-              <Field label="الإيميل"><span dir="ltr">{p?.email}</span></Field>
-              <Field label="محادثات قبل كده">{all.tickets.filter((x) => x.reporter_id === t.reporter_id && x.id !== t.id).length}</Field>
+              {brief.history.map(([k, v]) => <Field key={k} label={k}>{v}</Field>)}
             </div>
           </section>
-          {req ? (
+          {brief.order ? (
             <section className="panel">
               <h2>الطلب المرتبط</h2>
               <div className="fields">
-                <Field label="الطلب"><Link className="mono" to={`/orders/${req.id}`}>{orderId(req.num)}</Link></Field>
-                <Field label="القطعة">{req.part}</Field>
-                <Field label="الحالة">{REQUEST_STATUS[req.status]}</Field>
+                {brief.order.map(([k, v], i) => <Field key={k} label={k}>{i === 0 && req ? <Link to={`/orders/${req.id}`}>{v}</Link> : v}</Field>)}
+                {brief.shop?.map(([k, v]) => <Field key={k} label={k}>{k.includes('موبايل') ? <span className="mono" dir="ltr">{v}</span> : v}</Field>)}
               </div>
             </section>
           ) : null}
         </aside>
       </div>
     </Page>
+  );
+}
+
+/** The hand-over brief at the top of the case: read this first, then reply. */
+function BriefPanel({ brief, ticket, msgs }: { brief: Brief; ticket: { id: string; category: string; body: string }; msgs: TicketMessage[] }) {
+  const [ai, setAi] = useState<{ on: boolean; text: string; busy: boolean }>({ on: false, text: '', busy: false });
+  useEffect(() => {
+    supabase.functions.invoke('assistant', { body: { ping: true } }).then(({ data }) => setAi((x) => ({ ...x, on: !!data?.configured }))).catch(() => {});
+  }, []);
+  useEffect(() => { setAi((x) => ({ ...x, text: '' })); }, [ticket.id]);
+  async function summarize() {
+    setAi((x) => ({ ...x, busy: true }));
+    const transcript = msgs.filter((m) => !m.internal).map((m) => ({ role: 'user' as const, content: `[${m.kind === 'bot' ? 'المساعد' : m.kind === 'system' ? 'حدث' : 'رسالة'}] ${m.body}` }));
+    const facts = { headline: brief.headline, order: brief.order, shop: brief.shop, history: brief.history, category: CATEGORY[ticket.category] };
+    const { data } = await supabase.functions.invoke('assistant', { body: { mode: 'brief', messages: [{ role: 'user', content: transcript.map((m) => m.content).join('\n') || ticket.body }], context: facts } });
+    setAi((x) => ({ ...x, busy: false, text: data?.summary || 'معرفناش نعمل الملخص دلوقتي.' }));
+  }
+  return (
+    <section className="panel brief">
+      <div className="panel-head"><h2>ملخص للموظف</h2>{brief.waiting ? <Pill tone="wait">{brief.waiting}</Pill> : null}</div>
+      <p className="brief-headline">{brief.headline}</p>
+      {brief.tags.length ? <div className="tags">{brief.tags.map((x) => <Pill key={x.label} tone={x.tone}>{x.label}</Pill>)}</div> : null}
+      <div className="brief-block"><span>العميل قال</span><p>«{brief.customerSaid}»</p></div>
+      <div className="brief-block"><span>ليه وصلتلك</span><p>{brief.why}</p></div>
+      {brief.botTried.length ? (
+        <div className="brief-block"><span>المساعد قاله</span><ul>{brief.botTried.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+      ) : null}
+      <div className="brief-block suggest"><span>اقتراح للتعامل</span><ul>{brief.suggest.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+      {ai.text ? <div className="brief-block ai"><span>✨ ملخص بالذكاء الاصطناعي</span><p>{ai.text}</p></div> : null}
+      {ai.on && !ai.text ? <button className="btn ghost small" disabled={ai.busy} onClick={summarize}>{ai.busy ? 'بيكتب الملخص…' : '✨ لخّص المحادثة بالذكاء الاصطناعي'}</button> : null}
+    </section>
   );
 }
