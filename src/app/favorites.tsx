@@ -33,7 +33,7 @@ export default function Favorites() {
               meta={s.brands.join('، ')} />
           ))}
         </View>
-      ) : <Empty icon="🤍" text={'لسه مفيش محلات مفضلة.\nافتح صفحة أي محل من العروض واضغط على القلب.'} />}
+      ) : <Empty icon="heart-outline" text={'لسه مفيش محلات مفضلة.\nافتح صفحة أي محل من العروض واضغط على القلب.'} />}
     </Screen>
   );
 }

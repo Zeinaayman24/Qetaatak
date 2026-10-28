@@ -71,6 +71,7 @@ export type Request = {
   rating: number | null; created_at: string;
   vin: string; side: '' | 'right' | 'left' | 'front' | 'rear'; urgency: 'normal' | 'today' | 'urgent'; budget: number | null;
   order_status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | null; review: string; done_at?: string | null;
+  batch_id: string | null; qty: number;
 };
 export type Car = { id: string; make: string; model: string; year: number; vin: string };
 export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; created_at: string };
@@ -106,4 +107,36 @@ export function friendlyError(e: any): string {
   if (/postal_code/i.test(msg)) return 'الرقم البريدي لازم يكون ٥ أرقام.';
   if (/network|fetch/i.test(msg)) return 'مفيش اتصال بالإنترنت. جرّب تاني.';
   return 'حصلت مشكلة. جرّب تاني.';
+}
+
+/** Parts sent together share a batch; the apps show a batch as one request. */
+export type Group = { key: string; first: Request; items: Request[] };
+export function groupRequests(rs: Request[]): Group[] {
+  const map = new Map<string, Request[]>();
+  for (const r of rs) {
+    const k = r.batch_id ?? r.id;
+    map.set(k, [...(map.get(k) ?? []), r]);
+  }
+  return [...map.entries()].map(([key, items]) => {
+    const sorted = [...items].sort((a, b) => a.num - b.num);
+    return { key, first: sorted[0], items: sorted };
+  });
+}
+export const partsLabel = (items: { part: string }[]) =>
+  items.length === 1 ? items[0].part : items.length === 2 ? items[0].part + ' و' + items[1].part : `${items[0].part} و${ar(items.length - 1)} قطع تانية`;
+
+/** A random id for a batch of parts (no crypto needed). */
+export const newId = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+  const r = (Math.random() * 16) | 0;
+  return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+});
+
+/** One step of progress for a group of parts, 0..4, and its label for the customer. */
+export function groupProgress(items: Request[], quoteCount: number): { step: number; label: string } {
+  if (items.every((r) => r.status === 'done')) return { step: 4, label: 'اتسلّم' };
+  if (items.every((r) => r.status === 'cancelled')) return { step: 0, label: 'اتلغى' };
+  if (items.some((r) => r.status === 'chosen' && r.order_status === 'out_for_delivery')) return { step: 3, label: 'في الطريق ليك' };
+  if (items.some((r) => r.status === 'chosen')) return { step: 3, label: 'المحل بيجهّز' };
+  if (quoteCount) return { step: 2, label: `${ar(quoteCount)} عروض مستنياك` };
+  return { step: 1, label: 'بندوّر عند المحلات' };
 }

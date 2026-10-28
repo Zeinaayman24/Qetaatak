@@ -55,6 +55,11 @@ const PARTS: { words: string[]; name: string; rear?: string; sided?: boolean }[]
 export const SIDED_HINT = ['فانوس', 'مراية', 'رفرف', 'أكصدام', 'باب', 'مساعد', 'مقص'];
 export const partIsSided = (part: string) => SIDED_HINT.some((w) => part.includes(w));
 
+/** Splits «فانوس يمين ومراية شمال، ورديتر» into one piece of text per part. */
+export function splitParts(raw: string): string[] {
+  return raw.split(/\s*[،,+]\s*|\s+و\s+|\s+و(?!را(?:\s|$|،))(?!احد)(?!ش\s)(?=[\u0621-\u064A])/).map((x) => x.trim()).filter(Boolean);
+}
+
 export type Parsed = {
   intent: 'request' | 'complaint' | 'track' | 'greet' | 'thanks' | 'human' | null;
   part?: string; sided?: boolean; side?: '' | 'right' | 'left' | 'front' | 'rear';

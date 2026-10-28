@@ -4,13 +4,13 @@ import { View } from 'react-native';
 import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { shopPill, shopState, type ShopState } from '@/components/status';
-import { Btn, Chips, Empty, Icon, Labeled, ListRow, Loading, Muted, Notice, Photo, Row, Screen, Seg, Select, Stats, T } from '@/components/ui';
+import { Btn, Chips, Empty, Icon, Labeled, Loading, Muted, Notice, Photo, Pill, Press, Row, Screen, Seg, Select, T } from '@/components/ui';
 import { Pressable, TextInput } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { URGENCY, WANTED, ago, ar, money, reqNo, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
-import { colors, fonts } from '@/lib/theme';
+import { colors, fonts, lift } from '@/lib/theme';
 
 type Tab = 'open' | 'quoted' | 'sold' | 'all';
 
@@ -48,7 +48,6 @@ export default function ShopInbox() {
   const needle = q.trim();
   const urgencyRank = { urgent: 0, today: 1, normal: 2 } as const;
   const shown = rows
-    .filter((x) => (tab === 'all' ? true : x.st === tab))
     .filter((x) => !mineOnly || shop.brands.includes(x.r.car_make))
     .filter((x) => cond === 'all' || x.r.wanted_condition === cond || x.r.wanted_condition === 'any')
     .filter((x) => area === 'الكل' || x.r.area === area)
@@ -60,33 +59,49 @@ export default function ShopInbox() {
   const waiting = rows.filter((x) => x.st === 'open').length;
 
   return (
-    <Screen nav={<BottomNav role="shop" />}>
-      <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <View style={{ flex: 1 }}>
-          <Muted size={14}>{shop.area}، {shop.governorate} · {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</Muted>
-          <T w="bold" size={26} style={{ lineHeight: 36 }}>{shopPrivate?.name}</T>
+    <Screen nav={<BottomNav role="shop" />} top={
+      <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingBottom: 56 }}>
+        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, gap: 14 }}>
+          <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1 }}>
+              <T size={13} color="rgba(255,255,255,.65)">{shop.area}، {shop.governorate} · {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</T>
+              <T w="bold" size={26} color="#fff" style={{ lineHeight: 36 }}>{shopPrivate?.name}</T>
+            </View>
+            <Bell light />
+          </Row>
+          <Row gap={8}>
+            {[[ar(waiting), 'مستنية ردّك', true], [ar(data?.mine.length ?? 0), 'عروض بعتها', false], [money(sales), 'مبيعات ج.م', false]].map(([v, l, hot]) => (
+              <View key={String(l)} style={{ flex: 1, backgroundColor: hot ? colors.accent : 'rgba(255,255,255,.08)', borderRadius: 18, padding: 12, gap: 2 }}>
+                <T w="bold" size={22} color={hot ? colors.ink : '#fff'}>{String(v)}</T>
+                <T size={12} color={hot ? colors.ink : 'rgba(255,255,255,.7)'}>{String(l)}</T>
+              </View>
+            ))}
+          </Row>
         </View>
-        <Bell />
-      </Row>
+      </View>
+    }>
+      <View style={{ marginTop: -40, gap: 12 }}>
       {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
       {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}
-      <Stats items={[[ar(waiting), 'مستنية ردّك'], [ar(data?.mine.length ?? 0), 'عروض بعتها'], [money(sales), 'مبيعات (ج.م)']]} />
+      <View style={[{ backgroundColor: colors.surface, borderRadius: 20, padding: 6 }, lift]}>
       <Seg options={[{ v: 'open', label: 'جديد' }, { v: 'quoted', label: 'بعت عرض' }, { v: 'sold', label: 'مبيعات' }, { v: 'all', label: 'الكل' }] as { v: Tab; label: string }[]}
         value={tab} onPick={setTab} />
+      </View>
+      </View>
       <Row gap={8}>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.card, borderRadius: 14, paddingHorizontal: 12 }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 12, borderWidth: 1.5, borderColor: colors.line }}>
           <Icon name="search" size={18} color={colors.muted} />
           <TextInput value={q} onChangeText={setQ} placeholder="دوّر: فانوس، سنترا…" placeholderTextColor={colors.faint}
             style={[{ flex: 1, paddingVertical: 11, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, textAlign: 'right' }, { outlineStyle: 'none' } as any]} />
         </View>
         <Pressable onPress={() => setShowFilters((v) => !v)} accessibilityRole="button" accessibilityLabel="الفلاتر"
-          style={{ height: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: showFilters || activeFilters ? colors.ink : colors.card, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          style={{ height: 48, paddingHorizontal: 14, borderRadius: 16, backgroundColor: showFilters || activeFilters ? colors.ink : colors.surface, borderWidth: 1.5, borderColor: showFilters || activeFilters ? colors.ink : colors.line, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="options-outline" size={18} color={showFilters || activeFilters ? '#fff' : colors.ink} />
           {activeFilters ? <T size={13} w="bold" color="#fff">{ar(activeFilters)}</T> : null}
         </Pressable>
       </Row>
       {showFilters ? (
-        <View style={{ gap: 14, backgroundColor: colors.card, borderRadius: 18, padding: 14 }}>
+        <View style={[{ gap: 14, backgroundColor: colors.surface, borderRadius: 20, padding: 14 }, lift]}>
           <Chips options={[{ v: 'mine', label: 'ماركاتي بس' }, { v: 'urgent', label: 'المستعجل الأول' }]} selected={[...(mineOnly ? ['mine'] : []), ...(urgentFirst ? ['urgent'] : [])]}
             onPick={(v) => (v === 'mine' ? setMineOnly((x) => !x) : setUrgentFirst((x) => !x))} />
           <Labeled label="العميل عايزها">
@@ -96,18 +111,54 @@ export default function ShopInbox() {
           {activeFilters ? <Btn kind="link" title="امسح الفلاتر" onPress={() => { setMineOnly(false); setCond('all'); setUrgentFirst(false); setArea('الكل'); }} /> : null}
         </View>
       ) : null}
-      {loading && !data ? <Loading /> : shown.length ? (
-        <View>
-          {shown.map(({ r, st }, i) => (
-            <ListRow key={r.id} last={i === shown.length - 1} onPress={() => router.push(`/shop/${r.id}`)}
-              leading={<Photo uri={photoUrl(r.photo_path)} size={48} />}
-              title={r.part}
-              subtitle={<Muted numberOfLines={1}>{r.car_make} {r.car_model} {ar(r.car_year)} · {WANTED[r.wanted_condition]}{shop.brands.includes(r.car_make) ? <T size={13} color={colors.good} w="semibold">  · تخصصك</T> : null}</Muted>}
-              meta={`${r.area} · ${reqNo(r.num)} · ${ago(r.created_at)}${r.urgency !== 'normal' ? ' · ' + URGENCY[r.urgency] : ''}${r.budget ? ' · ميزانية ' + money(r.budget) : ''}`}
-              trailing={shopPill(st)} />
-          ))}
+      {loading && !data ? <Loading /> : groupShown(shown).some((g) => tab === 'all' || g.some((x) => x.st === tab)) ? (
+        <View style={{ gap: 12 }}>
+          {groupShown(shown).filter((g) => tab === 'all' || g.some((x) => x.st === tab)).map((g) => {
+            const r = g[0].r;
+            const fresh = g.some((x) => x.st === 'open');
+            return (
+              <Press key={r.batch_id ?? r.id} onPress={() => router.push(`/shop/${(g.find((x) => x.st === 'open') ?? g[0]).r.id}`)}
+                style={[{ backgroundColor: colors.surface, borderRadius: 22, padding: 14, gap: 10, borderWidth: 2, borderColor: fresh ? colors.accent : 'transparent' }, lift]}>
+                <Row gap={12}>
+                  <Photo uri={photoUrl(g.find((x) => x.r.photo_path)?.r.photo_path)} size={50} />
+                  <View style={{ flex: 1, gap: 1 }}>
+                    <Row gap={6}>
+                      <T w="bold" size={15} numberOfLines={1} style={{ flexShrink: 1 }}>{g.length > 1 ? `${ar(g.length)} قطع` : r.part}</T>
+                      {shop.brands.includes(r.car_make) ? <Pill label="تخصصك" tone="good" /> : null}
+                    </Row>
+                    <Muted size={12.5} numberOfLines={1}>{r.car_make} {r.car_model} {ar(r.car_year)} · {r.area}</Muted>
+                  </View>
+                  {g.length === 1 ? shopPill(g[0].st) : null}
+                </Row>
+                {g.length > 1 ? (
+                  <View style={{ gap: 6, backgroundColor: colors.soft, borderRadius: 14, padding: 10 }}>
+                    {g.map((x) => (
+                      <Row key={x.r.id} style={{ justifyContent: 'space-between' }}>
+                        <T size={13.5} w="medium" numberOfLines={1} style={{ flex: 1 }}>{x.r.part}{x.r.qty > 1 ? ` × ${ar(x.r.qty)}` : ''} <T size={12} color={colors.muted}>· {WANTED[x.r.wanted_condition]}</T></T>
+                        {shopPill(x.st)}
+                      </Row>
+                    ))}
+                  </View>
+                ) : null}
+                <Row gap={6}>
+                  <Icon name="time-outline" size={14} color={colors.faint} />
+                  <Muted size={12}>{reqNo(r.num)} · {ago(r.created_at)}{r.urgency !== 'normal' ? ' · ' + URGENCY[r.urgency] : ''}{r.budget && g.length === 1 ? ' · ميزانية ' + money(r.budget) : ''}</Muted>
+                </Row>
+              </Press>
+            );
+          })}
         </View>
-      ) : <Empty icon="📭" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'مفيش حاجة هنا لسه.'} />}
+      ) : <Empty icon="file-tray-outline" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'مفيش حاجة هنا لسه.'} />}
     </Screen>
   );
+}
+
+/** Parts sent together arrive as one card, in the order of the first part's place in the list. */
+function groupShown<X extends { r: Request }>(rows: X[]): X[][] {
+  const out: X[][] = []; const at = new Map<string, number>();
+  for (const x of rows) {
+    const k = x.r.batch_id ?? x.r.id;
+    if (at.has(k)) out[at.get(k)!].push(x); else { at.set(k, out.length); out.push([x]); }
+  }
+  return out.map((g) => g.sort((a, b) => a.r.num - b.r.num));
 }

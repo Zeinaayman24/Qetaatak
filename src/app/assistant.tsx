@@ -4,9 +4,9 @@ import { Pressable } from 'react-native';
 import { CaseChat } from '@/components/CaseChat';
 import { ChatFrame } from '@/components/chat';
 import { Loading, Muted, Screen, toast } from '@/components/ui';
-import { aiAvailable, askAi, parse, partIsSided, type AiTurn, type Parsed } from '@/lib/assistant';
+import { aiAvailable, askAi, parse, partIsSided, splitParts, type AiTurn, type Parsed } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
-import { COMMON_PARTS, REPORT_CATEGORIES, SIDES, URGENCY, WANTED, ar, friendlyError, money, reqNo, type Car, type Request } from '@/lib/data';
+import { COMMON_PARTS, REPORT_CATEGORIES, SIDES, URGENCY, WANTED, ar, friendlyError, money, newId, reqNo, type Car, type Request } from '@/lib/data';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
 
@@ -42,6 +42,7 @@ export default function Assistant() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>('menu');
   const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [basket, setBasket] = useState<Draft[]>([]); // parts already filled in, when the customer needs more than one
   const [cdraft, setC] = useState<CDraft>(emptyC);
   const [typing, setTyping] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -139,7 +140,7 @@ export default function Assistant() {
       budgetAsked: d.budgetAsked || !!p.budget,
     };
   }
-  function advance(d: Draft) {
+  function advance(d: Draft, b: Draft[] = basket) {
     if (cars && cars.length === 1 && !d.carKey) d = { ...d, carKey: cars[0].key };
     setDraft(d);
     if (!d.part) { setStep('part'); return say({ text: 'اسم القطعة إيه؟ اكتبها بأي طريقة، أو اختار من تحت.' }); }
@@ -152,10 +153,16 @@ export default function Assistant() {
     if (d.budget === null && !d.budgetAsked) { setStep('budget'); return say({ text: 'في ميزانية معينة في دماغك؟ اكتب الرقم بالجنيه، أو تخطّى.' }); }
     setStep('confirm');
     const car = carOf(d)!;
+    const all = [...b, d];
+    const itemLine = (x: Draft): string => [x.part, x.side ? SIDES[x.side] : '', WANTED[x.cond ?? d.cond ?? 'any']].filter(Boolean).join(' · ');
     say({
-      text: 'تمام، ده طلبك. أبعته للمحلات؟',
+      text: all.length > 1 ? `تمام، ده طلبك (${ar(all.length)} قطع). أبعته للمحلات؟ كل محل هيسعّر اللي عنده.` : 'تمام، ده طلبك. أبعته للمحلات؟',
       photo: d.photo ?? undefined,
-      lines: [
+      lines: all.length > 1 ? [
+        ...all.map((x, i) => [`قطعة ${ar(i + 1)}`, itemLine(x)] as [string, string]),
+        ['العربية', car.label],
+        ['محتاجها', URGENCY[d.urgency]],
+      ] : [
         ['القطعة', d.part],
         ['العربية', car.label],
         ...(d.side ? [['الجهة', SIDES[d.side]] as [string, string]] : []),
@@ -174,16 +181,24 @@ export default function Assistant() {
     me('ابعت الطلب');
     setBusy(true);
     try {
-      const photo_path = d.photo ? await uploadPhoto(d.photo, profile.id) : null;
-      const { data, error } = await supabase.from('requests').insert({
-        customer_id: profile.id, part: d.part, car_make: car.make, car_model: car.model, car_year: car.year, vin: car.vin,
-        wanted_condition: d.cond, side: d.side ?? '', urgency: d.urgency, budget: d.budget, area: profile.area, notes: d.notes, photo_path,
-      }).select('*').single();
+      const all = [...basket, d];
+      const batch = all.length > 1 ? newId() : null;
+      const rows = [];
+      for (const x of all) {
+        const photo_path = x.photo ? await uploadPhoto(x.photo, profile.id) : null;
+        rows.push({
+          customer_id: profile.id, part: x.part, car_make: car.make, car_model: car.model, car_year: car.year, vin: car.vin,
+          wanted_condition: x.cond ?? d.cond, side: x.side ?? '', urgency: d.urgency, budget: x.budget, area: profile.area, notes: x.notes, photo_path, batch_id: batch,
+        });
+      }
+      const { data: made, error } = await supabase.from('requests').insert(rows).select('*');
       if (error) throw error;
-      setRecent((r) => [data as Request, ...r]);
+      const sorted = [...(made as Request[])].sort((a, b) => a.num - b.num);
+      const data = sorted[0];
+      setRecent((r) => [...sorted, ...r]);
       setStep('done');
-      setDraft(emptyDraft());
-      say({ text: `اتبعت ✅ طلبك رقم ${reqNo(data.num)} وصل للمحلات اللي بتشتغل في ${car.make}.\nأول ما محل يبعت سعر هيوصلك إشعار، وتقدر تقارن العروض وتختار.`, links: [{ label: 'افتح الطلب', href: `/customer/${data.id}` }] });
+      setDraft(emptyDraft()); setBasket([]);
+      say({ text: `اتبعت ✅ طلبك رقم ${reqNo(data.num)}${all.length > 1 ? ` (${ar(all.length)} قطع)` : ''} وصل للمحلات اللي بتشتغل في ${car.make}.\nأول ما محل يبعت سعر هيوصلك إشعار، وتقدر تقارن العروض وتختار.`, links: [{ label: 'افتح الطلب', href: `/customer/${data.id}` }] });
     } catch (x) {
       say({ text: 'معرفتش أبعت الطلب: ' + friendlyError(x) + '\nجرّب تاني.' });
     } finally { setBusy(false); }
@@ -249,8 +264,19 @@ export default function Assistant() {
     if (p.intent === 'track') return showTrack();
     if (p.intent === 'request') {
       if (isShop) return say({ text: 'طلب القطع للعملاء بس. لو عندك مشكلة اكتبهالي.' });
-      let d = merge(emptyDraft(), p);
+      // «عايز فانوس يمين ومراية شمال» → two parts in one request
+      const segs = splitParts(t).map(parse).filter((x) => x.part);
       const car = cars?.find((c) => t.includes(c.make));
+      if (segs.length > 1) {
+        const earlier = segs.slice(0, -1).map((x) => ({ ...emptyDraft(), part: x.part!, side: x.side ?? (partIsSided(x.part!) ? null : ''), cond: x.cond ?? p.cond ?? null, photoAsked: true, budgetAsked: true }));
+        const last = segs[segs.length - 1];
+        let d = merge({ ...emptyDraft(), part: last.part!, side: last.side ?? null, cond: last.cond ?? p.cond ?? null }, p);
+        if (car) d = { ...d, carKey: car.key };
+        setBasket(earlier);
+        say({ text: `تمام، ${ar(segs.length)} قطع: ${segs.map((x) => x.part).join('، ')}.` });
+        return advance(d, earlier);
+      }
+      let d = merge(emptyDraft(), p);
       if (car) d = { ...d, carKey: car.key };
       return advance(d);
     }
@@ -382,8 +408,13 @@ export default function Assistant() {
     case 'budget': chips = [...[500, 1000, 2000, 5000].map((n) => tap(`لحد ${money(n)} ج`, () => advance({ ...draft, budget: n, budgetAsked: true }))), tap('مفيش ميزانية', () => advance({ ...draft, budgetAsked: true }))]; break;
     case 'confirm': chips = [
       { label: busy ? 'بيتبعت…' : 'ابعت الطلب', fn: sendRequest },
+      tap('ضيف قطعة تانية', () => {
+        const nb = [...basket, draft];
+        setBasket(nb);
+        advance({ ...emptyDraft(), carKey: draft.carKey, urgency: draft.urgency }, nb);
+      }),
       tap('غيّر حاجة', () => { setStep('edit'); say({ text: 'تحب تغيّر إيه؟' }); }),
-      tap('إلغاء', () => { setDraft(emptyDraft()); setStep('menu'); say({ text: 'لغيت الطلب. أي خدمة تانية؟' }); }),
+      tap('إلغاء', () => { setDraft(emptyDraft()); setBasket([]); setStep('menu'); say({ text: 'لغيت الطلب. أي خدمة تانية؟' }); }),
     ]; break;
     case 'edit': chips = [
       tap('القطعة', () => advance({ ...draft, part: '' })),

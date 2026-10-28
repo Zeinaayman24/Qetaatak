@@ -99,3 +99,6 @@ Each complaint is one conversation (`reports` + `ticket_messages`).
 2. If it can't, or the customer asks for a person, it calls `escalate_ticket` → status `open`, and staff are notified.
 3. An agent clicks **استلم المحادثة** in the management site (`take_ticket`) → status `in_progress`. The customer sees the agent join and keeps writing in the same chat.
 4. The agent ends it with **إنهاء المحادثة** (`close_ticket`) → status `resolved`, and the customer's chat closes. The customer can also mark it solved (`customer_resolve_ticket`).
+
+## Several parts in one request
+A request can hold several parts (a basket). Each part is its own row in `requests` (own quotes, chosen shop, tracking, rating and commission); parts sent together share `batch_id`. Shops quote the parts they have; the customer picks the best offer per part, or takes "everything from one shop" when a shop quoted all of them, and confirms all choices at once with `choose_quotes`. Shops get one alert per batch.

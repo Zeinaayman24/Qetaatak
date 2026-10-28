@@ -68,12 +68,12 @@ function Shell({ me }: { me: Profile }) {
           <aside className="sidebar">
             <div className="brand"><span className="logo">قطع<b>تك</b></span><span className="tag">الإدارة</span></div>
             <nav>
-              <Nav to="/" icon="▦" label="لوحة التحكم" end />
-              <Nav to="/tickets" icon="✉" label="خدمة العملاء" badge={openTickets} />
-              <Nav to="/customers" icon="☺" label="العملاء" />
-              <Nav to="/shops" icon="⌂" label="المحلات" badge={pendingShops} />
-              <Nav to="/orders" icon="☰" label="الطلبات" />
-              {me.is_admin ? <Nav to="/staff" icon="★" label="فريق العمل" /> : null}
+              <Nav to="/" icon="grid" label="لوحة التحكم" end />
+              <Nav to="/tickets" icon="chat" label="خدمة العملاء" badge={openTickets} />
+              <Nav to="/customers" icon="users" label="العملاء" />
+              <Nav to="/shops" icon="store" label="المحلات" badge={pendingShops} />
+              <Nav to="/orders" icon="receipt" label="الطلبات" />
+              {me.is_admin ? <Nav to="/staff" icon="shield" label="فريق العمل" /> : null}
             </nav>
             <div className="me">
               <div>
@@ -107,10 +107,27 @@ function Shell({ me }: { me: Profile }) {
 function Nav({ to, icon, label, badge, end }: { to: string; icon: string; label: string; badge?: number; end?: boolean }) {
   return (
     <NavLink to={to} end={end} className={({ isActive }) => 'nav' + (isActive ? ' active' : '')}>
-      <span className="nav-icon" aria-hidden>{icon}</span>
+      <span className="nav-icon" aria-hidden><Glyph name={icon} /></span>
       <span>{label}</span>
       {badge ? <span className="badge">{badge}</span> : null}
     </NavLink>
+  );
+}
+
+/** Line icons for the sidebar (24px grid, 1.8 stroke). */
+const GLYPHS: Record<string, string> = {
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  chat: 'M4 5h16v11H9l-5 4z M8 9.5h8 M8 12.5h5',
+  users: 'M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5 M16 4.3a3.5 3.5 0 0 1 0 6.4 M18 15.3c1.7.6 3 2 3.5 4.7',
+  store: 'M4 9l1.5-5h13L20 9 M4 9h16v2a2.7 2.7 0 0 1-5.3 0 2.7 2.7 0 0 1-5.4 0A2.7 2.7 0 0 1 4 11z M5 13v7h14v-7 M10 20v-4h4v4',
+  receipt: 'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6 M9 12h6 M9 16h3',
+  shield: 'M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z M9 12l2 2 4-4',
+};
+export function Glyph({ name }: { name: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d={GLYPHS[name] ?? ''} />
+    </svg>
   );
 }
 

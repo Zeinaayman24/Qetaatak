@@ -22,6 +22,7 @@ export type Request = {
   wanted_condition: string; side: string; urgency: string; budget: number | null; area: string; notes: string; photo_path: string | null;
   status: 'open' | 'chosen' | 'done' | 'cancelled'; chosen_quote_id: string | null; delivery_mode: string | null; order_status: string | null;
   rating: number | null; review: string; created_at: string; chosen_at: string | null; done_at: string | null;
+  batch_id: string | null; qty: number;
 };
 export type Quote = { id: string; request_id: string; shop_id: string; price: number; condition: string; warranty_days: number; created_at: string };
 export type Ticket = {
@@ -119,3 +120,10 @@ export async function loadAll() {
 }
 export type All = Awaited<ReturnType<typeof loadAll>>;
 export const ALL_TABLES = ['profiles', 'shops', 'requests', 'quotes', 'reports'];
+
+/** Where a part sits in a multi-part request: "1 of 3", with the batch's first order number. */
+export function batchOf(requests: Request[], r: Request) {
+  if (!r.batch_id) return null;
+  const parts = requests.filter((x) => x.batch_id === r.batch_id).sort((a, b) => a.num - b.num);
+  return { parts, index: parts.findIndex((x) => x.id === r.id) + 1, first: parts[0] };
+}

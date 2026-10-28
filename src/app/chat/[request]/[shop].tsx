@@ -91,7 +91,7 @@ export default function Chat() {
             );
           })}
         </View>
-      ) : <Empty icon="💬" text={iAmShop ? 'اسأل العميل عن أي تفاصيل محتاجها.' : 'اسأل المحل عن حالة القطعة أو اطلب صور أكتر.'} />}
+      ) : <Empty icon="chatbubbles-outline" text={iAmShop ? 'اسأل العميل عن أي تفاصيل محتاجها.' : 'اسأل المحل عن حالة القطعة أو اطلب صور أكتر.'} />}
       {profile?.is_shop && !iAmShop ? <Muted center>المحادثة دي مش بتاعتك.</Muted> : null}
     </Screen>
   );

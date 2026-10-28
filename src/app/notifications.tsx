@@ -47,7 +47,7 @@ export default function Notifications() {
           <Btn kind="link" title="امسح الكل" style={{ alignSelf: 'center', marginTop: 12 }}
             onPress={async () => { await supabase.from('notifications').delete().eq('user_id', uid!); }} />
         </View>
-      ) : <Empty icon="🔔" text="مفيش إشعارات لسه." />}
+      ) : <Empty icon="notifications-outline" text="مفيش إشعارات لسه." />}
     </Screen>
   );
 }

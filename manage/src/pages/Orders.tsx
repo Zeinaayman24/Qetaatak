@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
-import { ORDER_STATUS, REQUEST_STATUS, URGENCY, date, memberId, money, orderId } from '../lib';
+import { ORDER_STATUS, REQUEST_STATUS, URGENCY, date, batchOf, memberId, money, orderId } from '../lib';
 
 export default function Orders() {
   const { all } = useData();
@@ -29,7 +29,7 @@ export default function Orders() {
               const chosen = qs.find((x) => x.id === r.chosen_quote_id);
               return (
                 <tr key={r.id} onClick={() => nav(`/orders/${r.id}`)}>
-                  <td className="mono strong">{orderId(r.num)}</td>
+                  <td><span className="mono strong">{orderId(r.num)}</span>{(() => { const b = batchOf(all.requests, r); return b ? <div><span className="batch">قطعة {b.index} من {b.parts.length}</span></div> : null; })()}</td>
                   <td>{r.part}{r.urgency !== 'normal' ? <div><Pill tone="wait">{URGENCY[r.urgency]}</Pill></div> : null}</td>
                   <td className="small">{r.car_make} {r.car_model} {r.car_year}</td>
                   <td>{c?.full_name}<div className="mono small muted">{memberId(c)}</div></td>

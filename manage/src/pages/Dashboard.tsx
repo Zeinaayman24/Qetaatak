@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
-import { CATEGORY, PRIORITY, REQUEST_STATUS, TICKET_STATUS, ago, memberId, money, needsPeople, orderId, ticketId } from '../lib';
+import { CATEGORY, PRIORITY, REQUEST_STATUS, TICKET_STATUS, ago, batchOf, memberId, money, needsPeople, orderId, ticketId } from '../lib';
 
 export default function Dashboard() {
   const { all, me } = useData();
@@ -80,7 +80,7 @@ export default function Dashboard() {
           <tbody>
             {all.requests.slice(0, 8).map((r) => (
               <tr key={r.id}>
-                <td><Link to={`/orders/${r.id}`} className="mono">{orderId(r.num)}</Link></td>
+                <td><Link to={`/orders/${r.id}`} className="mono">{orderId(r.num)}</Link>{(() => { const b = batchOf(all.requests, r); return b ? <div><span className="batch">قطعة {b.index} من {b.parts.length}</span></div> : null; })()}</td>
                 <td>{r.part}<div className="muted small">{r.car_make} {r.car_model} {r.car_year}</div></td>
                 <td>{all.byId[r.customer_id]?.full_name}<div className="muted small mono">{memberId(all.byId[r.customer_id])}</div></td>
                 <td>{all.quotes.filter((q) => q.request_id === r.id).length}</td>

@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { Field, Page, Pill, useData } from '../App';
-import { CATEGORY, CONDITION, ORDER_STATUS, REQUEST_STATUS, SIDE, TICKET_STATUS, URGENCY, WANTED, dateTime, memberId, money, must, orderId, photoUrl, supabase, ticketId, useLive, type Message } from '../lib';
+import { CATEGORY, CONDITION, ORDER_STATUS, REQUEST_STATUS, SIDE, TICKET_STATUS, URGENCY, WANTED, batchOf, dateTime, memberId, money, must, orderId, photoUrl, supabase, ticketId, useLive, type Message } from '../lib';
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -20,7 +20,17 @@ export default function OrderDetail() {
         <section className="panel">
           <h2>الطلب</h2>
           <div className="fields">
-            <Field label="القطعة">{r.part}</Field>
+            <Field label="القطعة">{r.part}{r.qty > 1 ? ` × ${r.qty}` : ''}</Field>
+            {(() => {
+              const b = batchOf(all.requests, r);
+              return b ? (
+                <Field label="نفس الطلب">
+                  <div className="tags">{b.parts.map((x, i) => x.id === r.id
+                    ? <span key={x.id} className="pill dark">{i + 1}. {x.part}</span>
+                    : <Link key={x.id} className="pill" to={`/orders/${x.id}`}>{i + 1}. {x.part}</Link>)}</div>
+                </Field>
+              ) : null;
+            })()}
             <Field label="العربية">{r.car_make} {r.car_model} {r.car_year}{r.vin ? <div className="mono small">VIN {r.vin}</div> : null}</Field>
             <Field label="عايزها">{WANTED[r.wanted_condition]}</Field>
             <Field label="الجهة">{SIDE[r.side]}</Field>
