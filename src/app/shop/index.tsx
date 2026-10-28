@@ -1,7 +1,7 @@
 import { Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { AppHeader } from '@/components/AppHeader';
+import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { shopPill, shopState, type ShopState } from '@/components/status';
 import { Btn, Empty, ListRow, Loading, Muted, Notice, Photo, Row, Screen, Seg, Stats, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -16,6 +16,7 @@ export default function ShopInbox() {
   const { ready, session, profile, shop, shopPrivate } = useAuth();
   const [tab, setTab] = useState<Tab>('open');
   const uid = session?.user.id;
+  useEffect(() => { rememberRole('shop'); }, []);
 
   const { data, loading } = useLive(async () => {
     if (!uid) return { reqs: [] as Request[], mine: [] as Quote[], declined: new Set<string>() };
@@ -27,7 +28,7 @@ export default function ShopInbox() {
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && (!shop || !shop.governorate)) return <Redirect href="/shop-setup" />;
-  if (!profile || !shop) return <Screen header={<AppHeader role="shop" />}><Loading /></Screen>;
+  if (!profile || !shop) return <Screen><Loading /></Screen>;
 
   const rows = (data?.reqs ?? [])
     .filter((r) => r.customer_id !== uid || profile.is_admin)
@@ -42,13 +43,12 @@ export default function ShopInbox() {
   const waiting = rows.filter((x) => x.st === 'open').length;
 
   return (
-    <Screen header={<AppHeader role="shop" />}>
+    <Screen nav={<BottomNav role="shop" />}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
           <Muted size={14}>{shop.area}، {shop.governorate} · {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</Muted>
           <T w="bold" size={26} style={{ lineHeight: 36 }}>{shopPrivate?.name}</T>
         </View>
-        <Btn kind="link" title="تعديل" onPress={() => router.push('/shop-setup')} />
       </Row>
       {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
       {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}

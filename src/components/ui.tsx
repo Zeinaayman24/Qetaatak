@@ -4,6 +4,8 @@ import {
   type StyleProp, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { colors, fonts, radius } from '@/lib/theme';
 
 /* ---------------------------------------------------------------- text */
@@ -30,25 +32,37 @@ export const Title = ({ children, sub }: { children: ReactNode; sub?: ReactNode 
 );
 
 /* ---------------------------------------------------------------- layout */
-/** A screen: header on top, scrolling content, and an optional action bar pinned to the bottom. */
-export function Screen({ children, header, footer }: { children: ReactNode; header?: ReactNode; footer?: ReactNode }) {
+/** A screen: optional header, scrolling content, and either a pinned action bar (`footer`) or the bottom tab bar (`nav`). */
+export function Screen({ children, header, footer, nav }: { children: ReactNode; header?: ReactNode; footer?: ReactNode; nav?: ReactNode }) {
   const insets = useSafeAreaInsets();
+  const bottomBar = footer ?? nav;
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
-      <View style={{ paddingTop: insets.top, backgroundColor: colors.ground, borderBottomWidth: 1, borderColor: colors.line }}>
-        <View style={s.column}>{header}</View>
+      <View style={[{ paddingTop: insets.top, backgroundColor: colors.ground }, header ? { borderBottomWidth: 1, borderColor: colors.line } : null]}>
+        {header ? <View style={s.column}>{header}</View> : null}
       </View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={[s.column, s.body, { paddingBottom: footer ? 24 : insets.bottom + 40 }]}>{children}</View>
+        <View style={[s.column, s.body, { paddingBottom: bottomBar ? 28 : insets.bottom + 40 }]}>{children}</View>
       </ScrollView>
       {footer ? (
         <View style={{ borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.ground, paddingBottom: insets.bottom + 12, paddingTop: 12 }}>
           <View style={[s.column, { gap: 8 }]}>{footer}</View>
         </View>
+      ) : nav ? (
+        <View style={{ borderTopWidth: 1, borderColor: colors.line, backgroundColor: colors.ground, paddingBottom: insets.bottom }}>
+          <View style={s.column}>{nav}</View>
+        </View>
       ) : null}
-      <ToastHost bottom={footer ? 96 : 16} />
+      <ToastHost bottom={bottomBar ? 96 : 16} />
     </View>
   );
+}
+
+type IconSet = 'ion' | 'mci';
+/** Icons: Ionicons for interface, MaterialCommunityIcons for car parts. */
+export function Icon({ name, size = 22, color = colors.ink, set = 'ion' }: { name: string; size?: number; color?: string; set?: IconSet }) {
+  const C: any = set === 'mci' ? MaterialCommunityIcons : Ionicons;
+  return <C name={name} size={size} color={color} />;
 }
 
 export function Row({ children, style, gap = 10 }: { children: ReactNode; style?: StyleProp<ViewStyle>; gap?: number }) {
@@ -93,7 +107,7 @@ export function ListRow({ title, subtitle, meta, leading, trailing, onPress, las
         {meta ? (typeof meta === 'string' ? <Muted size={12} style={{ color: colors.faint }}>{meta}</Muted> : meta) : null}
       </View>
       {trailing}
-      {onPress ? <T color={colors.faint} size={18}>‹</T> : null}
+      {onPress ? <Icon name="chevron-back" size={16} color={colors.faint} /> : null}
     </View>
   );
   if (!onPress) return inner;
@@ -104,7 +118,7 @@ export function BackBar({ title, onBack }: { title: string; onBack: () => void }
   return (
     <Row style={{ marginBottom: 4 }}>
       <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="رجوع" hitSlop={10} style={s.back}>
-        <T size={20} w="semibold">→</T>
+        <Icon name="chevron-forward" size={22} />
       </Pressable>
       <T w="bold" size={22} style={{ flex: 1 }} numberOfLines={1}>{title}</T>
     </Row>
@@ -253,7 +267,7 @@ export function Stats({ items }: { items: [string, string][] }) {
 
 export function Photo({ uri, size = 72 }: { uri?: string | null; size?: number }) {
   const [big, setBig] = useState(false);
-  if (!uri) return <View style={[s.photo, { width: size, height: size }]}><T color={colors.faint} size={Math.round(size / 2.6)}>⚙︎</T></View>;
+  if (!uri) return <View style={[s.photo, { width: size, height: size }]}><Icon set="mci" name="car-wrench" size={Math.round(size / 2.4)} color={colors.faint} /></View>;
   return (
     <>
       <Pressable onPress={() => setBig(true)} accessibilityRole="imagebutton" accessibilityLabel="كبّر الصورة">
@@ -272,7 +286,7 @@ export function PhotoPicker({ uri, onPick, hint }: { uri: string | null; onPick:
   return (
     <Pressable onPress={onPick} accessibilityRole="button" style={s.upload}>
       {uri ? <Image source={{ uri }} style={[s.photo, { width: 56, height: 56 }]} /> : (
-        <View style={[s.photo, { width: 56, height: 56, backgroundColor: colors.ground }]}><T size={22}>📷</T></View>
+        <View style={[s.photo, { width: 56, height: 56, backgroundColor: colors.ground }]}><Icon name="camera-outline" size={24} /></View>
       )}
       <View style={{ flex: 1 }}>
         <T w="semibold" size={14}>{uri ? 'الصورة اتضافت' : 'أضف صورة'}</T>

@@ -1,7 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { AppHeader } from '@/components/AppHeader';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Row, Screen, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -33,7 +32,7 @@ export default function ShopRequest() {
   }, ['requests', 'quotes'], [id, uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  const header = <AppHeader role="shop" />;
+  const header = undefined;
   const back = () => router.replace('/shop');
   if (loading && !data) return <Screen header={header}><Loading /></Screen>;
   const r = data?.req;

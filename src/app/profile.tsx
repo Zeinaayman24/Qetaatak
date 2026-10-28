@@ -1,7 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { AppHeader } from '@/components/AppHeader';
 import { BackBar, Btn, ErrorText, Field, Loading, Muted, Row, Screen, Section, Select, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { COUNTRIES, GOVERNORATES, MAKES, YEARS, ar, friendlyError, toLatin, validPhone, validPostal } from '@/lib/data';
@@ -31,7 +30,7 @@ export default function ProfileScreen() {
   }, [profile?.id]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  if (!profile) return <Screen header={<AppHeader />}><Loading /></Screen>;
+  if (!profile) return <Screen><Loading /></Screen>;
   const editing = profile.is_customer;
   const email = session?.user.email ?? '';
 
@@ -58,7 +57,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen header={<AppHeader />} footer={<><ErrorText text={err} /><Btn title="حفظ" onPress={save} loading={busy} /></>}>
+    <Screen footer={<><ErrorText text={err} /><Btn title="حفظ" onPress={save} loading={busy} /></>}>
       <BackBar title={editing ? 'حسابي' : 'كمّل بياناتك'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       <Muted size={14}>بنطلب البيانات دي عشان نحافظ على أمان المنصة. عنوانك ورقمك بيظهروا بس للمحل اللي هتشتري منه.</Muted>
 

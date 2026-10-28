@@ -1,0 +1,89 @@
+import { Redirect, router } from 'expo-router';
+import { Pressable, View } from 'react-native';
+import { BottomNav, currentRole, rememberRole } from '@/components/AppHeader';
+import { Icon, Loading, Muted, Pill, Row, Screen, T } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import { SHOP_TYPES, addressLine, ar } from '@/lib/data';
+import { colors } from '@/lib/theme';
+
+function Item({ icon, title, sub, onPress, danger }: { icon: string; title: string; sub?: string; onPress: () => void; danger?: boolean }) {
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 }, pressed && { opacity: 0.6 }]}>
+      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: danger ? '#FCEDED' : colors.card, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={20} color={danger ? colors.bad : colors.ink} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <T w="semibold" color={danger ? colors.bad : colors.ink}>{title}</T>
+        {sub ? <Muted size={12.5} numberOfLines={1}>{sub}</Muted> : null}
+      </View>
+      {!danger ? <Icon name="chevron-back" size={16} color={colors.faint} /> : null}
+    </Pressable>
+  );
+}
+
+const Group = ({ children }: { children: React.ReactNode }) => (
+  <View style={{ backgroundColor: colors.ground, borderWidth: 1, borderColor: colors.line, borderRadius: 18, paddingHorizontal: 14 }}>{children}</View>
+);
+
+export default function Account() {
+  const { ready, session, profile, shop, shopPrivate, signOut } = useAuth();
+  if (ready && !session) return <Redirect href="/login" />;
+  if (!profile) return <Screen><Loading /></Screen>;
+  const role = currentRole(profile);
+  const switchTo = (r: 'customer' | 'shop') => { rememberRole(r); router.replace(r === 'customer' ? '/customer' : '/shop'); };
+
+  return (
+    <Screen nav={<BottomNav role={role} />}>
+      <Row gap={14}>
+        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+          <T w="bold" size={24} color="#fff">{(profile.full_name || '?').slice(0, 1)}</T>
+        </View>
+        <View style={{ flex: 1 }}>
+          <T w="bold" size={20}>{role === 'shop' ? shopPrivate?.name : profile.full_name}</T>
+          <Muted size={13} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{session?.user.email}</Muted>
+        </View>
+      </Row>
+
+      {role === 'customer' ? (
+        <Group>
+          <Item icon="person-outline" title="بياناتي وعنواني" sub={addressLine(profile)} onPress={() => router.push('/profile')} />
+          <View style={{ height: 1, backgroundColor: colors.line }} />
+          <Item icon="car-sport-outline" title="عربيتي" sub={`${profile.car_make ?? ''} ${profile.car_model ?? ''} ${ar(profile.car_year ?? '')}`} onPress={() => router.push('/profile')} />
+        </Group>
+      ) : (
+        <Group>
+          <Item icon="storefront-outline" title="بيانات المحل" sub={shop ? `${shop.area}، ${shop.governorate} · ${SHOP_TYPES[shop.shop_type]}` : ''} onPress={() => router.push('/shop-setup')} />
+          {shop ? (
+            <Row style={{ paddingBottom: 14 }} gap={8}>
+              <Pill label={shop.status === 'approved' ? 'المحل شغال' : shop.status === 'pending' ? 'تحت المراجعة' : 'موقوف'} tone={shop.status === 'approved' ? 'good' : shop.status === 'pending' ? 'wait' : 'plain'} />
+              <Pill label={shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'} />
+            </Row>
+          ) : null}
+        </Group>
+      )}
+
+      <Group>
+        {role === 'customer' ? (
+          profile.is_shop
+            ? <Item icon="swap-horizontal-outline" title="اتحوّل لواجهة المحل" sub={shopPrivate?.name} onPress={() => switchTo('shop')} />
+            : <Item icon="storefront-outline" title="عندك محل قطع غيار؟" sub="سجّله واستقبل طلبات" onPress={() => { rememberRole('shop'); router.push('/shop-setup'); }} />
+        ) : (
+          profile.is_customer
+            ? <Item icon="swap-horizontal-outline" title="اتحوّل لواجهة العميل" sub="اطلب قطع لعربيتك" onPress={() => switchTo('customer')} />
+            : <Item icon="car-sport-outline" title="عايز تطلب قطعة لعربيتك؟" sub="استخدم قطعتك كعميل" onPress={() => { rememberRole('customer'); router.push('/profile'); }} />
+        )}
+        {profile.is_admin ? (
+          <>
+            <View style={{ height: 1, backgroundColor: colors.line }} />
+            <Item icon="shield-checkmark-outline" title="لوحة الإدارة" sub="الموافقة على المحلات والأرقام" onPress={() => router.push('/admin')} />
+          </>
+        ) : null}
+      </Group>
+
+      <Group>
+        <Item icon="log-out-outline" title="تسجيل خروج" onPress={signOut} danger />
+      </Group>
+      <Muted center size={12}>قطعتك · نسخة تجريبية</Muted>
+    </Screen>
+  );
+}

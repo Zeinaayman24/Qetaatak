@@ -1,7 +1,6 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { AppHeader } from '@/components/AppHeader';
 import { BackBar, Btn, Card, CopyBox, Empty, Labeled, Lines, ListRow, Loading, Muted, Photo, Row, Screen, Section, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { CONDITIONS, DELIVERY_FEE, WANTED, addressLine, ago, ar, friendlyError, money, reqNo, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
@@ -31,8 +30,8 @@ export default function CustomerRequest() {
   }, ['requests', 'quotes'], [id]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  const back = () => (picked ? setPicked(null) : router.replace('/customer'));
-  const header = <AppHeader role="customer" />;
+  const back = () => (picked ? setPicked(null) : router.replace('/customer/requests'));
+  const header = undefined;
   if (loading && !data) return <Screen header={header}><Loading /></Screen>;
   const r = data?.req;
   if (!r) return <Screen header={header}><BackBar title="الطلب" onBack={back} /><Empty text="الطلب ده مش موجود." /></Screen>;

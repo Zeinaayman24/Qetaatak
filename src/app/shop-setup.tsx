@@ -1,7 +1,6 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { AppHeader } from '@/components/AppHeader';
 import { BackBar, Btn, Chips, ErrorText, Field, Labeled, Loading, Muted, Notice, Row, Screen, Section, Seg, Select, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { GOVERNORATES, MAKES, SHOP_TYPES, SPECIALTIES, friendlyError, toLatin, validPhone, validPostal } from '@/lib/data';
@@ -36,7 +35,7 @@ export default function ShopSetup() {
   }, [shop?.id, shopPrivate?.id, profile?.id]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  if (!profile) return <Screen header={<AppHeader role="shop" />}><Loading /></Screen>;
+  if (!profile) return <Screen><Loading /></Screen>;
 
   async function save() {
     setErr(null);
@@ -75,7 +74,7 @@ export default function ShopSetup() {
   }
 
   return (
-    <Screen header={<AppHeader role="shop" />} footer={<><ErrorText text={err} /><Btn title={shop ? 'حفظ' : 'ابعت المحل للمراجعة'} onPress={save} loading={busy} /></>}>
+    <Screen footer={<><ErrorText text={err} /><Btn title={shop ? 'حفظ' : 'ابعت المحل للمراجعة'} onPress={save} loading={busy} /></>}>
       <BackBar title={shop ? 'بيانات المحل' : 'سجّل محلك'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       {shop?.status === 'pending' ? <Notice>محلك تحت المراجعة. تقدر تعدّل البيانات لحد ما نوافق.</Notice>
         : !shop ? <Muted size={14}>بنراجع كل محل قبل ما يبدأ يستقبل طلبات. اسم المحل وأرقامه وعنوانه بالتفصيل بيظهروا للعميل بس بعد ما يختار عرضك.</Muted> : null}

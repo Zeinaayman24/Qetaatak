@@ -1,6 +1,5 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { AppHeader } from '@/components/AppHeader';
 import { BackBar, Btn, Chips, ErrorText, Field, Labeled, Loading, Muted, PhotoPicker, Screen, Seg, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { COMMON_PARTS, ar, friendlyError, reqNo } from '@/lib/data';
@@ -9,7 +8,8 @@ import { supabase } from '@/lib/supabase';
 
 export default function NewRequest() {
   const { ready, session, profile } = useAuth();
-  const [part, setPart] = useState('');
+  const params = useLocalSearchParams<{ part?: string }>();
+  const [part, setPart] = useState(typeof params.part === 'string' ? params.part : '');
   const [cond, setCond] = useState<'used' | 'new' | 'any'>('used');
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export default function NewRequest() {
   const [err, setErr] = useState<string | null>(null);
 
   if (ready && !session) return <Redirect href="/login" />;
-  if (!profile) return <Screen header={<AppHeader role="customer" />}><Loading /></Screen>;
+  if (!profile) return <Screen><Loading /></Screen>;
 
   async function choosePhoto() {
     try { const uri = await pickPhoto(); if (uri) setPhoto(uri); }
@@ -42,8 +42,8 @@ export default function NewRequest() {
   }
 
   return (
-    <Screen header={<AppHeader role="customer" />} footer={<><ErrorText text={err} /><Btn title="ابعت الطلب للمحلات" onPress={send} loading={busy} /></>}>
-      <BackBar title="طلب جديد" onBack={() => router.replace('/customer')} />
+    <Screen footer={<><ErrorText text={err} /><Btn title="ابعت الطلب للمحلات" onPress={send} loading={busy} /></>}>
+      <BackBar title="طلب جديد" onBack={() => (router.canGoBack() ? router.back() : router.replace('/customer'))} />
       <Muted size={14}>{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')} · {profile.area}</Muted>
       <Field big value={part} onChangeText={setPart} placeholder="اسم القطعة" />
       <Chips options={COMMON_PARTS.map((p) => ({ v: p, label: p }))} selected={[part]} onPick={setPart} />

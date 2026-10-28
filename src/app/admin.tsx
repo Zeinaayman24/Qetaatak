@@ -1,9 +1,9 @@
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { AppHeader } from '@/components/AppHeader';
+import { router } from 'expo-router';
 import { customerPill } from '@/components/status';
-import { Btn, Card, Empty, Lines, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, Empty, Lines, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { COMMISSION, SHOP_TYPES, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -29,7 +29,7 @@ export default function Admin() {
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && !profile.is_admin) return <Redirect href="/" />;
-  if (loading && !data) return <Screen header={<AppHeader role="admin" />}><Loading /></Screen>;
+  if (loading && !data) return <Screen><Loading /></Screen>;
   const d = data!;
   const sold = d.reqs.filter((r) => r.status === 'chosen' || r.status === 'done');
   const gmv = sold.reduce((s, r) => s + (d.quotes.find((q) => q.id === r.chosen_quote_id)?.price ?? 0), 0);
@@ -44,8 +44,8 @@ export default function Admin() {
   const order = { pending: 0, approved: 1, suspended: 2 } as const;
   const shops = [...d.shops].sort((a, b) => order[a.status] - order[b.status]);
   return (
-    <Screen header={<AppHeader role="admin" />}>
-      <T w="bold" size={26} style={{ lineHeight: 36 }}>لوحة الإدارة</T>
+    <Screen>
+      <BackBar title="لوحة الإدارة" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
       <Stats items={[[ar(d.reqs.length), 'طلبات'], [ar(sold.length), 'مبيعات'], [money(gmv * COMMISSION), 'عمولتك (ج.م)']]} />
       <Stats items={[[pct(found, d.reqs.length), 'لقت عرض'], [pct(sold.length, found), 'نسبة الإغلاق'], [money(gmv), 'المبيعات (ج.م)']]} />
 
