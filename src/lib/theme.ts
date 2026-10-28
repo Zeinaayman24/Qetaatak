@@ -1,19 +1,21 @@
+// Clean and minimal: white ground, near-black ink, one warm accent used sparingly.
 export const colors = {
-  ground: '#E9EDF1',
-  surface: '#F5F7F9',
-  card: '#FFFFFF',
-  ink: '#14202C',
-  muted: '#5A6875',
-  line: '#D5DCE3',
-  brand: '#1D3550',
-  brandInk: '#F3F6F9',
-  accent: '#F0A12C',
-  accentInk: '#1C1305',
-  accentSoft: '#FCEBCB',
-  good: '#1B7F52',
-  goodSoft: '#D8EFE3',
-  bad: '#B4421A',
-  soft: '#E3EAF1',
+  ground: '#FFFFFF',
+  surface: '#FFFFFF',
+  card: '#F5F5F6',      // filled blocks (no borders)
+  soft: '#EFEFF1',      // inputs, chips, inner boxes
+  ink: '#111111',
+  muted: '#6E6E73',
+  faint: '#A1A1A6',
+  line: '#ECECEE',      // hairline separators
+  brand: '#111111',     // primary buttons, selected chips
+  brandInk: '#FFFFFF',
+  accent: '#FF9F1C',    // logo mark, "new" badges, stars
+  accentInk: '#111111',
+  accentSoft: '#FFF3E0',
+  good: '#12924F',
+  goodSoft: '#E6F6EC',
+  bad: '#D14343',
   plate: '#2A58A3',
 };
 
@@ -25,4 +27,4 @@ export const fonts = {
   display: 'ReemKufi_700Bold',
 };
 
-export const radius = { sm: 10, md: 12, lg: 16, pill: 999 };
+export const radius = { sm: 10, md: 14, lg: 18, pill: 999 };

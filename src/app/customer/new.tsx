@@ -1,7 +1,7 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { AppHeader } from '@/components/AppHeader';
-import { BackBar, Btn, Chips, ErrorText, Field, Labeled, Loading, Muted, PhotoPicker, Screen, Seg, T, toast } from '@/components/ui';
+import { BackBar, Btn, Chips, ErrorText, Field, Labeled, Loading, Muted, PhotoPicker, Screen, Seg, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { COMMON_PARTS, ar, friendlyError, reqNo } from '@/lib/data';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
@@ -42,20 +42,16 @@ export default function NewRequest() {
   }
 
   return (
-    <Screen header={<AppHeader role="customer" />}>
-      <BackBar title="طلب قطعة جديدة" onBack={() => router.replace('/customer')} />
-      <Muted>للعربية: <T w="bold" size={13}>{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')}</T></Muted>
-      <Field label="اسم القطعة" value={part} onChangeText={setPart} placeholder="مثلاً: فانوس أمامي يمين" />
+    <Screen header={<AppHeader role="customer" />} footer={<><ErrorText text={err} /><Btn title="ابعت الطلب للمحلات" onPress={send} loading={busy} /></>}>
+      <BackBar title="طلب جديد" onBack={() => router.replace('/customer')} />
+      <Muted size={14}>{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')} · {profile.area}</Muted>
+      <Field big value={part} onChangeText={setPart} placeholder="اسم القطعة" />
       <Chips options={COMMON_PARTS.map((p) => ({ v: p, label: p }))} selected={[part]} onPick={setPart} />
-      <Labeled label="صورة القطعة (اختياري)">
-        <PhotoPicker uri={photo} onPick={choosePhoto} hint="صوّر القطعة القديمة أو مكانها في العربية. الصورة بتخلي المحل يعرفها أسرع." />
-      </Labeled>
       <Labeled label="عايزها">
         <Seg options={[{ v: 'used', label: 'مستعمل' }, { v: 'new', label: 'جديد' }, { v: 'any', label: 'أي حاجة' }]} value={cond} onPick={setCond} />
       </Labeled>
-      <Field label="ملاحظات للمحل (اختياري)" value={notes} onChangeText={setNotes} multiline placeholder="مثلاً: الجنب اليمين، لون فضي، فتيس أوتوماتيك" />
-      <ErrorText text={err} />
-      <Btn title={busy ? 'بيتبعت…' : 'ابعت الطلب'} onPress={send} loading={busy} />
+      <PhotoPicker uri={photo} onPick={choosePhoto} hint="صورة القطعة القديمة بتخلي المحل يعرفها أسرع" />
+      <Field label="ملاحظات (اختياري)" value={notes} onChangeText={setNotes} multiline placeholder="مثلاً: الجنب اليمين، لون فضي" />
     </Screen>
   );
 }

@@ -32,12 +32,12 @@ export default function RootLayout() {
     }
   }, []);
 
-  if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.brand }} />;
+  if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.ground }} />;
 
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <View style={{ flex: 1, direction: 'rtl', backgroundColor: colors.ground }}>
           <Slot />
         </View>

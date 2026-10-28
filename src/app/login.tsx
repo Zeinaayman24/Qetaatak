@@ -2,7 +2,7 @@ import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
-import { Btn, Card, ErrorText, Field, Muted, Notice, Screen, Seg, Steps, T } from '@/components/ui';
+import { Btn, ErrorText, Field, Muted, Notice, Screen, Seg, Steps, T, Title } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { friendlyError } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
@@ -39,28 +39,22 @@ export default function Login() {
   }
 
   return (
-    <Screen header={<AppHeader />}>
-      <View style={{ gap: 4 }}>
-        <T w="bold" size={22}>أهلاً بيك في قطعتك</T>
-        <Muted size={14}>ابعت صورة القطعة، وخلال ساعة يوصلك أسعار من محلات وتشاليح موثوقة.</Muted>
-      </View>
+    <Screen header={<AppHeader />} footer={<Btn title={mode === 'signup' ? 'إنشاء حساب' : 'دخول'} onPress={submit} loading={busy} />}>
+      <Title sub="ابعت صورة القطعة، وخلال ساعة يوصلك أسعار من محلات وتشاليح موثوقة.">قطع غيار عربيتك{'\n'}بأحسن سعر</Title>
       {sent ? (
         <Notice>
           <T w="semibold">بعتنالك إيميل تأكيد على {email.trim()}</T>
           <T size={13}>افتح الرسالة واضغط على اللينك، وبعدها ارجع هنا وسجّل دخول.</T>
         </Notice>
       ) : null}
-      <Card>
-        <Seg options={[{ v: 'signup', label: 'حساب جديد' }, { v: 'signin', label: 'تسجيل دخول' }]} value={mode} onPick={(v) => { setMode(v); setErr(null); }} />
-        <Field label="الإيميل" value={email} onChangeText={setEmail} keyboardType="email-address" ltr placeholder="name@example.com" />
-        <Field label="كلمة السر" value={password} onChangeText={setPassword} secure ltr placeholder="٦ حروف أو أكتر" />
-        <ErrorText text={err} />
-        <Btn title={mode === 'signup' ? 'إنشاء حساب' : 'دخول'} onPress={submit} loading={busy} />
-      </Card>
-      <Card>
-        <T w="bold">إزاي بيشتغل</T>
-        <Steps items={['صاحب العربية بيبعت اسم القطعة وصورتها.', 'المحلات بتبعت أسعارها وصور القطعة والضمان.', 'العميل بيختار الأنسب ويستلم توصيل أو من المحل.']} />
-      </Card>
+      <Seg options={[{ v: 'signup', label: 'حساب جديد' }, { v: 'signin', label: 'عندي حساب' }]} value={mode} onPick={(v) => { setMode(v); setErr(null); }} />
+      <Field label="الإيميل" value={email} onChangeText={setEmail} keyboardType="email-address" ltr placeholder="name@example.com" />
+      <Field label="كلمة السر" value={password} onChangeText={setPassword} secure ltr placeholder="٦ حروف أو أكتر" />
+      <ErrorText text={err} />
+      <View style={{ gap: 14, marginTop: 8 }}>
+        <Muted size={13}>إزاي بيشتغل</Muted>
+        <Steps items={['ابعت اسم القطعة وصورتها.', 'المحلات بتبعتلك أسعارها وصور القطعة والضمان.', 'اختار الأنسب واستلم توصيل أو من المحل.']} />
+      </View>
     </Screen>
   );
 }

@@ -1,8 +1,8 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
-import { BackBar, Btn, Card, Empty, Labeled, Lines, Loading, Muted, Notice, Photo, Row, Screen, Seg, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, CopyBox, Empty, Labeled, Lines, ListRow, Loading, Muted, Photo, Row, Screen, Section, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { CONDITIONS, DELIVERY_FEE, WANTED, ago, ar, friendlyError, money, reqNo, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -26,7 +26,7 @@ export default function CustomerRequest() {
     const shops = Object.fromEntries(shopRows.map((s) => [s.id, s]));
     let chosenShop: ShopPrivate | null = null;
     const chosen = quotes.find((q) => q.id === req.chosen_quote_id);
-    if (chosen) chosenShop = (must(await supabase.from('shop_private').select('*').eq('id', chosen.shop_id).maybeSingle()) as ShopPrivate | null);
+    if (chosen) chosenShop = must(await supabase.from('shop_private').select('*').eq('id', chosen.shop_id).maybeSingle()) as ShopPrivate | null;
     return { req, quotes, shops, chosenShop, shopCount: shopRows.filter((s) => s.status === 'approved').length };
   }, ['requests', 'quotes'], [id]);
 
@@ -47,47 +47,44 @@ export default function CustomerRequest() {
   }
 
   const summary = (
-    <Card>
-      <Row style={{ alignItems: 'flex-start' }}>
-        <Photo uri={photoUrl(r.photo_path)} />
+    <View style={{ gap: 16 }}>
+      <Row style={{ alignItems: 'flex-start' }} gap={14}>
+        <Photo uri={photoUrl(r.photo_path)} size={64} />
         <View style={{ flex: 1 }}>
-          <T w="bold">{r.part}</T>
-          <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
-          <Muted>عايزها: {WANTED[r.wanted_condition]} · {r.area}</Muted>
+          <T w="bold" size={18}>{r.part}</T>
+          <Muted>{r.car_make} {r.car_model} {ar(r.car_year)} · {WANTED[r.wanted_condition]}</Muted>
+          {r.notes ? <Muted>«{r.notes}»</Muted> : null}
         </View>
       </Row>
-      {r.notes ? <View style={{ backgroundColor: colors.soft, borderRadius: 10, padding: 10 }}><T size={13}>{r.notes}</T></View> : null}
       <Track r={r} n={quotes.length} />
-    </Card>
+    </View>
   );
 
-  /* ---- choosing a quote ---- */
+  /* ---- confirm a chosen quote ---- */
   if (picked && r.status === 'open') {
     const shop = data!.shops[picked.shop_id];
     const total = picked.price + (mode === 'delivery' ? DELIVERY_FEE : 0);
     return (
-      <Screen header={header}>
+      <Screen header={header} footer={
+        <Btn title={'أكّد الطلب · ' + money(total) + ' ج.م'} loading={busy} onPress={async () => {
+          if (await rpc('choose_quote', { p_request: r.id, p_quote: picked.id, p_mode: mode }, 'تمام! طلبك اتأكد')) setPicked(null);
+        }} />
+      }>
         <BackBar title="تأكيد الطلب" onBack={back} />
-        <Card>
-          <Row style={{ alignItems: 'flex-start' }}>
-            <Photo uri={photoUrl(picked.photo_path)} />
-            <View style={{ flex: 1, gap: 4 }}>
-              <T w="bold">{r.part}</T>
-              <Muted>{CONDITIONS[picked.condition]} · ضمان {ar(picked.warranty_days)} يوم</Muted>
-              <Muted>محل في {shop?.area ?? '—'}</Muted>
-            </View>
-          </Row>
-        </Card>
+        <Row gap={14}>
+          <Photo uri={photoUrl(picked.photo_path)} size={64} />
+          <View style={{ flex: 1 }}>
+            <T w="bold" size={18}>{r.part}</T>
+            <Muted>{CONDITIONS[picked.condition]} · ضمان {ar(picked.warranty_days)} يوم · {shop?.area ?? ''}</Muted>
+          </View>
+        </Row>
         <Labeled label="هتستلمها إزاي؟">
-          <Seg options={[{ v: 'delivery', label: 'توصيل لحد البيت' }, { v: 'pickup', label: 'من المحل' }]} value={mode} onPick={setMode} />
+          <Seg options={[{ v: 'delivery', label: 'توصيل للبيت' }, { v: 'pickup', label: 'من المحل' }]} value={mode} onPick={setMode} />
         </Labeled>
         <Card>
           <Lines rows={[['سعر القطعة', money(picked.price) + ' ج.م'], ['التوصيل', mode === 'delivery' ? money(DELIVERY_FEE) + ' ج.م (تقريبي)' : 'مجاناً']]} total={['الإجمالي', money(total) + ' ج.م']} />
-          <Muted>الدفع كاش أو إنستاباي عند الاستلام. الدفع أونلاين جاي قريب.</Muted>
         </Card>
-        <Btn title="أكّد الطلب" loading={busy} onPress={async () => {
-          if (await rpc('choose_quote', { p_request: r.id, p_quote: picked.id, p_mode: mode }, 'تمام! طلبك اتأكد')) setPicked(null);
-        }} />
+        <Muted center>الدفع كاش أو إنستاباي عند الاستلام.</Muted>
       </Screen>
     );
   }
@@ -97,40 +94,42 @@ export default function CustomerRequest() {
     const q = quotes.find((x) => x.id === r.chosen_quote_id);
     const sp = data!.chosenShop;
     const shop = q ? data!.shops[q.shop_id] : undefined;
+    const footer = r.status === 'chosen'
+      ? <Btn title="استلمت القطعة" loading={busy} onPress={() => rpc('mark_received', { p_request: r.id }, 'تمام! قيّم المحل لو سمحت')} />
+      : undefined;
     return (
-      <Screen header={header}>
+      <Screen header={header} footer={footer}>
         <BackBar title={'طلب ' + reqNo(r.num)} onBack={back} />
         {summary}
-        <View style={{ alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.good, alignItems: 'center', justifyContent: 'center' }}><T color="#fff" size={30} w="bold">✓</T></View>
-          <T w="bold" size={19}>{r.status === 'done' ? 'الطلب اتسلّم' : 'طلبك اتأكد'}</T>
-          <Muted center>{r.delivery_mode === 'delivery' ? 'المحل هيكلمك ويبعتها مع مندوب. الدفع عند الاستلام.' : 'روح المحل وقول رقم الطلب ' + reqNo(r.num) + '. الدفع في المحل.'}</Muted>
+        <View style={{ alignItems: 'center', gap: 6, paddingVertical: 8 }}>
+          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.good, alignItems: 'center', justifyContent: 'center' }}><T color="#fff" size={26} w="bold">✓</T></View>
+          <T w="bold" size={20}>{r.status === 'done' ? 'الطلب اتسلّم' : 'طلبك اتأكد'}</T>
+          <Muted center size={14}>{r.delivery_mode === 'delivery' ? 'المحل هيكلمك ويبعتها مع مندوب. الدفع عند الاستلام.' : 'روح المحل وقول رقم الطلب ' + reqNo(r.num) + '.'}</Muted>
         </View>
         {q && sp ? (
           <Card>
-            <Muted>المحل</Muted>
-            <Row style={{ justifyContent: 'space-between' }}><T w="bold">{sp.name}</T><Muted>{shop?.area}</Muted></Row>
-            <View style={{ backgroundColor: colors.soft, borderRadius: 10, padding: 10 }}><T selectable style={{ writingDirection: 'ltr', textAlign: 'right' }}>{sp.phone}</T></View>
-            <Lines rows={[[r.part + ' · ' + CONDITIONS[q.condition], money(q.price) + ' ج.م'], ...(r.delivery_mode === 'delivery' ? [['التوصيل (تقريبي)', money(DELIVERY_FEE) + ' ج.م'] as [string, string]] : [])]}
+            <Row style={{ justifyContent: 'space-between' }}>
+              <View><Muted size={12}>المحل</Muted><T w="bold" size={17}>{sp.name}</T></View>
+              <Muted>{shop?.area}</Muted>
+            </Row>
+            <CopyBox text={sp.phone} />
+            <Lines rows={[[CONDITIONS[q.condition], money(q.price) + ' ج.م'], ...(r.delivery_mode === 'delivery' ? [['التوصيل (تقريبي)', money(DELIVERY_FEE) + ' ج.م'] as [string, string]] : [])]}
               total={['الإجمالي', money(q.price + (r.delivery_mode === 'delivery' ? DELIVERY_FEE : 0)) + ' ج.م']} />
             <Muted>ضمان {ar(q.warranty_days)} يوم: لو القطعة مركبتش، المحل يبدّلها.</Muted>
           </Card>
         ) : null}
-        {r.status === 'chosen' ? (
-          <Btn title="استلمت القطعة" loading={busy} onPress={() => rpc('mark_received', { p_request: r.id }, 'تمام! قيّم المحل لو سمحت')} />
-        ) : (
-          <Card style={{ alignItems: 'center' }}>
-            <T w="bold">القطعة ركبت تمام؟ قيّم المحل</T>
+        {r.status === 'done' ? (
+          <View style={{ alignItems: 'center', gap: 6 }}>
+            <T w="semibold">القطعة ركبت تمام؟ قيّم المحل</T>
             <Row gap={6}>
               {[1, 2, 3, 4, 5].map((n) => (
-                <Pressable key={n} onPress={() => rpc('rate_request', { p_request: r.id, p_rating: n }, 'شكراً على التقييم')} accessibilityLabel={ar(n) + ' نجوم'}>
-                  <T size={30} color={(r.rating ?? 0) >= n ? colors.accent : colors.line}>★</T>
+                <Pressable key={n} onPress={() => rpc('rate_request', { p_request: r.id, p_rating: n }, 'شكراً على التقييم')} accessibilityLabel={ar(n) + ' نجوم'} hitSlop={4}>
+                  <T size={34} color={(r.rating ?? 0) >= n ? colors.accent : colors.line}>★</T>
                 </Pressable>
               ))}
             </Row>
-            {r.rating ? <Muted>شكراً! تقييمك بيساعد غيرك يختار صح.</Muted> : null}
-          </Card>
-        )}
+          </View>
+        ) : null}
       </Screen>
     );
   }
@@ -143,25 +142,25 @@ export default function CustomerRequest() {
       {r.status === 'cancelled' ? <Empty text="الطلب ده اتلغى." /> : (
         <>
           {quotes.length === 0 ? (
-            <Notice>بعتنا طلبك لـ {ar(data!.shopCount)} محل. هنبلغك أول ما يوصل عرض.</Notice>
+            <View style={{ alignItems: 'center', gap: 10, paddingVertical: 28 }}>
+              <ActivityIndicator color={colors.ink} />
+              <T w="semibold" size={16}>بندوّر عند {ar(data!.shopCount)} محل</T>
+              <Muted center>هنبلغك أول ما يوصل عرض. ممكن تقفل الصفحة.</Muted>
+            </View>
           ) : (
-            <Row style={{ justifyContent: 'space-between' }}><T w="bold">العروض ({ar(quotes.length)})</T><Muted>الأرخص الأول</Muted></Row>
+            <Section title={'العروض (' + ar(quotes.length) + ')'} note="الأرخص الأول">
+              {quotes.map((q, i) => (
+                <ListRow key={q.id} last={i === quotes.length - 1}
+                  leading={<Photo uri={photoUrl(q.photo_path)} size={56} />}
+                  title={<T w="bold" size={22} style={{ lineHeight: 30 }}>{money(q.price)} <T size={13} color={colors.muted}>ج.م</T></T>}
+                  subtitle={CONDITIONS[q.condition] + ' · ضمان ' + ar(q.warranty_days) + ' يوم'}
+                  meta={'محل في ' + (data!.shops[q.shop_id]?.area ?? '—') + ' · ' + ago(q.created_at)}
+                  trailing={<Btn kind="small" title="اختار" onPress={() => { setMode('delivery'); setPicked(q); }} />} />
+              ))}
+              <Muted center size={12}>اسم المحل ورقمه بيظهروا بعد ما تختار.</Muted>
+            </Section>
           )}
-          {quotes.map((q) => (
-            <Card key={q.id}>
-              <Row style={{ alignItems: 'flex-start' }}>
-                <Photo uri={photoUrl(q.photo_path)} />
-                <View style={{ flex: 1, gap: 4 }}>
-                  <T w="bold" size={24}>{money(q.price)} <T size={13} color={colors.muted}>ج.م</T></T>
-                  <Muted>{CONDITIONS[q.condition]} · ضمان {ar(q.warranty_days)} يوم</Muted>
-                  <Muted size={12}>محل في {data!.shops[q.shop_id]?.area ?? '—'} · {ago(q.created_at)}</Muted>
-                </View>
-              </Row>
-              <Btn kind="dark" title="اختار العرض ده" onPress={() => { setMode('delivery'); setPicked(q); }} />
-            </Card>
-          ))}
-          {quotes.length ? <Muted center>اسم المحل ورقمه بيظهروا بعد ما تختار العرض.</Muted> : null}
-          <Btn kind="secondary" title="إلغاء الطلب" loading={busy} onPress={() => rpc('cancel_request', { p_request: r.id }, 'الطلب اتلغى')} />
+          <Btn kind="link" title="إلغاء الطلب" loading={busy} onPress={() => rpc('cancel_request', { p_request: r.id }, 'الطلب اتلغى')} style={{ alignSelf: 'center' }} />
         </>
       )}
     </Screen>
@@ -170,17 +169,11 @@ export default function CustomerRequest() {
 
 function Track({ r, n }: { r: Request; n: number }) {
   const chosen = r.status === 'chosen' || r.status === 'done';
-  const steps: [boolean, string][] = [[true, 'اتبعت للمحلات'], [n > 0, n ? 'وصلت عروض' : 'المحلات بترد'], [chosen, 'اخترت عرض'], [r.status === 'done', 'استلمت']];
+  const steps: [boolean, string][] = [[true, 'اتبعت'], [n > 0, 'وصلت عروض'], [chosen, 'اخترت'], [r.status === 'done', 'استلمت']];
   return (
-    <Row gap={4} style={{ alignItems: 'flex-start' }}>
-      {steps.map(([on, label], i) => (
-        <View key={i} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: on ? colors.good : colors.line, backgroundColor: on ? colors.good : colors.card, alignItems: 'center', justifyContent: 'center' }}>
-            {on ? <T size={11} color="#fff" w="bold">✓</T> : null}
-          </View>
-          <T size={11} center color={on ? colors.ink : colors.muted} w={on ? 'semibold' : 'regular'}>{label}</T>
-        </View>
-      ))}
-    </Row>
+    <View style={{ gap: 6 }}>
+      <Row gap={4}>{steps.map(([on], i) => <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: on ? colors.ink : colors.line }} />)}</Row>
+      <Row gap={4}>{steps.map(([on, label], i) => <T key={i} size={11.5} color={on ? colors.ink : colors.faint} w={on ? 'semibold' : 'regular'} style={{ flex: 1 }}>{label}</T>)}</Row>
+    </View>
   );
 }

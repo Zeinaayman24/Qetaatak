@@ -1,6 +1,5 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { BackBar, Btn, ErrorText, Field, Loading, Row, Screen, Select, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -49,19 +48,18 @@ export default function ProfileScreen() {
   }
 
   return (
-    <Screen header={<AppHeader />}>
+    <Screen header={<AppHeader />} footer={<Btn title="حفظ" onPress={save} loading={busy} />}>
       <BackBar title={editing ? 'بياناتك وعربيتك' : 'بياناتك وبيانات عربيتك'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       <Field label="اسمك" value={name} onChangeText={setName} placeholder="مثلاً: أحمد" />
       <Field label="رقم موبايلك" value={phone} onChangeText={setPhone} keyboardType="phone-pad" ltr placeholder="01xxxxxxxxx" hint="الرقم بيظهر للمحل بس بعد ما تختار عرضه." />
       <Select label="منطقتك" value={area} options={AREAS.map((a) => ({ v: a, label: a }))} onPick={setArea} />
-      <T w="bold">عربيتك</T>
+      <T w="bold" size={17} style={{ marginTop: 4 }}>عربيتك</T>
       <Row style={{ alignItems: 'flex-start' }}>
         <Select label="الماركة" value={make} options={MAKES.map((m) => ({ v: m, label: m }))} onPick={setMake} />
         <Select label="سنة الصنع" value={year} options={YEARS.map((y) => ({ v: y, label: ar(y) }))} onPick={setYear} />
       </Row>
       <Field label="الموديل" value={model} onChangeText={setModel} placeholder="مثلاً: فيرنا، سنترا، لانسر" />
       <ErrorText text={err} />
-      <View><Btn title="حفظ" onPress={save} loading={busy} /></View>
     </Screen>
   );
 }

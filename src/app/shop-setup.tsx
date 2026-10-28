@@ -55,7 +55,7 @@ export default function ShopSetup() {
   const toggle = (m: string) => setBrands((b) => (b.includes(m) ? b.filter((x) => x !== m) : [...b, m]));
 
   return (
-    <Screen header={<AppHeader role="shop" />}>
+    <Screen header={<AppHeader role="shop" />} footer={<Btn title={shop ? 'حفظ' : 'سجّل المحل'} onPress={save} loading={busy} />}>
       <BackBar title={shop ? 'بيانات المحل' : 'سجّل محلك'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       <Field label="اسم المحل" value={shopName} onChangeText={setShopName} placeholder="مثلاً: تشليح الأمانة" />
       <Field label="اسم صاحب المحل" value={owner} onChangeText={setOwner} />
@@ -65,7 +65,6 @@ export default function ShopSetup() {
         <Chips options={MAKES.map((m) => ({ v: m, label: m }))} selected={brands} onPick={toggle} />
       </Labeled>
       <ErrorText text={err} />
-      <Btn title={shop ? 'حفظ' : 'سجّل المحل'} onPress={save} loading={busy} />
       <Muted>بنراجع كل محل قبل ما يبدأ يستقبل طلبات، عشان نحافظ على ثقة العملاء.</Muted>
     </Screen>
   );

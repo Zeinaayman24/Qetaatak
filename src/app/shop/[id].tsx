@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { shopState } from '@/components/status';
-import { BackBar, Btn, Card, Chips, Empty, ErrorText, Field, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Row, Screen, Seg, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Row, Screen, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { COMMISSION, CONDITIONS, WANTED, WARRANTY_DAYS, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -41,6 +41,7 @@ export default function ShopRequest() {
   const st = shopState(r, data!.mine, data!.declined);
   const mine = data!.mine;
   const p = parseInt(price.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))), 10) || 0;
+  const approved = shop?.status === 'approved';
 
   async function choosePhoto() {
     try { const uri = await pickPhoto(); if (uri) setPhoto(uri); } catch { toast('الصورة دي مش مدعومة. جرّب صورة تانية.'); }
@@ -72,49 +73,50 @@ export default function ShopRequest() {
     </Row>
   ) : null;
 
+  const canQuote = st === 'open' || st === 'declined';
+  const footer = canQuote ? (
+    <>
+      <ErrorText text={err} />
+      <Btn title={p ? 'ابعت العرض · ' + money(p) + ' ج.م' : 'ابعت العرض'} onPress={send} loading={busy} disabled={!approved} />
+      {st === 'open' ? <Btn kind="link" title="مش متوفر عندي" onPress={decline} style={{ alignSelf: 'center' }} /> : null}
+    </>
+  ) : undefined;
+
   let body;
-  if (st === 'open' || st === 'declined') {
+  if (canQuote) {
     body = (
       <>
         {st === 'declined' ? <Notice>قلت إنها مش متوفرة. لو لقيتها، تقدر تبعت عرض.</Notice> : null}
-        <T w="bold">ابعت عرضك</T>
-        {shop?.status !== 'approved' ? <Notice>محلك لسه تحت المراجعة، فمش هتقدر تبعت عروض دلوقتي.</Notice> : null}
-        <Field label="السعر (جنيه)" value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="مثلاً 1100"
-          hint={p ? `عمولة قطعتك ٥٪ = ${money(p * COMMISSION)} ج.م · يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة قطعتك ٥٪ بس لو العميل اشترى منك.'} />
+        {!approved ? <Notice>محلك لسه تحت المراجعة، فمش هتقدر تبعت عروض دلوقتي.</Notice> : null}
+        <Field big label="سعرك (جنيه)" value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0"
+          hint={p ? `عمولة قطعتك ٥٪ = ${money(p * COMMISSION)} ج.م · يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة ٥٪ بس لو العميل اشترى منك.'} />
         <Labeled label="حالة القطعة">
           <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
         </Labeled>
         <Labeled label="الضمان">
           <Seg options={WARRANTY_DAYS.map((w) => ({ v: w, label: ar(w) + ' يوم' }))} value={warranty} onPick={setWarranty} />
         </Labeled>
-        <Labeled label="صورة القطعة عندك (اختياري)">
-          <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر." />
-        </Labeled>
-        <ErrorText text={err} />
-        <Btn title="ابعت العرض" onPress={send} loading={busy} disabled={shop?.status !== 'approved'} />
-        {st === 'open' ? <Btn kind="secondary" title="مش متوفر عندي" onPress={decline} /> : null}
-        <Muted>السعر اللي تبعته هو اللي العميل هيدفعه. ممنوع تغييره وقت الاستلام.</Muted>
+        <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر" />
+        <Muted size={12}>السعر اللي تبعته هو اللي العميل هيدفعه وقت الاستلام.</Muted>
       </>
     );
   } else if (st === 'quoted') {
-    body = <Card><Pill label="بعت عرض" tone="wait" /><T w="bold">العرض اتبعت للعميل</T>{sum}<Muted>هنبلغك أول ما العميل يختار.</Muted></Card>;
+    body = <Card><Pill label="بعت عرض" tone="wait" /><T w="bold" size={17}>العرض اتبعت للعميل</T>{sum}<Muted>هنبلغك أول ما العميل يختار.</Muted></Card>;
   } else if (st === 'sold' && mine) {
     const c = data!.customer;
     body = (
-      <Card style={{ borderColor: colors.good }}>
-        <Pill label="اتباع" tone="good" />
-        <T w="bold" size={17}>مبروك! العميل اختار عرضك</T>
+      <Card style={{ backgroundColor: colors.goodSoft }}>
+        <T w="bold" size={19}>مبروك! العميل اختار عرضك 🎉</T>
         {sum}
         <T size={14}>{r.delivery_mode === 'pickup' ? 'العميل جاي ياخدها من المحل وهيقولك رقم الطلب ' + reqNo(r.num) + '.' : 'كلّم العميل واتفق على التوصيل. اكتب رقم الطلب ' + reqNo(r.num) + ' على الكيس.'}</T>
         {c ? (
-          <>
-            <Muted>العميل</Muted>
-            <Row style={{ justifyContent: 'space-between' }}><T w="bold">{c.full_name}</T><Muted>{r.area}</Muted></Row>
-            <View style={{ backgroundColor: colors.soft, borderRadius: 10, padding: 10 }}><T selectable style={{ writingDirection: 'ltr', textAlign: 'right' }}>{c.phone}</T></View>
-          </>
+          <View style={{ gap: 6 }}>
+            <Row style={{ justifyContent: 'space-between' }}><T w="semibold">{c.full_name}</T><Muted>{r.area}</Muted></Row>
+            <CopyBox text={c.phone} />
+          </View>
         ) : null}
         <Lines rows={[['سعر البيع', money(mine.price) + ' ج.م'], ['عمولة قطعتك ٥٪', money(mine.price * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(mine.price * (1 - COMMISSION)) + ' ج.م']} />
-        {r.status === 'done' ? <T size={13} color={colors.good}>العميل أكد الاستلام{r.rating ? ' وقيّمك ' + ar(r.rating) + ' من ٥' : ''}.</T> : null}
+        {r.status === 'done' ? <T size={13} color={colors.good} w="semibold">العميل أكد الاستلام{r.rating ? ' وقيّمك ' + ar(r.rating) + ' من ٥' : ''}.</T> : null}
       </Card>
     );
   } else if (st === 'lost') {
@@ -124,20 +126,17 @@ export default function ShopRequest() {
   }
 
   return (
-    <Screen header={header}>
+    <Screen header={header} footer={footer}>
       <BackBar title={'طلب ' + reqNo(r.num)} onBack={back} />
-      <Card>
-        <Row style={{ alignItems: 'flex-start' }}>
-          <Photo uri={photoUrl(r.photo_path)} />
-          <View style={{ flex: 1 }}>
-            <T w="bold">{r.part}</T>
-            <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
-            <Muted>عايزها: {WANTED[r.wanted_condition]} · {r.area}</Muted>
-            <Muted size={12}>{ago(r.created_at)}</Muted>
-          </View>
-        </Row>
-        {r.notes ? <View style={{ backgroundColor: colors.soft, borderRadius: 10, padding: 10 }}><T size={13}>ملاحظة العميل: {r.notes}</T></View> : null}
-      </Card>
+      <Row style={{ alignItems: 'flex-start' }} gap={14}>
+        <Photo uri={photoUrl(r.photo_path)} size={64} />
+        <View style={{ flex: 1 }}>
+          <T w="bold" size={18}>{r.part}</T>
+          <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
+          <Muted>عايزها {WANTED[r.wanted_condition]} · {r.area} · {ago(r.created_at)}</Muted>
+        </View>
+      </Row>
+      {r.notes ? <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 12 }}><Muted size={12}>ملاحظة العميل</Muted><T size={14}>{r.notes}</T></View> : null}
       {body}
     </Screen>
   );

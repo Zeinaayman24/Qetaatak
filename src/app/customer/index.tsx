@@ -1,12 +1,13 @@
 import { Redirect, router } from 'expo-router';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { customerPill } from '@/components/status';
-import { Btn, Card, Empty, Loading, Muted, Photo, Plate, Row, Screen, T } from '@/components/ui';
+import { Btn, Empty, ListRow, Loading, Muted, Photo, Row, Screen, Section, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { ago, ar, reqNo, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
+import { colors } from '@/lib/theme';
 
 export default function CustomerHome() {
   const { ready, session, profile } = useAuth();
@@ -23,37 +24,45 @@ export default function CustomerHome() {
   if (profile && !profile.is_customer) return <Redirect href="/profile" />;
   if (!profile) return <Screen header={<AppHeader role="customer" />}><Loading /></Screen>;
 
+  const reqs = data?.reqs ?? [];
+  const active = reqs.filter((r) => r.status === 'open' || r.status === 'chosen');
+  const past = reqs.filter((r) => r.status === 'done' || r.status === 'cancelled');
+  const row = (r: Request, i: number, arr: Request[]) => (
+    <ListRow key={r.id} last={i === arr.length - 1} onPress={() => router.push(`/customer/${r.id}`)}
+      leading={<Photo uri={photoUrl(r.photo_path)} size={48} />}
+      title={r.part}
+      subtitle={`${r.car_make} ${r.car_model} · ${reqNo(r.num)}`}
+      meta={ago(r.created_at)}
+      trailing={customerPill(r, data!.quotes.filter((q) => q.request_id === r.id).length)} />
+  );
+
   return (
     <Screen header={<AppHeader role="customer" />}>
-      <Card>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Muted>أهلاً يا {profile.full_name}، عربيتك</Muted>
-            <T w="bold">{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')}</T>
-            <Btn kind="small" title="تعديل" onPress={() => router.push('/profile')} style={{ marginTop: 6 }} />
-          </View>
-          <Plate top={(profile.car_make || '').slice(0, 3)} bottom={ar(profile.car_year ?? '')} />
-        </Row>
-      </Card>
-      <Btn title="+  اطلب قطعة" onPress={() => router.push('/customer/new')} />
-      <T w="bold">طلباتك</T>
-      {loading && !data ? <Loading /> : data && data.reqs.length ? (
-        data.reqs.map((r) => (
-          <Card key={r.id} onPress={() => router.push(`/customer/${r.id}`)}>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <Muted size={12}>{reqNo(r.num)} · {ago(r.created_at)}</Muted>
-              {customerPill(r, data.quotes.filter((q) => q.request_id === r.id).length)}
-            </Row>
-            <Row>
-              {r.photo_path ? <Photo uri={photoUrl(r.photo_path)} size={52} /> : null}
-              <View style={{ flex: 1 }}>
-                <T w="bold">{r.part}</T>
-                <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
-              </View>
-            </Row>
-          </Card>
-        ))
-      ) : <Empty text={'لسه مفيش طلبات.\nاضغط «اطلب قطعة» وابعت أول طلب.'} />}
+      <View style={{ gap: 2 }}>
+        <Muted size={14}>أهلاً يا {profile.full_name}</Muted>
+        <T w="bold" size={26} style={{ lineHeight: 36 }}>عايز قطعة إيه؟</T>
+      </View>
+
+      <Pressable onPress={() => router.push('/customer/new')} accessibilityRole="button"
+        style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 16 }, pressed && { opacity: 0.8 }]}>
+        <T size={18}>🔍</T>
+        <T color={colors.faint} size={16} style={{ flex: 1 }}>فانوس، مراية، رديتر…</T>
+        <View style={{ backgroundColor: colors.ink, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 }}><T color={colors.brandInk} w="semibold" size={13}>اطلب</T></View>
+      </Pressable>
+
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Muted size={14}>عربيتك: <T w="semibold" size={14}>{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')}</T></Muted>
+        <Btn kind="link" title="تغيير" onPress={() => router.push('/profile')} />
+      </Row>
+
+      {loading && !data ? <Loading /> : reqs.length === 0 ? (
+        <Empty icon="🧰" text={'لسه مفيش طلبات.\nاكتب اسم القطعة فوق وابعت أول طلب.'} />
+      ) : (
+        <>
+          {active.length ? <Section title="طلبات شغالة">{active.map(row)}</Section> : null}
+          {past.length ? <Section title="طلبات قديمة">{past.map(row)}</Section> : null}
+        </>
+      )}
     </Screen>
   );
 }

@@ -2,7 +2,7 @@ import { Redirect } from 'expo-router';
 import { View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { customerPill } from '@/components/status';
-import { Btn, Card, Empty, Loading, Muted, Pill, Row, Screen, Stat, T, toast } from '@/components/ui';
+import { Btn, Empty, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { COMMISSION, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -40,44 +40,42 @@ export default function Admin() {
   }
 
   const order = { pending: 0, approved: 1, suspended: 2 } as const;
+  const shops = [...d.shops].sort((a, b) => order[a.status] - order[b.status]);
   return (
     <Screen header={<AppHeader role="admin" />}>
-      <Row gap={8}><Stat value={ar(d.reqs.length)} label="طلبات" /><Stat value={ar(sold.length)} label="مبيعات" /><Stat value={money(gmv * COMMISSION)} label="عمولتك (ج.م)" /></Row>
-      <Row gap={8}><Stat value={pct(found, d.reqs.length)} label="طلبات لقت عرض" /><Stat value={pct(sold.length, found)} label="نسبة الإغلاق" /><Stat value={money(gmv)} label="قيمة المبيعات (ج.م)" /></Row>
+      <T w="bold" size={26} style={{ lineHeight: 36 }}>لوحة الإدارة</T>
+      <Stats items={[[ar(d.reqs.length), 'طلبات'], [ar(sold.length), 'مبيعات'], [money(gmv * COMMISSION), 'عمولتك (ج.م)']]} />
+      <Stats items={[[pct(found, d.reqs.length), 'لقت عرض'], [pct(sold.length, found), 'نسبة الإغلاق'], [money(gmv), 'المبيعات (ج.م)']]} />
 
-      <T w="bold">المحلات ({ar(d.shops.length)})</T>
-      {d.shops.length ? [...d.shops].sort((a, b) => order[a.status] - order[b.status]).map((s) => {
-        const p = d.priv[s.id];
-        return (
-          <Card key={s.id}>
-            <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View style={{ flex: 1 }}>
-                <T w="bold">{p?.name ?? '—'}</T>
-                <Muted>{s.area} · {p?.owner_name}</Muted>
-                <Muted><T size={13} selectable style={{ writingDirection: 'ltr' }}>{p?.phone}</T></Muted>
-                <Muted size={12}>{s.brands.join('، ')}</Muted>
-              </View>
-              <Pill label={s.status === 'approved' ? 'موافق عليه' : s.status === 'pending' ? 'مستني موافقة' : 'موقوف'} tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'plain'} />
-            </Row>
-            {s.status === 'approved'
-              ? <Btn kind="small" title="إيقاف المحل" onPress={() => setStatus(s.id, 'suspended')} />
-              : <Btn kind="small" title="وافق على المحل" onPress={() => setStatus(s.id, 'approved')} />}
-          </Card>
-        );
-      }) : <Empty text="لسه مفيش محلات مسجلة." />}
+      <Section title={'المحلات (' + ar(d.shops.length) + ')'}>
+        {shops.length ? shops.map((s, i) => {
+          const p = d.priv[s.id];
+          return (
+            <ListRow key={s.id} last={i === shops.length - 1}
+              title={<Row gap={8}><T w="semibold">{p?.name ?? '—'}</T><Pill label={s.status === 'approved' ? 'شغال' : s.status === 'pending' ? 'مستني موافقة' : 'موقوف'} tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'plain'} /></Row>}
+              subtitle={`${s.area} · ${p?.owner_name ?? ''} · ${p?.phone ?? ''}`}
+              meta={s.brands.join('، ')}
+              trailing={s.status === 'approved'
+                ? <Btn kind="link" title="إيقاف" onPress={() => setStatus(s.id, 'suspended')} />
+                : <Btn kind="small" title="وافق" onPress={() => setStatus(s.id, 'approved')} />} />
+          );
+        }) : <Empty text="لسه مفيش محلات مسجلة." />}
+      </Section>
 
-      <T w="bold">كل الطلبات</T>
-      {d.reqs.length ? d.reqs.map((r) => {
-        const qs = d.quotes.filter((q) => q.request_id === r.id);
-        return (
-          <Card key={r.id}>
-            <Row style={{ justifyContent: 'space-between' }}><Muted size={12}>{reqNo(r.num)} · {ago(r.created_at)}</Muted>{customerPill(r, qs.length)}</Row>
-            <T w="bold">{r.part}</T>
-            <Muted>{r.car_make} {r.car_model} {ar(r.car_year)} · {d.people[r.customer_id]?.full_name} · {r.area}</Muted>
-            {qs.length ? <Muted>{qs.map((q) => `${d.priv[q.shop_id]?.name ?? 'محل'}: ${money(q.price)} ج.م${q.id === r.chosen_quote_id ? ' ✓' : ''}`).join(' · ')}</Muted> : null}
-          </Card>
-        );
-      }) : <Empty text="لسه مفيش طلبات." />}
+      <Section title="كل الطلبات">
+        {d.reqs.length ? d.reqs.map((r, i) => {
+          const qs = d.quotes.filter((q) => q.request_id === r.id);
+          return (
+            <ListRow key={r.id} last={i === d.reqs.length - 1}
+              title={r.part}
+              subtitle={`${r.car_make} ${r.car_model} · ${d.people[r.customer_id]?.full_name ?? ''} · ${r.area}`}
+              meta={qs.length ? qs.map((q) => `${d.priv[q.shop_id]?.name ?? 'محل'} ${money(q.price)}${q.id === r.chosen_quote_id ? ' ✓' : ''}`).join(' · ') : `${reqNo(r.num)} · ${ago(r.created_at)}`}
+              trailing={customerPill(r, qs.length)} />
+          );
+        }) : <Empty text="لسه مفيش طلبات." />}
+      </Section>
+      <View />
+      <Muted center size={12}>الأرقام بتتحدث لوحدها أول ما حاجة تتغير.</Muted>
     </Screen>
   );
 }

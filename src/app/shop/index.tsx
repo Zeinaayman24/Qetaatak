@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { shopPill, shopState, type ShopState } from '@/components/status';
-import { Btn, Card, Chips, Empty, Loading, Muted, Notice, Photo, Row, Screen, Stat, T } from '@/components/ui';
+import { Btn, Empty, ListRow, Loading, Muted, Notice, Photo, Row, Screen, Seg, Stats, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { WANTED, ago, ar, money, reqNo, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -39,39 +39,34 @@ export default function ShopInbox() {
     .filter((x) => (tab === 'all' ? true : x.st === tab))
     .sort((a, b) => Number(!shop.brands.includes(a.r.car_make)) - Number(!shop.brands.includes(b.r.car_make)) || b.r.created_at.localeCompare(a.r.created_at));
   const sales = rows.filter((x) => x.st === 'sold').reduce((s, x) => s + (x.mq?.price ?? 0), 0);
+  const waiting = rows.filter((x) => x.st === 'open').length;
 
   return (
     <Screen header={<AppHeader role="shop" />}>
-      {shop.status === 'pending' ? <Notice><T w="bold" size={13}>محلك تحت المراجعة.</T><T size={13}>أول ما نوافق على المحل هتبدأ الطلبات تظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
-      {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}
-      <Row style={{ justifyContent: 'space-between' }}>
+      <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
-          <T w="bold">{shopPrivate?.name}</T>
-          <Muted>{shop.area} · {shop.brands.join('، ')}</Muted>
+          <Muted size={14}>{shop.area}</Muted>
+          <T w="bold" size={26} style={{ lineHeight: 36 }}>{shopPrivate?.name}</T>
         </View>
-        <Btn kind="small" title="تعديل" onPress={() => router.push('/shop-setup')} />
+        <Btn kind="link" title="تعديل" onPress={() => router.push('/shop-setup')} />
       </Row>
-      <Row gap={8}>
-        <Stat value={ar(rows.filter((x) => x.st === 'open').length)} label="مستنية ردّك" />
-        <Stat value={ar(data?.mine.length ?? 0)} label="عروض بعتها" />
-        <Stat value={money(sales)} label="مبيعات (ج.م)" />
-      </Row>
-      <Chips options={[{ v: 'open', label: 'جديد' }, { v: 'quoted', label: 'بعت عرض' }, { v: 'sold', label: 'مبيعاتي' }, { v: 'all', label: 'الكل' }] as { v: Tab; label: string }[]}
-        selected={[tab]} onPick={setTab} />
-      {loading && !data ? <Loading /> : shown.length ? shown.map(({ r, st }) => (
-        <Card key={r.id} onPress={() => router.push(`/shop/${r.id}`)}>
-          <Row style={{ justifyContent: 'space-between' }}><Muted size={12}>{reqNo(r.num)} · {ago(r.created_at)}</Muted>{shopPill(st)}</Row>
-          <Row style={{ alignItems: 'flex-start' }}>
-            {r.photo_path ? <Photo uri={photoUrl(r.photo_path)} size={52} /> : null}
-            <View style={{ flex: 1 }}>
-              <T w="bold">{r.part}</T>
-              <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
-              {shop.brands.includes(r.car_make) ? <T size={12} color={colors.good} w="semibold">في تخصصك</T> : null}
-              <Muted>عايزها: {WANTED[r.wanted_condition]} · {r.area}</Muted>
-            </View>
-          </Row>
-        </Card>
-      )) : <Empty text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'مفيش حاجة هنا لسه.'} />}
+      {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
+      {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}
+      <Stats items={[[ar(waiting), 'مستنية ردّك'], [ar(data?.mine.length ?? 0), 'عروض بعتها'], [money(sales), 'مبيعات (ج.م)']]} />
+      <Seg options={[{ v: 'open', label: 'جديد' }, { v: 'quoted', label: 'بعت عرض' }, { v: 'sold', label: 'مبيعات' }, { v: 'all', label: 'الكل' }] as { v: Tab; label: string }[]}
+        value={tab} onPick={setTab} />
+      {loading && !data ? <Loading /> : shown.length ? (
+        <View>
+          {shown.map(({ r, st }, i) => (
+            <ListRow key={r.id} last={i === shown.length - 1} onPress={() => router.push(`/shop/${r.id}`)}
+              leading={<Photo uri={photoUrl(r.photo_path)} size={48} />}
+              title={r.part}
+              subtitle={<Muted numberOfLines={1}>{r.car_make} {r.car_model} {ar(r.car_year)} · {WANTED[r.wanted_condition]}{shop.brands.includes(r.car_make) ? <T size={13} color={colors.good} w="semibold">  · تخصصك</T> : null}</Muted>}
+              meta={`${r.area} · ${reqNo(r.num)} · ${ago(r.created_at)}`}
+              trailing={shopPill(st)} />
+          ))}
+        </View>
+      ) : <Empty icon="📭" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'مفيش حاجة هنا لسه.'} />}
     </Screen>
   );
 }
