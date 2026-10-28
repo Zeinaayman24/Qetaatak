@@ -42,7 +42,7 @@ export default function MyRequests() {
       ) : (
         <View style={{ gap: 12 }}>
           <Empty icon="🧰" text={tab === 'active' ? 'مفيش طلبات شغالة دلوقتي.' : 'لسه مفيش طلبات قديمة.'} />
-          {tab === 'active' ? <Btn title="اطلب قطعة" onPress={() => router.push('/customer/new')} /> : null}
+          {tab === 'active' ? <Btn title="اطلب قطعة" onPress={() => router.push({ pathname: '/assistant', params: { mode: 'request' } })} /> : null}
         </View>
       )}
     </Screen>

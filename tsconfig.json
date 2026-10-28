@@ -15,6 +15,7 @@
   "exclude": [
     "manage",
     "node_modules",
-    "dist"
+    "dist",
+    "supabase/functions"
   ]
 }

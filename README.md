@@ -87,3 +87,8 @@ where id = (select id from auth.users where email = 'you@example.com');
 1. Create the new project.
 2. Run the files in `supabase/migrations/` in order in its SQL editor.
 3. Change `SUPABASE_URL` and `SUPABASE_KEY` in `src/lib/supabase.ts`.
+
+## Chat assistant (`/assistant`)
+Customers make part requests and complaints by chatting with «مساعد قطعتك».
+- **Free mode (default):** tap-to-answer buttons plus on-device understanding of simple Arabic (`src/lib/assistant.ts`). It always shows a summary and the customer confirms before a request or ticket is created.
+- **Smart AI mode:** the `assistant` Supabase Edge Function (`supabase/functions/assistant`) is deployed but switched off. To turn it on, add the secret `ANTHROPIC_API_KEY` in Supabase → Edge Functions → Secrets (optional `ASSISTANT_MODEL`, default `claude-haiku-5-5`). The app detects it automatically; no new build needed.

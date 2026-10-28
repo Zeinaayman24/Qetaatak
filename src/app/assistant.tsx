@@ -1,0 +1,519 @@
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon, Loading, Muted, Screen, T, ToastHost, toast } from '@/components/ui';
+import { aiAvailable, askAi, parse, partIsSided, type AiTurn, type Parsed } from '@/lib/assistant';
+import { useAuth } from '@/lib/auth';
+import { COMMON_PARTS, REPORT_CATEGORIES, SIDES, URGENCY, WANTED, ar, friendlyError, money, reqNo, type Car, type Request } from '@/lib/data';
+import { pickPhoto, uploadPhoto } from '@/lib/photos';
+import { supabase } from '@/lib/supabase';
+import { colors, fonts } from '@/lib/theme';
+
+/* The chat assistant: customers make part requests and complaints by talking to it.
+   Free mode: guided buttons + on-device understanding of simple Arabic.
+   Smart mode: turns on by itself when an AI key is added on the server (see supabase/functions/assistant). */
+
+type Link = { label: string; href: string };
+type Msg = { id: number; from: 'bot' | 'me'; text?: string; photo?: string; lines?: [string, string][]; links?: Link[] };
+type Step = 'menu' | 'part' | 'car' | 'side' | 'cond' | 'urgency' | 'photo' | 'budget' | 'confirm' | 'edit'
+  | 'c_cat' | 'c_order' | 'c_body' | 'c_confirm' | 'ai' | 'done';
+type Cond = 'used' | 'new' | 'any';
+type Urg = 'normal' | 'today' | 'urgent';
+type Side = '' | 'right' | 'left' | 'front' | 'rear';
+type Draft = {
+  part: string; carKey: string | null; side: Side | null; cond: Cond | null; urgency: Urg | null;
+  photo: string | null; photoAsked: boolean; budget: number | null; budgetAsked: boolean; notes: string;
+};
+type CDraft = { category: string | null; requestId: string | null; requestAsked: boolean; body: string };
+type CarOpt = { key: string; label: string; make: string; model: string; year: number; vin: string };
+
+const emptyDraft = (): Draft => ({ part: '', carKey: null, side: null, cond: null, urgency: null, photo: null, photoAsked: false, budget: null, budgetAsked: false, notes: '' });
+const emptyC = (): CDraft => ({ category: null, requestId: null, requestAsked: false, body: '' });
+const STATUS: Record<string, string> = { open: 'بيستقبل عروض', chosen: 'اتأكد مع المحل', done: 'اتسلّم', cancelled: 'اتلغى' };
+
+export default function Assistant() {
+  const { ready, session, profile } = useAuth();
+  const params = useLocalSearchParams<{ mode?: string; part?: string; request?: string; cond?: string; side?: string; notes?: string }>();
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  const insets = useSafeAreaInsets();
+
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [step, setStep] = useState<Step>('menu');
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [cdraft, setC] = useState<CDraft>(emptyC);
+  const [typing, setTyping] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [text, setText] = useState('');
+  const [cars, setCars] = useState<CarOpt[] | null>(null);
+  const [recent, setRecent] = useState<Request[]>([]);
+  const [aiOn, setAiOn] = useState(false);
+  const [aiChips, setAiChips] = useState<string[]>([]);
+  const aiLog = useRef<AiTurn[]>([]);
+  const nextId = useRef(1);
+  const queue = useRef(0);
+  const started = useRef(false);
+  const scroller = useRef<any>(null);
+  const uid = session?.user.id;
+  const isShop = !!profile?.is_shop;
+
+  /* ---------- data */
+  useEffect(() => {
+    if (!uid || !profile) return;
+    (async () => {
+      const [{ data: extra }, { data: reqs }] = await Promise.all([
+        supabase.from('cars').select('*').eq('owner_id', uid).order('created_at'),
+        isShop ? Promise.resolve({ data: [] as Request[] }) : supabase.from('requests').select('*').eq('customer_id', uid).order('created_at', { ascending: false }).limit(6),
+      ]);
+      const list: CarOpt[] = [];
+      if (profile.car_make) list.push({ key: 'main', label: `${profile.car_make} ${profile.car_model ?? ''} ${ar(profile.car_year ?? '')}`.trim(), make: profile.car_make, model: profile.car_model ?? '', year: profile.car_year ?? 0, vin: profile.car_vin ?? '' });
+      ((extra ?? []) as Car[]).forEach((c) => list.push({ key: c.id, label: `${c.make} ${c.model} ${ar(c.year)}`, make: c.make, model: c.model, year: c.year, vin: c.vin }));
+      setCars(list);
+      setRecent((reqs ?? []) as Request[]);
+    })();
+    aiAvailable().then(setAiOn);
+  }, [uid, profile?.id]);
+
+  /* ---------- chat plumbing */
+  const push = (m: Omit<Msg, 'id'>) => setMsgs((xs) => [...xs, { ...m, id: nextId.current++ }]);
+  /** The bot "types" briefly, then says each message in turn. */
+  function say(...ms: Omit<Msg, 'id' | 'from'>[]) {
+    ms.forEach((m) => {
+      queue.current += 1;
+      setTyping(true);
+      setTimeout(() => {
+        push({ from: 'bot', ...m });
+        queue.current -= 1;
+        if (!queue.current) setTyping(false);
+      }, 380 * queue.current + 120);
+    });
+    ms.forEach((m) => m.text && aiLog.current.push({ role: 'assistant', content: m.text }));
+  }
+  const me = (t: string, photo?: string) => { push({ from: 'me', text: t, photo }); aiLog.current.push({ role: 'user', content: t || 'صورة' }); };
+
+  /* ---------- start */
+  useEffect(() => { start(); }, [profile?.id, cars]);
+  function start() {
+    if (!profile || !cars || started.current) return;
+    started.current = true;
+    const first = (profile.full_name || '').split(' ')[0];
+    const mode = str(params.mode);
+    if (mode === 'complaint') {
+      say({ text: `أهلاً يا ${first} 👋 أنا مساعد قطعتك. خليني أسجّل مشكلتك وأوصّلها لخدمة العملاء.` });
+      const rid = str(params.request);
+      return advanceC({ ...emptyC(), category: rid ? 'order' : null, requestId: rid || null, requestAsked: !!rid });
+    }
+    if (mode === 'track') { say({ text: `أهلاً يا ${first} 👋` }); return showTrack(); }
+    if (mode === 'request' && !isShop) {
+      say({ text: `أهلاً يا ${first} 👋 هسألك كام سؤال سريع وأبعت طلبك لكل المحلات المناسبة.` });
+      const p = str(params.part);
+      const cond = str(params.cond);
+      return advance({
+        ...emptyDraft(), part: p,
+        cond: (['used', 'new', 'any'].includes(cond) ? cond : null) as Cond | null,
+        side: (str(params.side) && Object.keys(SIDES).includes(str(params.side)) ? str(params.side) : null) as Side | null,
+        notes: str(params.notes),
+      });
+    }
+    say({ text: isShop
+      ? `أهلاً يا ${first} 👋 أنا مساعد قطعتك. لو عندك مشكلة أو شكوى اكتبهالي وأنا أوصّلها لخدمة العملاء.`
+      : `أهلاً يا ${first} 👋 أنا مساعد قطعتك.\nأقدر أدوّرلك على أي قطعة عند المحلات، أو أسجّل شكوى، أو أتابعلك طلب.\nاكتبلي محتاج إيه، مثلاً «عايز فانوس يمين مستعمل».` });
+    setStep('menu');
+  }
+
+  /* ---------- request flow */
+  const carOf = (d: Draft) => cars?.find((c) => c.key === d.carKey) ?? cars?.[0];
+  function merge(d: Draft, p: Parsed): Draft {
+    return {
+      ...d,
+      part: p.part && !d.part ? p.part : d.part,
+      side: p.side !== undefined && d.side === null ? p.side : d.side,
+      cond: p.cond && !d.cond ? p.cond : d.cond,
+      urgency: p.urgency && !d.urgency ? p.urgency : d.urgency,
+      budget: p.budget && d.budget === null ? p.budget : d.budget,
+      budgetAsked: d.budgetAsked || !!p.budget,
+    };
+  }
+  function advance(d: Draft) {
+    if (cars && cars.length === 1 && !d.carKey) d = { ...d, carKey: cars[0].key };
+    setDraft(d);
+    if (!d.part) { setStep('part'); return say({ text: 'اسم القطعة إيه؟ اكتبها بأي طريقة، أو اختار من تحت.' }); }
+    if (!d.carKey && cars && cars.length > 1) { setStep('car'); return say({ text: `${d.part}، تمام. لأنهي عربية؟` }); }
+    if (!cars?.length) { setStep('menu'); return say({ text: 'محتاج تضيف عربيتك الأول عشان المحلات تعرف القطعة.', links: [{ label: 'ضيف عربيتي', href: '/profile' }] }); }
+    if (d.side === null && partIsSided(d.part)) { setStep('side'); return say({ text: 'أنهي جهة؟' }); }
+    if (!d.cond) { setStep('cond'); return say({ text: 'عايزها مستعملة ولا جديدة؟' }); }
+    if (!d.urgency) { setStep('urgency'); return say({ text: 'محتاجها إمتى؟' }); }
+    if (!d.photo && !d.photoAsked) { setStep('photo'); return say({ text: 'عندك صورة للقطعة القديمة؟ الصورة بتخلي المحل يعرفها أسرع ويديك سعر مظبوط.' }); }
+    if (d.budget === null && !d.budgetAsked) { setStep('budget'); return say({ text: 'في ميزانية معينة في دماغك؟ اكتب الرقم بالجنيه، أو تخطّى.' }); }
+    setStep('confirm');
+    const car = carOf(d)!;
+    say({
+      text: 'تمام، ده طلبك. أبعته للمحلات؟',
+      photo: d.photo ?? undefined,
+      lines: [
+        ['القطعة', d.part],
+        ['العربية', car.label],
+        ...(d.side ? [['الجهة', SIDES[d.side]] as [string, string]] : []),
+        ['الحالة', WANTED[d.cond]],
+        ['محتاجها', URGENCY[d.urgency]],
+        ['الميزانية', d.budget ? money(d.budget) + ' ج' : 'مفتوحة'],
+        ...(d.notes ? [['ملاحظات', d.notes] as [string, string]] : []),
+      ],
+    });
+  }
+  async function sendRequest() {
+    if (busy || !profile) return;
+    const d = draft;
+    const car = carOf(d);
+    if (!car) return;
+    me('ابعت الطلب');
+    setBusy(true);
+    try {
+      const photo_path = d.photo ? await uploadPhoto(d.photo, profile.id) : null;
+      const { data, error } = await supabase.from('requests').insert({
+        customer_id: profile.id, part: d.part, car_make: car.make, car_model: car.model, car_year: car.year, vin: car.vin,
+        wanted_condition: d.cond, side: d.side ?? '', urgency: d.urgency, budget: d.budget, area: profile.area, notes: d.notes, photo_path,
+      }).select('*').single();
+      if (error) throw error;
+      setRecent((r) => [data as Request, ...r]);
+      setStep('done');
+      setDraft(emptyDraft());
+      say({ text: `اتبعت ✅ طلبك رقم ${reqNo(data.num)} وصل للمحلات اللي بتشتغل في ${car.make}.\nأول ما محل يبعت سعر هيوصلك إشعار، وتقدر تقارن العروض وتختار.`, links: [{ label: 'افتح الطلب', href: `/customer/${data.id}` }] });
+    } catch (x) {
+      say({ text: 'معرفتش أبعت الطلب: ' + friendlyError(x) + '\nجرّب تاني.' });
+    } finally { setBusy(false); }
+  }
+
+  /* ---------- complaint flow */
+  const complaintCats = Object.entries(REPORT_CATEGORIES).filter(([k]) => (isShop ? k !== 'shop' : k !== 'customer'));
+  function advanceC(c: CDraft) {
+    setC(c);
+    if (!c.category) { setStep('c_cat'); return say({ text: 'آسفين إن في مشكلة 🙏 الشكوى عن إيه؟' }); }
+    if ((c.category === 'order' || c.category === 'shop') && !c.requestId && !c.requestAsked && recent.length) {
+      setStep('c_order'); return say({ text: 'عن أنهي طلب؟' });
+    }
+    if (c.body.trim().length < 5) { setStep('c_body'); return say({ text: 'احكيلي اللي حصل بالتفصيل، وأنا هوصّله لفريق خدمة العملاء.' }); }
+    setStep('c_confirm');
+    const r = recent.find((x) => x.id === c.requestId);
+    say({
+      text: 'ده ملخص شكوتك. أبعتها؟',
+      lines: [
+        ['النوع', REPORT_CATEGORIES[c.category]],
+        ...(r ? [['الطلب', `${reqNo(r.num)} · ${r.part}`] as [string, string]] : []),
+        ['التفاصيل', c.body.trim()],
+      ],
+    });
+  }
+  async function sendComplaint() {
+    if (busy) return;
+    me('ابعت الشكوى');
+    setBusy(true);
+    const { data, error } = await supabase.from('reports').insert({ category: cdraft.category, body: cdraft.body.trim(), request_id: cdraft.requestId }).select('id, ticket_no').single();
+    setBusy(false);
+    if (error) return say({ text: 'معرفتش أسجّل الشكوى: ' + friendlyError(error) });
+    setStep('done');
+    setC(emptyC());
+    say({ text: `اتسجّلت ✅ رقم شكوتك T-${data.ticket_no}.\nحد من خدمة العملاء هيرد عليك خلال ٤٨ ساعة، وهيوصلك إشعار. تقدر تتابع وتكلّمهم من هنا:`, links: [{ label: `محادثة الشكوى T-${data.ticket_no}`, href: `/ticket/${data.id}` }] });
+  }
+
+  /* ---------- tracking */
+  async function showTrack() {
+    setStep('done');
+    if (isShop) return say({ text: 'متابعة الطلبات من شاشة الطلبات بتاعة المحل.', links: [{ label: 'الطلبات', href: '/shop' }] });
+    const { data } = await supabase.from('requests').select('*').eq('customer_id', uid!).in('status', ['open', 'chosen']).order('created_at', { ascending: false }).limit(5);
+    const rs = (data ?? []) as Request[];
+    if (!rs.length) return say({ text: 'مفيش طلبات شغالة دلوقتي. تحب أدوّرلك على قطعة؟' });
+    say({ text: rs.length === 1 ? 'عندك طلب شغال:' : `عندك ${ar(rs.length)} طلبات شغالة:`, links: rs.map((r) => ({ label: `${reqNo(r.num)} · ${r.part} — ${STATUS[r.status]}`, href: `/customer/${r.id}` })) });
+  }
+
+  /* ---------- understanding typed text */
+  function startFrom(t: string) {
+    const p = parse(t);
+    if (p.intent === 'complaint' || p.intent === 'human') {
+      const long = t.trim().length >= 18;
+      if (p.intent === 'human') say({ text: 'أكيد، هوصّلك بخدمة العملاء. هسجّل طلبك والموظف يرد عليك في محادثة.' });
+      return advanceC({ ...emptyC(), category: p.category && complaintCats.some(([k]) => k === p.category) ? p.category : null, body: long ? t.trim() : '' });
+    }
+    if (p.intent === 'track') return showTrack();
+    if (p.intent === 'request') {
+      if (isShop) return say({ text: 'طلب القطع للعملاء بس. لو عندك مشكلة اكتبهالي.' });
+      let d = merge(emptyDraft(), p);
+      const car = cars?.find((c) => t.includes(c.make));
+      if (car) d = { ...d, carKey: car.key };
+      return advance(d);
+    }
+    if (p.intent === 'thanks') return say({ text: 'العفو 🙏 أي خدمة تانية؟' });
+    if (p.intent === 'greet') return say({ text: 'أهلاً بيك! محتاج قطعة، ولا عندك مشكلة؟' });
+    setStep('menu');
+    say({ text: 'مفهمتش قصدك أوي 😅 جرّب تكتبها كده: «عايز رديتر مستعمل»، أو «عندي شكوى من محل»، أو اختار من تحت.' });
+  }
+
+  async function onText(raw: string) {
+    const t = raw.trim();
+    if (!t || busy) return;
+    setText('');
+    me(t);
+    if (aiOn && step !== 'c_body' && step !== 'part') {
+      setTyping(true);
+      const r = await askAi(aiLog.current, {
+        customer_name: profile?.full_name, is_shop: isShop, step,
+        cars: (cars ?? []).map((c, i) => ({ index: i, car: c.label })),
+        recent_requests: recent.map((x) => ({ num: x.num, part: x.part, status: x.status })),
+        current_request_draft: draft, current_complaint_draft: cdraft,
+      });
+      setTyping(false);
+      if (r) return applyAi(r);
+    }
+    const p = parse(t);
+    switch (step) {
+      case 'part': return advance(merge({ ...draft, part: p.part ?? t }, p));
+      case 'car': {
+        const c = cars?.find((x) => t.includes(x.make) || t.includes(x.model));
+        return c ? advance({ ...draft, carKey: c.key }) : say({ text: 'اختار العربية من الأزرار تحت.' });
+      }
+      case 'side': return p.side !== undefined || p.skip ? advance({ ...draft, side: p.side ?? '' }) : say({ text: 'يمين ولا شمال؟ (أو قدام / ورا)' });
+      case 'cond': return p.cond ? advance(merge(draft, p)) : say({ text: 'مستعملة، جديدة، ولا أي حاجة؟' });
+      case 'urgency': return p.urgency ? advance(merge(draft, p)) : say({ text: 'عادي، النهارده، ولا مستعجل جداً؟' });
+      case 'photo': return advance({ ...draft, photoAsked: true, notes: p.skip || p.no ? draft.notes : [draft.notes, t].filter(Boolean).join('، ') });
+      case 'budget':
+        if (p.budget) return advance({ ...draft, budget: p.budget, budgetAsked: true });
+        if (p.skip || p.no) return advance({ ...draft, budgetAsked: true });
+        return say({ text: 'اكتب الرقم بالجنيه، مثلاً ١٥٠٠، أو اضغط «مفيش ميزانية».' });
+      case 'confirm':
+        if (p.yes) return sendRequest();
+        if (p.no) { setStep('edit'); return say({ text: 'تحب تغيّر إيه؟' }); }
+        if (p.part || p.side !== undefined || p.cond || p.urgency || p.budget) {
+          return advance({ ...draft, ...(p.part ? { part: p.part } : {}), ...(p.side !== undefined ? { side: p.side } : {}), ...(p.cond ? { cond: p.cond } : {}), ...(p.urgency ? { urgency: p.urgency } : {}), ...(p.budget ? { budget: p.budget } : {}) });
+        }
+        say({ text: 'ضفت ده كملاحظة للمحلات 👍' });
+        return advance({ ...draft, notes: [draft.notes, t].filter(Boolean).join('، ') });
+      case 'c_cat': {
+        const cat = p.category && complaintCats.some(([k]) => k === p.category) ? p.category : 'other';
+        return advanceC({ ...cdraft, category: cat, body: t.length >= 18 ? t : cdraft.body });
+      }
+      case 'c_order': {
+        const n = parseInt(t.replace(/\D/g, ''), 10);
+        const r = recent.find((x) => x.num === n || t.includes(x.part));
+        return advanceC({ ...cdraft, requestId: r?.id ?? null, requestAsked: true, body: !r && t.length >= 18 ? t : cdraft.body });
+      }
+      case 'c_body': return t.length < 5 ? say({ text: 'اكتب تفاصيل أكتر شوية عشان نقدر نساعدك.' }) : advanceC({ ...cdraft, body: t });
+      case 'c_confirm':
+        if (p.yes) return sendComplaint();
+        return advanceC({ ...cdraft, body: cdraft.body.trim() + '\n' + t });
+      default: return startFrom(t);
+    }
+  }
+
+  /** Smart mode: the AI fills the same drafts; the app still shows the summary and the customer confirms. */
+  function applyAi(r: NonNullable<Awaited<ReturnType<typeof askAi>>>) {
+    const g = r.draft;
+    if (g?.intent === 'request' && !isShop) {
+      const car = typeof g.car_index === 'number' ? cars?.[g.car_index] : undefined;
+      const d: Draft = {
+        ...draft,
+        part: g.part || draft.part,
+        carKey: car?.key ?? draft.carKey,
+        side: g.side !== undefined && g.side in SIDES ? (g.side as Side) : draft.side,
+        cond: g.condition && g.condition in WANTED ? (g.condition as Cond) : draft.cond,
+        urgency: g.urgency && g.urgency in URGENCY ? (g.urgency as Urg) : draft.urgency,
+        budget: typeof g.budget === 'number' ? g.budget : draft.budget,
+        budgetAsked: draft.budgetAsked || 'budget' in g,
+        notes: g.notes ?? draft.notes,
+      };
+      if (r.ready) { if (r.reply) say({ text: r.reply }); return advance(d); }
+      setDraft(d);
+    }
+    if (g?.intent === 'complaint') {
+      const rq = recent.find((x) => x.num === g.request_num);
+      const c: CDraft = {
+        ...cdraft,
+        category: g.category && complaintCats.some(([k]) => k === g.category) ? g.category : cdraft.category,
+        requestId: rq?.id ?? cdraft.requestId, requestAsked: cdraft.requestAsked || !!rq,
+        body: g.complaint_text || cdraft.body,
+      };
+      if (r.ready) { if (r.reply) say({ text: r.reply }); return advanceC({ ...c, requestAsked: true }); }
+      setC(c);
+    }
+    setAiChips(r.quick_replies ?? []);
+    setStep('ai');
+    say({ text: r.reply || '…' });
+  }
+
+  async function addPhoto() {
+    try {
+      const uri = await pickPhoto();
+      if (!uri) return;
+      me('', uri);
+      advance({ ...draft, photo: uri, photoAsked: true });
+    } catch { toast('الصورة دي مش مدعومة. جرّب صورة تانية.'); }
+  }
+
+  /* ---------- the buttons under the chat */
+  const tap = (label: string, fn: () => void) => ({ label, fn: () => { me(label); fn(); } });
+  const menu = isShop
+    ? [tap('عندي شكوى', () => advanceC(emptyC())), { label: 'شكاويّا السابقة', fn: () => router.push('/support') }]
+    : [
+        tap('عايز قطعة غيار', () => advance(emptyDraft())),
+        tap('عندي شكوى', () => advanceC(emptyC())),
+        tap('فين طلبي؟', showTrack),
+        { label: 'شكاويّا السابقة', fn: () => router.push('/support') },
+      ];
+  let chips: { label: string; fn: () => void; icon?: string }[] = [];
+  switch (step) {
+    case 'menu': case 'done': chips = menu; break;
+    case 'part': chips = COMMON_PARTS.map((p) => tap(p, () => advance({ ...draft, part: p }))); break;
+    case 'car': chips = [...(cars ?? []).map((c) => tap(c.label, () => advance({ ...draft, carKey: c.key }))), { label: '+ عربية تانية', fn: () => router.push('/cars') }]; break;
+    case 'side': chips = (['right', 'left', 'front', 'rear', ''] as Side[]).map((v) => tap(SIDES[v], () => advance({ ...draft, side: v }))); break;
+    case 'cond': chips = (['used', 'new', 'any'] as Cond[]).map((v) => tap(WANTED[v], () => advance({ ...draft, cond: v }))); break;
+    case 'urgency': chips = (['normal', 'today', 'urgent'] as Urg[]).map((v) => tap(URGENCY[v], () => advance({ ...draft, urgency: v }))); break;
+    case 'photo': chips = [{ label: 'ضيف صورة', icon: 'camera-outline', fn: addPhoto }, tap('مش معايا صورة', () => advance({ ...draft, photoAsked: true }))]; break;
+    case 'budget': chips = [...[500, 1000, 2000, 5000].map((n) => tap(`لحد ${money(n)} ج`, () => advance({ ...draft, budget: n, budgetAsked: true }))), tap('مفيش ميزانية', () => advance({ ...draft, budgetAsked: true }))]; break;
+    case 'confirm': chips = [
+      { label: busy ? 'بيتبعت…' : 'ابعت الطلب', fn: sendRequest },
+      tap('غيّر حاجة', () => { setStep('edit'); say({ text: 'تحب تغيّر إيه؟' }); }),
+      tap('إلغاء', () => { setDraft(emptyDraft()); setStep('menu'); say({ text: 'لغيت الطلب. أي خدمة تانية؟' }); }),
+    ]; break;
+    case 'edit': chips = [
+      tap('القطعة', () => advance({ ...draft, part: '' })),
+      ...((cars?.length ?? 0) > 1 ? [tap('العربية', () => advance({ ...draft, carKey: null }))] : []),
+      ...(partIsSided(draft.part) ? [tap('الجهة', () => advance({ ...draft, side: null }))] : []),
+      tap('مستعمل/جديد', () => advance({ ...draft, cond: null })),
+      tap('الاستعجال', () => advance({ ...draft, urgency: null })),
+      tap('الصورة', () => advance({ ...draft, photo: null, photoAsked: false })),
+      tap('الميزانية', () => advance({ ...draft, budget: null, budgetAsked: false })),
+    ]; break;
+    case 'c_cat': chips = complaintCats.map(([k, v]) => tap(v, () => advanceC({ ...cdraft, category: k }))); break;
+    case 'c_order': chips = [...recent.map((r) => tap(`${reqNo(r.num)} · ${r.part}`, () => advanceC({ ...cdraft, requestId: r.id, requestAsked: true }))), tap('مش عن طلب معين', () => advanceC({ ...cdraft, requestAsked: true }))]; break;
+    case 'c_body': chips = []; break;
+    case 'c_confirm': chips = [
+      { label: busy ? 'بتتبعت…' : 'ابعت الشكوى', fn: sendComplaint },
+      tap('عدّل الكلام', () => advanceC({ ...cdraft, body: '' })),
+      tap('إلغاء', () => { setC(emptyC()); setStep('menu'); say({ text: 'تمام، لغيتها. أي خدمة تانية؟' }); }),
+    ]; break;
+    case 'ai': chips = [...aiChips.map((c) => ({ label: c, fn: () => onText(c) })), ...menu.slice(-1)]; break;
+  }
+
+  if (ready && !session) return <Redirect href="/login" />;
+  if (!profile || !cars) return <Screen><Loading /></Screen>;
+
+  const placeholder = step === 'c_body' ? 'اكتب اللي حصل…' : step === 'part' ? 'اسم القطعة…' : step === 'budget' ? 'المبلغ بالجنيه…' : 'اكتب رسالتك…';
+  const back = () => (router.canGoBack() ? router.back() : router.replace(isShop ? '/account' : '/customer'));
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* header */}
+      <View style={{ paddingTop: insets.top, borderBottomWidth: 1, borderColor: colors.line }}>
+        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 }}>
+          <Pressable onPress={back} hitSlop={10} accessibilityRole="button" accessibilityLabel="رجوع"
+            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="chevron-forward" size={20} />
+          </Pressable>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="sparkles" size={19} color={colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <T w="bold" size={16}>مساعد قطعتك</T>
+            <Row2>
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.good }} />
+              <Muted size={12}>{typing ? 'بيكتب…' : aiOn ? 'متصل · ذكاء اصطناعي' : 'متصل دايماً'}</Muted>
+            </Row2>
+          </View>
+          {!isShop ? (
+            <Pressable onPress={() => router.push('/customer/new')} hitSlop={8} accessibilityRole="button">
+              <Muted size={12.5}>الفورم العادي</Muted>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
+      {/* messages */}
+      <ScrollView ref={scroller} style={{ flex: 1 }} keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: true })}
+        contentContainerStyle={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: 16, gap: 8 }}>
+        {msgs.map((m) => <Bubble key={m.id} m={m} />)}
+        {typing ? (
+          <View style={[bubble('bot'), { flexDirection: 'row', gap: 4, paddingVertical: 14 }]}>
+            {[0, 1, 2].map((i) => <View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.faint }} />)}
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {/* quick replies + input */}
+      <View style={{ borderTopWidth: 1, borderColor: colors.line, paddingBottom: insets.bottom + 10, paddingTop: 10 }}>
+        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 16, gap: 10 }}>
+          {!typing && chips.length ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {chips.map((c, i) => {
+                const main = (step === 'confirm' || step === 'c_confirm') && i === 0;
+                return (
+                  <Pressable key={c.label + i} onPress={c.fn} disabled={busy} accessibilityRole="button"
+                    style={({ pressed }) => [{
+                      flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9,
+                      backgroundColor: main ? colors.ink : colors.ground, borderWidth: 1.5, borderColor: main ? colors.ink : colors.line,
+                    }, pressed && { opacity: 0.7 }]}>
+                    {busy && main ? <ActivityIndicator size="small" color="#fff" /> : c.icon ? <Icon name={c.icon} size={16} /> : null}
+                    <T size={13.5} w="medium" color={main ? '#fff' : colors.ink}>{c.label}</T>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+            <TextInput
+              value={text} onChangeText={setText} placeholder={placeholder} placeholderTextColor={colors.faint}
+              onSubmitEditing={() => onText(text)} submitBehavior="submit" returnKeyType="send"
+              style={{
+                flex: 1, minHeight: 46, maxHeight: 120, borderRadius: 23, backgroundColor: colors.card, paddingHorizontal: 16, paddingVertical: 11,
+                fontFamily: fonts.regular, fontSize: 15, color: colors.ink, textAlign: 'right', writingDirection: 'rtl',
+                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}),
+              }}
+            />
+            <Pressable onPress={() => onText(text)} disabled={!text.trim() || busy} accessibilityRole="button" accessibilityLabel="ابعت"
+              style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: text.trim() ? colors.ink : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="arrow-up" size={20} color={text.trim() ? '#fff' : colors.faint} />
+            </Pressable>
+          </View>
+        </View>
+      </View>
+      <ToastHost bottom={120} />
+    </KeyboardAvoidingView>
+  );
+}
+
+const Row2 = ({ children }: { children: React.ReactNode }) => <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>{children}</View>;
+
+const bubble = (from: 'bot' | 'me') => ({
+  alignSelf: (from === 'me' ? 'flex-end' : 'flex-start') as 'flex-end' | 'flex-start',
+  maxWidth: '86%' as const,
+  backgroundColor: from === 'me' ? colors.ink : colors.card,
+  borderRadius: 20,
+  ...(from === 'me' ? { borderBottomLeftRadius: 6 } : { borderBottomRightRadius: 6 }),
+  paddingHorizontal: 14, paddingVertical: 10,
+});
+
+function Bubble({ m }: { m: Msg }) {
+  const mine = m.from === 'me';
+  return (
+    <View style={[bubble(m.from), { gap: 8 }]}>
+      {m.photo ? <Image source={{ uri: m.photo }} style={{ width: 200, height: 150, borderRadius: 14, backgroundColor: colors.soft }} resizeMode="cover" /> : null}
+      {m.text ? <T size={15} color={mine ? '#fff' : colors.ink}>{m.text}</T> : null}
+      {m.lines ? (
+        <View style={{ backgroundColor: colors.ground, borderRadius: 14, padding: 12, gap: 6, minWidth: 230 }}>
+          {m.lines.map(([k, v]) => (
+            <View key={k} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+              <Muted size={13} style={{ width: 70 }}>{k}</Muted>
+              <T size={14} w="medium" style={{ flex: 1 }}>{v}</T>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {m.links?.map((l) => (
+        <Pressable key={l.href} onPress={() => router.push(l.href as any)} accessibilityRole="link"
+          style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.ground, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }, pressed && { opacity: 0.7 }]}>
+          <T size={14} w="semibold" style={{ flex: 1 }}>{l.label}</T>
+          <Icon name="chevron-back" size={16} color={colors.muted} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}

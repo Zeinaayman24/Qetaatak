@@ -48,7 +48,7 @@ export default function CustomerRequest() {
     if (error) { toast(friendlyError(error)); return false; }
     toast(ok); return true;
   }
-  const again = () => router.push({ pathname: '/customer/new', params: { part: r.part, cond: r.wanted_condition, notes: r.notes, side: r.side } });
+  const again = () => router.push({ pathname: '/assistant', params: { mode: 'request', part: r.part, cond: r.wanted_condition, notes: r.notes, side: r.side } });
   const chat = (shopId: string) => router.push(`/chat/${r.id}/${shopId}`);
   const extras = [
     r.side ? 'الجهة: ' + SIDES[r.side] : '', r.urgency !== 'normal' ? URGENCY[r.urgency] : '',
@@ -178,7 +178,7 @@ export default function CustomerRequest() {
             </View>
           )
         ) : null}
-        <Btn kind="link" title="عندك مشكلة في الطلب؟" style={{ alignSelf: 'center' }} onPress={() => router.push({ pathname: '/support', params: { request: r.id } })} />
+        <Btn kind="link" title="عندك مشكلة في الطلب؟" style={{ alignSelf: 'center' }} onPress={() => router.push({ pathname: '/assistant', params: { mode: 'complaint', request: r.id } })} />
       </Screen>
     );
   }

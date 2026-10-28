@@ -38,6 +38,7 @@ export function BottomNav({ role }: { role: 'customer' | 'shop' }) {
   const items: Item[] = role === 'customer'
     ? [
         { href: '/customer', label: 'الرئيسية', icon: 'home', match: (p) => p === '/customer' || p === '/customer/new' },
+        { href: '/assistant', label: 'المساعد', icon: 'chatbubbles', match: (p) => p === '/assistant' },
         { href: '/customer/requests', label: 'طلباتي', icon: 'receipt', match: (p) => p.startsWith('/customer/') && p !== '/customer/new' },
         { href: '/account', label: 'حسابي', icon: 'person', match: (p) => ['/account', '/profile', '/cars', '/favorites', '/support', '/notifications'].includes(p) },
       ]

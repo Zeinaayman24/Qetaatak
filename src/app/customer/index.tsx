@@ -38,7 +38,7 @@ export default function CustomerHome() {
   if (profile && (!profile.is_customer || !profile.street)) return <Redirect href="/profile" />;
   if (!profile) return <Screen><Loading /></Screen>;
   const first = (profile.full_name || '').split(' ')[0];
-  const newReq = (part?: string) => router.push(part ? { pathname: '/customer/new', params: { part } } : '/customer/new');
+  const newReq = (part?: string) => router.push({ pathname: '/assistant', params: part ? { mode: 'request', part } : { mode: 'request' } });
 
   return (
     <Screen nav={<BottomNav role="customer" />}>
@@ -63,21 +63,21 @@ export default function CustomerHome() {
         <Pressable onPress={() => newReq()} accessibilityRole="button"
           style={({ pressed }) => [{ flex: 1, backgroundColor: colors.ink, borderRadius: 22, padding: 18, minHeight: 150, justifyContent: 'space-between' }, pressed && { opacity: 0.9 }]}>
           <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,.12)', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="camera" size={22} color="#fff" />
+            <Icon name="chatbubbles" size={22} color="#fff" />
           </View>
           <View>
-            <T w="bold" size={17} color="#fff">صوّر القطعة</T>
-            <T size={12.5} color="rgba(255,255,255,.7)">والمحلات تبعتلك أسعار</T>
+            <T w="bold" size={17} color="#fff">قول عايز إيه</T>
+            <T size={12.5} color="rgba(255,255,255,.7)">المساعد يبعت طلبك للمحلات</T>
           </View>
         </Pressable>
-        <Pressable onPress={() => newReq()} accessibilityRole="button"
+        <Pressable onPress={() => router.push({ pathname: '/assistant', params: { mode: 'complaint' } })} accessibilityRole="button"
           style={({ pressed }) => [{ flex: 1, backgroundColor: colors.card, borderRadius: 22, padding: 18, minHeight: 150, justifyContent: 'space-between' }, pressed && { opacity: 0.85 }]}>
           <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="search" size={22} />
+            <Icon name="headset-outline" size={22} />
           </View>
           <View>
-            <T w="bold" size={17}>اكتب اسمها</T>
-            <Muted size={12.5}>لو عارف اسم القطعة</Muted>
+            <T w="bold" size={17}>عندك مشكلة؟</T>
+            <Muted size={12.5}>اشتكي وخدمة العملاء ترد</Muted>
           </View>
         </Pressable>
       </Row>

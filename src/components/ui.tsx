@@ -347,7 +347,7 @@ export function CopyBox({ text }: { text: string }) {
 let pushToast: ((m: string) => void) | null = null;
 export const toast = (m: string) => pushToast?.(m);
 
-function ToastHost({ bottom }: { bottom: number }) {
+export function ToastHost({ bottom }: { bottom: number }) {
   const [msg, setMsg] = useState('');
   const insets = useSafeAreaInsets();
   useEffect(() => {

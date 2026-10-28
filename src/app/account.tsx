@@ -68,7 +68,9 @@ export default function Account() {
       <Group>
         <Item icon="notifications-outline" title="الإشعارات" onPress={() => router.push('/notifications')} />
         <Line />
-        <Item icon="help-circle-outline" title="المساعدة والشكاوى" sub="بلّغ عن مشكلة أو كلّمنا" onPress={() => router.push('/support')} />
+        <Item icon="chatbubbles-outline" title="المساعد" sub="اشتكي أو اسأل، وهو يوصّلك لخدمة العملاء" onPress={() => router.push('/assistant')} />
+        <Line />
+        <Item icon="help-circle-outline" title="شكاويّا" sub="تابع شكاويك وردود خدمة العملاء" onPress={() => router.push('/support')} />
         {profile.is_admin ? (<><Line /><Item icon="shield-checkmark-outline" title="لوحة الإدارة" sub="المحلات، الطلبات، الشكاوى" onPress={() => router.push('/admin')} /></>) : null}
       </Group>
 
