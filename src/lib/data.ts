@@ -2,6 +2,14 @@ export const MAKES = ['هيونداي', 'كيا', 'نيسان', 'تويوتا', 
 
 export const AREAS = ['مدينة نصر', 'مصر الجديدة', 'التجمع الخامس', 'المعادي', 'حلوان', 'شبرا', 'شبرا الخيمة', 'وسط البلد', 'حدائق القبة', 'عين شمس', 'المطرية', 'الدقي', 'المهندسين', 'فيصل', 'الهرم', '٦ أكتوبر', 'الشيخ زايد', 'السبتية', 'التوفيقية', 'أخرى'];
 
+export const GOVERNORATES = ['القاهرة', 'الجيزة', 'الإسكندرية', 'القليوبية', 'الدقهلية', 'الشرقية', 'الغربية', 'المنوفية', 'البحيرة', 'كفر الشيخ', 'دمياط', 'بورسعيد', 'الإسماعيلية', 'السويس', 'الفيوم', 'بني سويف', 'المنيا', 'أسيوط', 'سوهاج', 'قنا', 'الأقصر', 'أسوان', 'البحر الأحمر', 'الوادي الجديد', 'مطروح', 'شمال سيناء', 'جنوب سيناء'];
+
+export const COUNTRIES = ['مصر'];
+
+export const SHOP_TYPES: Record<string, string> = { used: 'مستعمل / تشليح', new: 'جديد', both: 'مستعمل وجديد' };
+
+export const SPECIALTIES = ['ميكانيكا', 'كهرباء', 'صاج وبودي', 'فوانيس ومرايات', 'تكييف وتبريد', 'عفشة ودبرياج', 'فرامل', 'فرش وإكسسوارات', 'إطارات وجنوط', 'زيوت وفلاتر', 'زجاج'];
+
 export const COMMON_PARTS = ['فانوس أمامي', 'مراية جانبية', 'رديتر مياه', 'كمبروسر تكييف', 'طقم دبرياج', 'تيل فرامل', 'دينامو', 'مارش', 'رفرف', 'أكصدام'];
 
 export const YEARS = Array.from({ length: 36 }, (_, i) => new Date().getFullYear() - i);
@@ -33,14 +41,29 @@ export const ago = (iso: string) => {
 };
 
 export const validPhone = (p: string) => /^01\d{9}$/.test(p.replace(/\s/g, ''));
+export const validPostal = (p: string) => p.trim() === '' || /^\d{5}$/.test(toLatin(p.trim()));
+/** Converts Arabic-Indic digits typed on Arabic keyboards to 0-9. */
+export const toLatin = (s: string) => s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 
 export type Profile = {
   id: string; full_name: string; phone: string; area: string;
   car_make: string | null; car_model: string | null; car_year: number | null;
   is_customer: boolean; is_shop: boolean; is_admin: boolean;
+  email: string; country: string; governorate: string; street: string; building: string;
+  floor: string; apartment: string; landmark: string; postal_code: string;
 };
-export type Shop = { id: string; area: string; brands: string[]; status: 'pending' | 'approved' | 'suspended'; created_at: string };
-export type ShopPrivate = { id: string; name: string; owner_name: string; phone: string };
+export type Shop = {
+  id: string; area: string; brands: string[]; status: 'pending' | 'approved' | 'suspended'; created_at: string;
+  governorate: string; shop_type: 'used' | 'new' | 'both'; specialties: string[]; offers_delivery: boolean;
+};
+export type ShopPrivate = {
+  id: string; name: string; owner_name: string; phone: string; phone2: string;
+  street: string; building: string; landmark: string; postal_code: string; commercial_register: string;
+};
+
+/** One readable line for an address. */
+export const addressLine = (a: { street?: string; building?: string; floor?: string; apartment?: string; area?: string; governorate?: string }) =>
+  [a.street, a.building && 'عمارة ' + a.building, a.floor && 'دور ' + a.floor, a.apartment && 'شقة ' + a.apartment, a.area, a.governorate].filter(Boolean).join('، ');
 export type Request = {
   id: string; num: number; customer_id: string; part: string; car_make: string; car_model: string; car_year: number;
   wanted_condition: 'used' | 'new' | 'any'; area: string; notes: string; photo_path: string | null;
@@ -59,7 +82,9 @@ export function friendlyError(e: any): string {
   if (/Password should be/i.test(msg)) return 'كلمة السر لازم تكون ٦ حروف أو أكتر.';
   if (/Email not confirmed/i.test(msg)) return 'لازم تأكد إيميلك الأول من الرسالة اللي وصلتك.';
   if (/rate limit/i.test(msg)) return 'محاولات كتير. استنى شوية وجرّب تاني.';
+  if (/does not deliver/i.test(msg)) return 'المحل ده مش بيوصّل. اختار الاستلام من المحل.';
   if (/request is closed|cannot choose/i.test(msg)) return 'الطلب ده اتقفل.';
+  if (/postal_code/i.test(msg)) return 'الرقم البريدي لازم يكون ٥ أرقام.';
   if (/network|fetch/i.test(msg)) return 'مفيش اتصال بالإنترنت. جرّب تاني.';
   return 'حصلت مشكلة. جرّب تاني.';
 }

@@ -1,27 +1,29 @@
 import { Redirect } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { customerPill } from '@/components/status';
-import { Btn, Empty, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
+import { Btn, Card, Empty, Lines, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
+import { COMMISSION, SHOP_TYPES, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 
 export default function Admin() {
   const { ready, session, profile } = useAuth();
+  const [openId, setOpenId] = useState<string | null>(null);
   const { data, loading } = useLive(async () => {
     const [shops, priv, reqs, quotes, people] = await Promise.all([
       supabase.from('shops').select('*').order('created_at', { ascending: false }),
       supabase.from('shop_private').select('*'),
       supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('quotes').select('*'),
-      supabase.from('profiles').select('id, full_name, phone'),
+      supabase.from('profiles').select('id, full_name, phone, email'),
     ]);
     return {
       shops: must(shops) as Shop[], priv: Object.fromEntries((must(priv) as ShopPrivate[]).map((p) => [p.id, p])),
       reqs: must(reqs) as Request[], quotes: must(quotes) as Quote[],
-      people: Object.fromEntries((must(people) as Pick<Profile, 'id' | 'full_name' | 'phone'>[]).map((p) => [p.id, p])),
+      people: Object.fromEntries((must(people) as Pick<Profile, 'id' | 'full_name' | 'phone' | 'email'>[]).map((p) => [p.id, p])),
     };
   }, ['shops', 'requests', 'quotes'], [profile?.is_admin]);
 
@@ -50,14 +52,35 @@ export default function Admin() {
       <Section title={'المحلات (' + ar(d.shops.length) + ')'}>
         {shops.length ? shops.map((s, i) => {
           const p = d.priv[s.id];
+          const owner = d.people[s.id];
+          const open = openId === s.id;
           return (
-            <ListRow key={s.id} last={i === shops.length - 1}
-              title={<Row gap={8}><T w="semibold">{p?.name ?? '—'}</T><Pill label={s.status === 'approved' ? 'شغال' : s.status === 'pending' ? 'مستني موافقة' : 'موقوف'} tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'plain'} /></Row>}
-              subtitle={`${s.area} · ${p?.owner_name ?? ''} · ${p?.phone ?? ''}`}
-              meta={s.brands.join('، ')}
-              trailing={s.status === 'approved'
-                ? <Btn kind="link" title="إيقاف" onPress={() => setStatus(s.id, 'suspended')} />
-                : <Btn kind="small" title="وافق" onPress={() => setStatus(s.id, 'approved')} />} />
+            <View key={s.id}>
+              <ListRow last={i === shops.length - 1 && !open} onPress={() => setOpenId(open ? null : s.id)}
+                title={<Row gap={8}><T w="semibold">{p?.name ?? '—'}</T><Pill label={s.status === 'approved' ? 'شغال' : s.status === 'pending' ? 'مستني موافقة' : 'موقوف'} tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'plain'} /></Row>}
+                subtitle={`${s.area}، ${s.governorate} · ${SHOP_TYPES[s.shop_type] ?? ''}`}
+                meta={open ? 'اضغط للإخفاء' : 'اضغط لعرض كل البيانات'} />
+              {open ? (
+                <Card style={{ marginBottom: 12 }}>
+                  <Lines rows={[
+                    ['صاحب المحل', p?.owner_name ?? '—'],
+                    ['موبايل', p?.phone ?? '—'],
+                    ...(p?.phone2 ? [['موبايل تاني', p.phone2] as [string, string]] : []),
+                    ['الإيميل', owner?.email || '—'],
+                    ['العنوان', addressLine({ street: p?.street, building: p?.building, area: s.area, governorate: s.governorate }) || '—'],
+                    ...(p?.landmark ? [['علامة مميزة', p.landmark] as [string, string]] : []),
+                    ['الرقم البريدي', p?.postal_code || '—'],
+                    ['السجل التجاري', p?.commercial_register || '—'],
+                    ['التوصيل', s.offers_delivery ? 'بيوصّل' : 'استلام من المحل بس'],
+                    ['التخصص', s.specialties.join('، ') || '—'],
+                    ['الماركات', s.brands.join('، ') || '—'],
+                  ]} />
+                  {s.status === 'approved'
+                    ? <Btn kind="danger" title="إيقاف المحل" onPress={() => setStatus(s.id, 'suspended')} />
+                    : <Btn kind="dark" title="وافق على المحل" onPress={() => setStatus(s.id, 'approved')} />}
+                </Card>
+              ) : null}
+            </View>
           );
         }) : <Empty text="لسه مفيش محلات مسجلة." />}
       </Section>

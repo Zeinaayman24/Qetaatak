@@ -5,7 +5,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Row, Screen, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, CONDITIONS, WANTED, WARRANTY_DAYS, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request } from '@/lib/data';
+import { COMMISSION, CONDITIONS, WANTED, WARRANTY_DAYS, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -111,8 +111,11 @@ export default function ShopRequest() {
         <T size={14}>{r.delivery_mode === 'pickup' ? 'العميل جاي ياخدها من المحل وهيقولك رقم الطلب ' + reqNo(r.num) + '.' : 'كلّم العميل واتفق على التوصيل. اكتب رقم الطلب ' + reqNo(r.num) + ' على الكيس.'}</T>
         {c ? (
           <View style={{ gap: 6 }}>
-            <Row style={{ justifyContent: 'space-between' }}><T w="semibold">{c.full_name}</T><Muted>{r.area}</Muted></Row>
+            <T w="semibold">{c.full_name}</T>
             <CopyBox text={c.phone} />
+            {r.delivery_mode === 'delivery' ? (
+              <Muted size={13}>العنوان: {addressLine(c)}{c.landmark ? ' (' + c.landmark + ')' : ''}{c.postal_code ? ' · ' + c.postal_code : ''}</Muted>
+            ) : null}
           </View>
         ) : null}
         <Lines rows={[['سعر البيع', money(mine.price) + ' ج.م'], ['عمولة قطعتك ٥٪', money(mine.price * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(mine.price * (1 - COMMISSION)) + ' ج.م']} />

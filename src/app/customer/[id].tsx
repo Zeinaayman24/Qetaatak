@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AppHeader } from '@/components/AppHeader';
 import { BackBar, Btn, Card, CopyBox, Empty, Labeled, Lines, ListRow, Loading, Muted, Photo, Row, Screen, Section, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { CONDITIONS, DELIVERY_FEE, WANTED, ago, ar, friendlyError, money, reqNo, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
+import { CONDITIONS, DELIVERY_FEE, WANTED, addressLine, ago, ar, friendlyError, money, reqNo, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
@@ -13,7 +13,7 @@ type Data = { req: Request | null; quotes: Quote[]; shops: Record<string, Shop>;
 
 export default function CustomerRequest() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { ready, session } = useAuth();
+  const { ready, session, profile } = useAuth();
   const [picked, setPicked] = useState<Quote | null>(null);
   const [mode, setMode] = useState<'delivery' | 'pickup'>('delivery');
   const [busy, setBusy] = useState(false);
@@ -79,8 +79,11 @@ export default function CustomerRequest() {
           </View>
         </Row>
         <Labeled label="هتستلمها إزاي؟">
-          <Seg options={[{ v: 'delivery', label: 'توصيل للبيت' }, { v: 'pickup', label: 'من المحل' }]} value={mode} onPick={setMode} />
+          {shop?.offers_delivery
+            ? <Seg options={[{ v: 'delivery', label: 'توصيل للبيت' }, { v: 'pickup', label: 'من المحل' }]} value={mode} onPick={setMode} />
+            : <Muted size={14}>المحل ده مش بيوصّل، هتستلمها من المحل في {shop?.area}.</Muted>}
         </Labeled>
+        {mode === 'delivery' && profile ? <Muted size={13}>هتوصل على: {addressLine(profile)}</Muted> : null}
         <Card>
           <Lines rows={[['سعر القطعة', money(picked.price) + ' ج.م'], ['التوصيل', mode === 'delivery' ? money(DELIVERY_FEE) + ' ج.م (تقريبي)' : 'مجاناً']]} total={['الإجمالي', money(total) + ' ج.م']} />
         </Card>
@@ -113,6 +116,8 @@ export default function CustomerRequest() {
               <Muted>{shop?.area}</Muted>
             </Row>
             <CopyBox text={sp.phone} />
+            {sp.phone2 ? <CopyBox text={sp.phone2} /> : null}
+            <Muted size={13}>العنوان: {addressLine({ street: sp.street, building: sp.building, area: shop?.area, governorate: shop?.governorate })}{sp.landmark ? ' (' + sp.landmark + ')' : ''}</Muted>
             <Lines rows={[[CONDITIONS[q.condition], money(q.price) + ' ج.م'], ...(r.delivery_mode === 'delivery' ? [['التوصيل (تقريبي)', money(DELIVERY_FEE) + ' ج.م'] as [string, string]] : [])]}
               total={['الإجمالي', money(q.price + (r.delivery_mode === 'delivery' ? DELIVERY_FEE : 0)) + ' ج.م']} />
             <Muted>ضمان {ar(q.warranty_days)} يوم: لو القطعة مركبتش، المحل يبدّلها.</Muted>
@@ -154,8 +159,8 @@ export default function CustomerRequest() {
                   leading={<Photo uri={photoUrl(q.photo_path)} size={56} />}
                   title={<T w="bold" size={22} style={{ lineHeight: 30 }}>{money(q.price)} <T size={13} color={colors.muted}>ج.م</T></T>}
                   subtitle={CONDITIONS[q.condition] + ' · ضمان ' + ar(q.warranty_days) + ' يوم'}
-                  meta={'محل في ' + (data!.shops[q.shop_id]?.area ?? '—') + ' · ' + ago(q.created_at)}
-                  trailing={<Btn kind="small" title="اختار" onPress={() => { setMode('delivery'); setPicked(q); }} />} />
+                  meta={'محل في ' + (data!.shops[q.shop_id]?.area ?? '—') + (data!.shops[q.shop_id]?.offers_delivery ? ' · بيوصّل' : ' · استلام بس') + ' · ' + ago(q.created_at)}
+                  trailing={<Btn kind="small" title="اختار" onPress={() => { setMode(data!.shops[q.shop_id]?.offers_delivery ? 'delivery' : 'pickup'); setPicked(q); }} />} />
               ))}
               <Muted center size={12}>اسم المحل ورقمه بيظهروا بعد ما تختار.</Muted>
             </Section>

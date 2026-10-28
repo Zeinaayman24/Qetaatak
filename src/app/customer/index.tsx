@@ -21,7 +21,7 @@ export default function CustomerHome() {
   }, ['requests', 'quotes'], [uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  if (profile && !profile.is_customer) return <Redirect href="/profile" />;
+  if (profile && (!profile.is_customer || !profile.street)) return <Redirect href="/profile" />;
   if (!profile) return <Screen header={<AppHeader role="customer" />}><Loading /></Screen>;
 
   const reqs = data?.reqs ?? [];

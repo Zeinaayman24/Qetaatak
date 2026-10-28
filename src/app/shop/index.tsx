@@ -26,7 +26,7 @@ export default function ShopInbox() {
   }, ['requests', 'quotes'], [uid, shop?.status]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  if (profile && !shop) return <Redirect href="/shop-setup" />;
+  if (profile && (!shop || !shop.governorate)) return <Redirect href="/shop-setup" />;
   if (!profile || !shop) return <Screen header={<AppHeader role="shop" />}><Loading /></Screen>;
 
   const rows = (data?.reqs ?? [])
@@ -45,7 +45,7 @@ export default function ShopInbox() {
     <Screen header={<AppHeader role="shop" />}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <View style={{ flex: 1 }}>
-          <Muted size={14}>{shop.area}</Muted>
+          <Muted size={14}>{shop.area}، {shop.governorate} · {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</Muted>
           <T w="bold" size={26} style={{ lineHeight: 36 }}>{shopPrivate?.name}</T>
         </View>
         <Btn kind="link" title="تعديل" onPress={() => router.push('/shop-setup')} />
