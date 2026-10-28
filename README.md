@@ -39,6 +39,22 @@ supabase/migrations database schema and security rules
 - Shop inbox search and filters (my brands, area, condition, urgent first)
 - Support and complaints, answered from the admin page
 
+## Management system (`manage/`)
+
+A separate desktop web app for the Qetaatak team, served at `/Qetaatak/manage/` and using the same Supabase project.
+
+- **Customers** with unique IDs (`C-10001`), full details, cars, orders and complaints; admins can block
+- **Shops** with unique IDs (`S-10002`), full details, sales, ratings; admins approve, suspend or block
+- **Orders** with quotes, the chosen shop, tracking and chat history
+- **Customer service**: every complaint from the app is a ticket (`T-1001`) with priority, assignee,
+  status and a two-way conversation; internal notes stay hidden from the customer
+- **Staff**: admins add customer service employees by email (they handle tickets but can't approve shops or block)
+
+```bash
+cd manage && npm install && npm run dev   # local
+npm run build                             # production build in manage/dist
+```
+
 ## Security model (Supabase row level security)
 
 - Customers see only their own requests and the quotes on them.

@@ -23,9 +23,16 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            manage/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx expo export -p web
+      # management system (separate web app) served at /Qetaatak/manage/
+      - run: npm ci && npm run build
+        working-directory: manage
+      - run: mkdir -p dist/manage && cp -r manage/dist/. dist/manage/
       # single-page app: let GitHub Pages serve every route from index.html
       - run: cp dist/index.html dist/404.html && touch dist/.nojekyll
       - uses: actions/upload-pages-artifact@v3

@@ -75,7 +75,9 @@ export type Request = {
 export type Car = { id: string; make: string; model: string; year: number; vin: string };
 export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; created_at: string };
 export type Notification = { id: string; title: string; body: string; link: string; read_at: string | null; created_at: string };
-export type Report = { id: string; reporter_id: string; request_id: string | null; category: string; body: string; status: 'open' | 'resolved'; admin_reply: string; created_at: string };
+export type Report = { id: string; ticket_no: number; reporter_id: string; request_id: string | null; category: string; body: string; status: 'open' | 'in_progress' | 'resolved'; admin_reply: string; created_at: string; updated_at: string };
+export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; created_at: string };
+export const TICKET_STATUS: Record<string, string> = { open: 'جديدة', in_progress: 'بنحلّها', resolved: 'اتحلّت' };
 
 export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', front: 'قدام', rear: 'ورا' };
 export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };

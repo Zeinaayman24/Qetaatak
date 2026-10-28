@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { BackBar, Btn, Card, Chips, Empty, ErrorText, Field, Labeled, Muted, Pill, Row, Screen, Section, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { REPORT_CATEGORIES, ago, friendlyError, type Report } from '@/lib/data';
+import { REPORT_CATEGORIES, TICKET_STATUS, ago, friendlyError, type Report } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 
@@ -19,8 +19,8 @@ export default function Support() {
   const [err, setErr] = useState<string | null>(null);
   const { data, reload } = useLive(async () => {
     if (!uid) return [] as Report[];
-    return must(await supabase.from('reports').select('*').eq('reporter_id', uid).order('created_at', { ascending: false })) as Report[];
-  }, ['reports'], [uid]);
+    return must(await supabase.from('reports').select('*').eq('reporter_id', uid).order('updated_at', { ascending: false })) as Report[];
+  }, ['reports', 'ticket_messages'], [uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
   const cats = Object.entries(REPORT_CATEGORIES).filter(([k]) => (profile?.is_shop ? k !== 'shop' : k !== 'customer'));
@@ -29,10 +29,10 @@ export default function Support() {
     setErr(null);
     if (body.trim().length < 5) return setErr('اكتب المشكلة بتفاصيل أكتر.');
     setBusy(true);
-    const { error } = await supabase.from('reports').insert({ category, body: body.trim(), request_id: requestId });
+    const { data: created, error } = await supabase.from('reports').insert({ category, body: body.trim(), request_id: requestId }).select('id, ticket_no').single();
     setBusy(false);
     if (error) return setErr(friendlyError(error));
-    setBody(''); toast('اتبعتت. هنرد عليك في أقرب وقت.'); reload();
+    setBody(''); toast('اتسجّلت شكوتك برقم T-' + created.ticket_no); reload();
   }
 
   return (
@@ -49,14 +49,13 @@ export default function Support() {
         <Section title="شكاويك">
           <View style={{ gap: 10, marginTop: 8 }}>
             {data.map((r) => (
-              <Card key={r.id}>
+              <Card key={r.id} onPress={() => router.push(`/ticket/${r.id}`)}>
                 <Row style={{ justifyContent: 'space-between' }}>
-                  <T w="semibold" size={14}>{REPORT_CATEGORIES[r.category]}</T>
-                  <Pill label={r.status === 'resolved' ? 'اتحلّت' : 'بنراجعها'} tone={r.status === 'resolved' ? 'good' : 'wait'} />
+                  <T w="semibold" size={14}>T-{r.ticket_no} · {REPORT_CATEGORIES[r.category]}</T>
+                  <Pill label={TICKET_STATUS[r.status]} tone={r.status === 'resolved' ? 'good' : 'wait'} />
                 </Row>
-                <T size={14}>{r.body}</T>
-                {r.admin_reply ? <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 10 }}><Muted size={12}>ردّ الدعم</Muted><T size={14}>{r.admin_reply}</T></View> : null}
-                <Muted size={11.5}>{ago(r.created_at)}</Muted>
+                <T size={14} numberOfLines={2}>{r.body}</T>
+                <Muted size={11.5}>آخر تحديث {ago(r.updated_at)} · اضغط للمحادثة</Muted>
               </Card>
             ))}
           </View>
