@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
-import { CATEGORY, PRIORITY, REQUEST_STATUS, TICKET_STATUS, ago, memberId, money, orderId, ticketId } from '../lib';
+import { CATEGORY, PRIORITY, REQUEST_STATUS, TICKET_STATUS, ago, memberId, money, needsPeople, orderId, ticketId } from '../lib';
 
 export default function Dashboard() {
   const { all, me } = useData();
@@ -11,7 +11,7 @@ export default function Dashboard() {
   const sold = all.requests.filter((r) => r.status === 'chosen' || r.status === 'done');
   const gmv = sold.reduce((s, r) => s + (all.quotes.find((q) => q.id === r.chosen_quote_id)?.price ?? 0), 0);
   const found = all.requests.filter((r) => all.quotes.some((q) => q.request_id === r.id)).length;
-  const openTickets = all.tickets.filter((t) => t.status !== 'resolved');
+  const openTickets = all.tickets.filter(needsPeople);
   const pending = shops.filter((s) => s.status === 'pending');
   const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) + '%' : '—');
 
@@ -19,7 +19,7 @@ export default function Dashboard() {
     ['العملاء', customers.length],
     ['المحلات الشغالة', shops.filter((s) => s.status === 'approved').length, pending.length ? `${pending.length} مستنية موافقة` : undefined],
     ['طلبات النهارده', reqToday, `${all.requests.length} إجمالي`],
-    ['شكاوى مفتوحة', openTickets.length, openTickets.filter((t) => t.priority === 'high').length ? `${openTickets.filter((t) => t.priority === 'high').length} عاجلة` : undefined],
+    ['محادثات مع خدمة العملاء', openTickets.length, openTickets.filter((t) => t.priority === 'high').length ? `${openTickets.filter((t) => t.priority === 'high').length} عاجلة` : undefined],
     ['قيمة المبيعات', money(gmv), `عمولة ${money(gmv * 0.05)}`],
     ['طلبات لقت عرض', pct(found, all.requests.length), `إغلاق ${pct(sold.length, found)}`],
   ];
@@ -34,7 +34,7 @@ export default function Dashboard() {
 
       <div className="grid-2">
         <section className="panel">
-          <div className="panel-head"><h2>شكاوى محتاجة رد</h2><Link to="/tickets">الكل</Link></div>
+          <div className="panel-head"><h2>محادثات محتاجة موظف</h2><Link to="/tickets">الكل</Link></div>
           {openTickets.length ? (
             <table className="table">
               <tbody>

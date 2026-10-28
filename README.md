@@ -92,3 +92,10 @@ where id = (select id from auth.users where email = 'you@example.com');
 Customers make part requests and complaints by chatting with «مساعد قطعتك».
 - **Free mode (default):** tap-to-answer buttons plus on-device understanding of simple Arabic (`src/lib/assistant.ts`). It always shows a summary and the customer confirms before a request or ticket is created.
 - **Smart AI mode:** the `assistant` Supabase Edge Function (`supabase/functions/assistant`) is deployed but switched off. To turn it on, add the secret `ANTHROPIC_API_KEY` in Supabase → Edge Functions → Secrets (optional `ASSISTANT_MODEL`, default `claude-haiku-5-5`). The app detects it automatically; no new build needed.
+
+### Complaints: assistant first, then a person, in one chat
+Each complaint is one conversation (`reports` + `ticket_messages`).
+1. The assistant opens the case (status `bot`), saves the chat so far, and tries to solve it (order status, warranty, app tips).
+2. If it can't, or the customer asks for a person, it calls `escalate_ticket` → status `open`, and staff are notified.
+3. An agent clicks **استلم المحادثة** in the management site (`take_ticket`) → status `in_progress`. The customer sees the agent join and keeps writing in the same chat.
+4. The agent ends it with **إنهاء المحادثة** (`close_ticket`) → status `resolved`, and the customer's chat closes. The customer can also mark it solved (`customer_resolve_ticket`).

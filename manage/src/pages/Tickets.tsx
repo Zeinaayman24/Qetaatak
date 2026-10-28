@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
-import { CATEGORY, PRIORITY, TICKET_STATUS, ago, memberId, ticketId } from '../lib';
+import { CATEGORY, PRIORITY, TICKET_STATUS, ago, memberId, needsPeople, ticketId } from '../lib';
 
 export default function Tickets() {
   const { all, me } = useData();
   const nav = useNavigate();
-  const [status, setStatus] = useState<'active' | 'open' | 'in_progress' | 'resolved' | 'all'>('active');
+  const [status, setStatus] = useState<'active' | 'open' | 'in_progress' | 'bot' | 'resolved' | 'all'>('active');
   const [mine, setMine] = useState(false);
   const [q, setQ] = useState('');
   const staff = all.profiles.filter((p) => p.is_admin || p.is_support);
   const n = q.trim().toLowerCase();
   const rank = { high: 0, normal: 1, low: 2 } as const;
   const shown = all.tickets
-    .filter((t) => status === 'all' ? true : status === 'active' ? t.status !== 'resolved' : t.status === status)
+    .filter((t) => status === 'all' ? true : status === 'active' ? needsPeople(t) : t.status === status)
     .filter((t) => !mine || t.assigned_to === me.id)
     .filter((t) => {
       if (!n) return true;
@@ -21,13 +21,13 @@ export default function Tickets() {
       return [ticketId(t.ticket_no), t.body, p?.full_name, all.priv[t.reporter_id]?.name, memberId(p), p?.phone].join(' ').toLowerCase().includes(n);
     })
     .sort((a, b) => (status === 'resolved' ? 0 : rank[a.priority] - rank[b.priority]) || b.updated_at.localeCompare(a.updated_at));
-  const counts = { open: all.tickets.filter((t) => t.status === 'open').length, in_progress: all.tickets.filter((t) => t.status === 'in_progress').length };
+  const counts = { open: all.tickets.filter((t) => t.status === 'open').length, in_progress: all.tickets.filter((t) => t.status === 'in_progress').length, bot: all.tickets.filter((t) => t.status === 'bot').length };
 
   return (
-    <Page title="خدمة العملاء" sub={`${counts.open} جديدة · ${counts.in_progress} جاري حلها`}>
+    <Page title="خدمة العملاء" sub={`${counts.open} مستنية موظف · ${counts.in_progress} مع موظف · ${counts.bot} مع المساعد الآلي`}>
       <div className="toolbar">
         <div className="tabs">
-          {([['active', 'المفتوحة'], ['open', 'جديدة'], ['in_progress', 'جاري الحل'], ['resolved', 'اتحلّت'], ['all', 'الكل']] as const).map(([k, v]) => (
+          {([['active', 'محتاجة موظف'], ['open', 'مستنية'], ['in_progress', 'مع موظف'], ['bot', 'مع المساعد'], ['resolved', 'انتهت'], ['all', 'الكل']] as const).map(([k, v]) => (
             <button key={k} className={'tab' + (status === k ? ' on' : '')} onClick={() => setStatus(k)}>{v}</button>
           ))}
         </div>
@@ -48,7 +48,7 @@ export default function Tickets() {
                   <td className="small"><div className="clamp">{t.body}</div></td>
                   <td><Pill tone={t.priority === 'high' ? 'bad' : t.priority === 'low' ? 'plain' : 'dark'}>{PRIORITY[t.priority]}</Pill></td>
                   <td className="small">{t.assigned_to ? staff.find((s) => s.id === t.assigned_to)?.full_name || 'موظف' : '—'}</td>
-                  <td><Pill tone={t.status === 'resolved' ? 'good' : t.status === 'open' ? 'wait' : 'plain'}>{TICKET_STATUS[t.status]}</Pill></td>
+                  <td><Pill tone={t.status === 'resolved' ? 'good' : t.status === 'open' ? 'wait' : t.status === 'bot' ? 'plain' : 'dark'}>{TICKET_STATUS[t.status]}</Pill></td>
                   <td className="small muted">{ago(t.updated_at)}</td>
                 </tr>
               );

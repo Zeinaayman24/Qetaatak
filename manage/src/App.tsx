@@ -59,7 +59,7 @@ function Shell({ me }: { me: Profile }) {
   const { data, error, reload } = useLive(loadAll, ALL_TABLES);
   if (error) return <div className="center-screen"><p className="error">مشكلة في تحميل البيانات: {error}</p></div>;
   if (!data) return <div className="center-screen"><span className="spinner" /></div>;
-  const openTickets = data.tickets.filter((t) => t.status !== 'resolved').length;
+  const openTickets = data.tickets.filter((t) => t.status === 'open').length;
   const pendingShops = Object.values(data.shops).filter((s) => s.status === 'pending').length;
   return (
     <DataCtx.Provider value={{ me, all: data, reload }}>

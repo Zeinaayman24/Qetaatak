@@ -28,12 +28,23 @@ If the customer asks something unrelated, answer briefly and steer back.
 Reply with ONLY a JSON object, no other text:
 {"reply": "...", "quick_replies": ["up to 4 short Arabic button labels"], "draft": {"intent": "request" | "complaint" | null, ...fields}, "ready": true | false}`;
 
+const SUPPORT = `You are "مساعد قطعتك", the support assistant inside Qetaatak (Egyptian car spare-parts marketplace).
+A complaint case is open and you are handling it first. Talk in short, warm Egyptian Arabic.
+Use only the facts in the context: order status, warranty days, the complaint. Useful facts about the app:
+customers can chat with the chosen shop from the order page; shops give a warranty and must replace or refund a faulty part within it;
+new requests usually get a first quote within an hour; order steps are preparing → ready → out for delivery → delivered.
+Never promise refunds, compensation, or actions by staff, and never invent facts.
+Hand the case to a human (action "escalate") when: the customer asks for a person, is angry, the case needs a decision
+(refund, return dispute, payment, shop misconduct, safety), or you already answered and it is still not solved.
+Use action "resolved" only when the customer clearly says the problem is solved.
+Reply with ONLY a JSON object: {"reply": "...", "quick_replies": ["up to 3 short Arabic buttons"], "action": null | "escalate" | "resolved"}`;
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const key = Deno.env.get('ANTHROPIC_API_KEY');
   if (!key) return json({ configured: false });
 
-  let input: { ping?: boolean; messages?: { role: 'user' | 'assistant'; content: string }[]; context?: unknown };
+  let input: { ping?: boolean; mode?: string; messages?: { role: 'user' | 'assistant'; content: string }[]; context?: unknown };
   try { input = await req.json(); } catch { return json({ error: 'bad json' }, 400); }
   if (input.ping) return json({ configured: true });
   const messages = (input.messages ?? []).filter((m) => m && typeof m.content === 'string' && m.content.trim()).slice(-20);
@@ -45,7 +56,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 600,
-      system: SYSTEM + '\n\nCustomer context (JSON): ' + JSON.stringify(input.context ?? {}),
+      system: (input.mode === 'support' ? SUPPORT : SYSTEM) + '\n\nContext (JSON): ' + JSON.stringify(input.context ?? {}),
       messages: messages.map((m) => ({ role: m.role, content: m.content.slice(0, 2000) })),
     }),
   });
@@ -55,8 +66,13 @@ Deno.serve(async (req) => {
   const match = text.match(/\{[\s\S]*\}/);
   try {
     const out = JSON.parse(match ? match[0] : text);
+    if (input.mode === 'support') {
+      const action = out.action === 'escalate' || out.action === 'resolved' ? out.action : null;
+      return json({ configured: true, reply: String(out.reply ?? ''), quick_replies: Array.isArray(out.quick_replies) ? out.quick_replies.slice(0, 3) : [], action });
+    }
     return json({ configured: true, reply: String(out.reply ?? ''), quick_replies: Array.isArray(out.quick_replies) ? out.quick_replies.slice(0, 4) : [], draft: out.draft ?? null, ready: !!out.ready });
   } catch {
+    if (input.mode === 'support') return json({ configured: true, reply: text.slice(0, 600), quick_replies: [], action: null });
     return json({ configured: true, reply: text.slice(0, 600), quick_replies: [], draft: null, ready: false });
   }
 });

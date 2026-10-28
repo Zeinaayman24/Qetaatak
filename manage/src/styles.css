@@ -150,3 +150,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .main { padding: 18px 16px 48px; }
   .field { grid-template-columns: 100px 1fr; }
 }
+.bubble.bot { align-self: flex-start; background: var(--fill); border: 1px solid var(--line); }
+.chat-event { align-self: center; font-size: 12px; color: var(--muted); background: var(--fill); border-radius: 999px; padding: 3px 12px; }
+.chat-banner { border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 600; background: var(--fill); }
+.chat-banner.wait { background: var(--accent-soft); color: #8A5300; }
+.chat-banner.dark { background: var(--ink); color: #fff; }
+.chat-banner.good { background: var(--good-soft); color: var(--good); }
+.conversation { height: calc(100vh - 150px); min-height: 480px; overflow: hidden; }
+.chat-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 4px 2px; }

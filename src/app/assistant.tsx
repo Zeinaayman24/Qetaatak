@@ -1,14 +1,14 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon, Loading, Muted, Screen, T, ToastHost, toast } from '@/components/ui';
+import { Pressable } from 'react-native';
+import { CaseChat } from '@/components/CaseChat';
+import { ChatFrame } from '@/components/chat';
+import { Loading, Muted, Screen, toast } from '@/components/ui';
 import { aiAvailable, askAi, parse, partIsSided, type AiTurn, type Parsed } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
 import { COMMON_PARTS, REPORT_CATEGORIES, SIDES, URGENCY, WANTED, ar, friendlyError, money, reqNo, type Car, type Request } from '@/lib/data';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
-import { colors, fonts } from '@/lib/theme';
 
 /* The chat assistant: customers make part requests and complaints by talking to it.
    Free mode: guided buttons + on-device understanding of simple Arabic.
@@ -34,10 +34,11 @@ const STATUS: Record<string, string> = { open: 'بيستقبل عروض', chosen
 
 export default function Assistant() {
   const { ready, session, profile } = useAuth();
-  const params = useLocalSearchParams<{ mode?: string; part?: string; request?: string; cond?: string; side?: string; notes?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; part?: string; request?: string; cond?: string; side?: string; notes?: string; ticket?: string }>();
   const str = (v: unknown) => (typeof v === 'string' ? v : '');
-  const insets = useSafeAreaInsets();
-
+  
+  const [ticket, setTicket] = useState<{ id: string; fresh: boolean } | null>(str(params.ticket) ? { id: str(params.ticket), fresh: false } : null);
+  useEffect(() => { const t = str(params.ticket); if (t && t !== ticket?.id) setTicket({ id: t, fresh: false }); }, [params.ticket]);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [step, setStep] = useState<Step>('menu');
   const [draft, setDraft] = useState<Draft>(emptyDraft);
@@ -53,7 +54,6 @@ export default function Assistant() {
   const nextId = useRef(1);
   const queue = useRef(0);
   const started = useRef(false);
-  const scroller = useRef<any>(null);
   const uid = session?.user.id;
   const isShop = !!profile?.is_shop;
 
@@ -115,6 +115,11 @@ export default function Assistant() {
         notes: str(params.notes),
       });
     }
+    supabase.from('reports').select('id, ticket_no').eq('reporter_id', uid!).in('status', ['open', 'in_progress']).order('updated_at', { ascending: false }).limit(1)
+      .then(({ data }) => {
+        const live = data?.[0];
+        if (live) say({ text: `عندك محادثة مفتوحة مع خدمة العملاء (T-${live.ticket_no}).`, links: [{ label: 'كمّل المحادثة', href: `/assistant?ticket=${live.id}` }] });
+      });
     say({ text: isShop
       ? `أهلاً يا ${first} 👋 أنا مساعد قطعتك. لو عندك مشكلة أو شكوى اكتبهالي وأنا أوصّلها لخدمة العملاء.`
       : `أهلاً يا ${first} 👋 أنا مساعد قطعتك.\nأقدر أدوّرلك على أي قطعة عند المحلات، أو أسجّل شكوى، أو أتابعلك طلب.\nاكتبلي محتاج إيه، مثلاً «عايز فانوس يمين مستعمل».` });
@@ -208,12 +213,19 @@ export default function Assistant() {
     if (busy) return;
     me('ابعت الشكوى');
     setBusy(true);
-    const { data, error } = await supabase.from('reports').insert({ category: cdraft.category, body: cdraft.body.trim(), request_id: cdraft.requestId }).select('id, ticket_no').single();
+    // The assistant opens a case and keeps handling it in this same chat; customer service joins if needed.
+    const { data, error } = await supabase.from('reports')
+      .insert({ category: cdraft.category, body: cdraft.body.trim(), request_id: cdraft.requestId, status: 'bot' })
+      .select('id, ticket_no').single();
+    if (error) { setBusy(false); return say({ text: 'معرفتش أسجّل الشكوى: ' + friendlyError(error) }); }
+    const history = [...msgs, { id: 0, from: 'me' as const, text: 'ابعت الشكوى' }, { id: 0, from: 'bot' as const, text: `سجّلت شكوتك برقم T-${data.ticket_no} ✅` }]
+      .map((m) => ({ report_id: data.id, kind: m.from === 'bot' ? 'bot' : 'user', body: asText(m) }))
+      .filter((m) => m.body);
+    await supabase.from('ticket_messages').insert(history);
     setBusy(false);
-    if (error) return say({ text: 'معرفتش أسجّل الشكوى: ' + friendlyError(error) });
-    setStep('done');
     setC(emptyC());
-    say({ text: `اتسجّلت ✅ رقم شكوتك T-${data.ticket_no}.\nحد من خدمة العملاء هيرد عليك خلال ٤٨ ساعة، وهيوصلك إشعار. تقدر تتابع وتكلّمهم من هنا:`, links: [{ label: `محادثة الشكوى T-${data.ticket_no}`, href: `/ticket/${data.id}` }] });
+    setTicket({ id: data.id, fresh: true });
+    router.setParams({ ticket: data.id });
   }
 
   /* ---------- tracking */
@@ -394,126 +406,30 @@ export default function Assistant() {
   }
 
   if (ready && !session) return <Redirect href="/login" />;
+  if (ticket) return <CaseChat key={ticket.id} id={ticket.id} fresh={ticket.fresh} />;
   if (!profile || !cars) return <Screen><Loading /></Screen>;
 
   const placeholder = step === 'c_body' ? 'اكتب اللي حصل…' : step === 'part' ? 'اسم القطعة…' : step === 'budget' ? 'المبلغ بالجنيه…' : 'اكتب رسالتك…';
   const back = () => (router.canGoBack() ? router.back() : router.replace(isShop ? '/account' : '/customer'));
+  const main = step === 'confirm' || step === 'c_confirm';
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* header */}
-      <View style={{ paddingTop: insets.top, borderBottomWidth: 1, borderColor: colors.line }}>
-        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 }}>
-          <Pressable onPress={back} hitSlop={10} accessibilityRole="button" accessibilityLabel="رجوع"
-            style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="chevron-forward" size={20} />
-          </Pressable>
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="sparkles" size={19} color={colors.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <T w="bold" size={16}>مساعد قطعتك</T>
-            <Row2>
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.good }} />
-              <Muted size={12}>{typing ? 'بيكتب…' : aiOn ? 'متصل · ذكاء اصطناعي' : 'متصل دايماً'}</Muted>
-            </Row2>
-          </View>
-          {!isShop ? (
-            <Pressable onPress={() => router.push('/customer/new')} hitSlop={8} accessibilityRole="button">
-              <Muted size={12.5}>الفورم العادي</Muted>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-
-      {/* messages */}
-      <ScrollView ref={scroller} style={{ flex: 1 }} keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: true })}
-        contentContainerStyle={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: 16, gap: 8 }}>
-        {msgs.map((m) => <Bubble key={m.id} m={m} />)}
-        {typing ? (
-          <View style={[bubble('bot'), { flexDirection: 'row', gap: 4, paddingVertical: 14 }]}>
-            {[0, 1, 2].map((i) => <View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.faint }} />)}
-          </View>
-        ) : null}
-      </ScrollView>
-
-      {/* quick replies + input */}
-      <View style={{ borderTopWidth: 1, borderColor: colors.line, paddingBottom: insets.bottom + 10, paddingTop: 10 }}>
-        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 16, gap: 10 }}>
-          {!typing && chips.length ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {chips.map((c, i) => {
-                const main = (step === 'confirm' || step === 'c_confirm') && i === 0;
-                return (
-                  <Pressable key={c.label + i} onPress={c.fn} disabled={busy} accessibilityRole="button"
-                    style={({ pressed }) => [{
-                      flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9,
-                      backgroundColor: main ? colors.ink : colors.ground, borderWidth: 1.5, borderColor: main ? colors.ink : colors.line,
-                    }, pressed && { opacity: 0.7 }]}>
-                    {busy && main ? <ActivityIndicator size="small" color="#fff" /> : c.icon ? <Icon name={c.icon} size={16} /> : null}
-                    <T size={13.5} w="medium" color={main ? '#fff' : colors.ink}>{c.label}</T>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-            <TextInput
-              value={text} onChangeText={setText} placeholder={placeholder} placeholderTextColor={colors.faint}
-              onSubmitEditing={() => onText(text)} submitBehavior="submit" returnKeyType="send"
-              style={{
-                flex: 1, minHeight: 46, maxHeight: 120, borderRadius: 23, backgroundColor: colors.card, paddingHorizontal: 16, paddingVertical: 11,
-                fontFamily: fonts.regular, fontSize: 15, color: colors.ink, textAlign: 'right', writingDirection: 'rtl',
-                ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}),
-              }}
-            />
-            <Pressable onPress={() => onText(text)} disabled={!text.trim() || busy} accessibilityRole="button" accessibilityLabel="ابعت"
-              style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: text.trim() ? colors.ink : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="arrow-up" size={20} color={text.trim() ? '#fff' : colors.faint} />
-            </Pressable>
-          </View>
-        </View>
-      </View>
-      <ToastHost bottom={120} />
-    </KeyboardAvoidingView>
-  );
-}
-
-const Row2 = ({ children }: { children: React.ReactNode }) => <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>{children}</View>;
-
-const bubble = (from: 'bot' | 'me') => ({
-  alignSelf: (from === 'me' ? 'flex-end' : 'flex-start') as 'flex-end' | 'flex-start',
-  maxWidth: '86%' as const,
-  backgroundColor: from === 'me' ? colors.ink : colors.card,
-  borderRadius: 20,
-  ...(from === 'me' ? { borderBottomLeftRadius: 6 } : { borderBottomRightRadius: 6 }),
-  paddingHorizontal: 14, paddingVertical: 10,
-});
-
-function Bubble({ m }: { m: Msg }) {
-  const mine = m.from === 'me';
-  return (
-    <View style={[bubble(m.from), { gap: 8 }]}>
-      {m.photo ? <Image source={{ uri: m.photo }} style={{ width: 200, height: 150, borderRadius: 14, backgroundColor: colors.soft }} resizeMode="cover" /> : null}
-      {m.text ? <T size={15} color={mine ? '#fff' : colors.ink}>{m.text}</T> : null}
-      {m.lines ? (
-        <View style={{ backgroundColor: colors.ground, borderRadius: 14, padding: 12, gap: 6, minWidth: 230 }}>
-          {m.lines.map(([k, v]) => (
-            <View key={k} style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-              <Muted size={13} style={{ width: 70 }}>{k}</Muted>
-              <T size={14} w="medium" style={{ flex: 1 }}>{v}</T>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      {m.links?.map((l) => (
-        <Pressable key={l.href} onPress={() => router.push(l.href as any)} accessibilityRole="link"
-          style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.ground, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }, pressed && { opacity: 0.7 }]}>
-          <T size={14} w="semibold" style={{ flex: 1 }}>{l.label}</T>
-          <Icon name="chevron-back" size={16} color={colors.muted} />
+    <ChatFrame
+      subtitle={aiOn ? 'متصل · ذكاء اصطناعي' : 'متصل دايماً'}
+      onBack={back}
+      right={!isShop ? (
+        <Pressable onPress={() => router.push('/customer/new')} hitSlop={8} accessibilityRole="button">
+          <Muted size={12.5}>الفورم العادي</Muted>
         </Pressable>
-      ))}
-    </View>
+      ) : null}
+      messages={msgs.map((m) => ({ id: m.id, who: m.from === 'me' ? 'me' : 'bot', text: m.text, photo: m.photo, lines: m.lines, links: m.links }))}
+      typing={typing}
+      busy={busy}
+      chips={chips.map((c, i) => ({ ...c, main: main && i === 0 }))}
+      composer={{ value: text, onChange: setText, onSend: () => onText(text), placeholder }}
+    />
   );
 }
+
+/** One readable line per chat message, for the case history customer service sees. */
+const asText = (m: Msg) => [m.photo ? '📷 صورة' : '', m.text ?? '', ...(m.lines ?? []).map(([k, v]) => `${k}: ${v}`)].filter(Boolean).join('\n').slice(0, 2000);

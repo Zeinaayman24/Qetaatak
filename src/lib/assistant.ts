@@ -143,3 +143,13 @@ export async function askAi(messages: AiTurn[], context: unknown): Promise<AiRep
     return data as AiReply;
   } catch { return null; }
 }
+
+export type SupportReply = { reply?: string; quick_replies?: string[]; action?: 'escalate' | 'resolved' | null };
+/** Smart mode inside a complaint chat: try to solve it, or say it needs a person. */
+export async function askSupport(messages: AiTurn[], context: unknown): Promise<SupportReply | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('assistant', { body: { mode: 'support', messages, context } });
+    if (error || !data?.configured || data.error) return null;
+    return data as SupportReply;
+  } catch { return null; }
+}

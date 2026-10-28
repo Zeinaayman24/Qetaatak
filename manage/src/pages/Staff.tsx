@@ -41,7 +41,7 @@ export default function Staff() {
             <tr key={s.id}>
               <td className="mono">{memberId(s)}</td><td>{s.full_name || '—'}</td><td dir="ltr" className="small">{s.email}</td>
               <td><Pill tone={s.is_admin ? 'dark' : 'plain'}>{s.is_admin ? 'أدمن' : 'خدمة عملاء'}</Pill></td>
-              <td>{all.tickets.filter((t) => t.assigned_to === s.id && t.status !== 'resolved').length}</td>
+              <td>{all.tickets.filter((t) => t.assigned_to === s.id && t.status === 'in_progress').length}</td>
               <td>{!s.is_admin && s.id !== me.id ? <button className="link danger" onClick={() => remove(s.id)}>شيله</button> : null}</td>
             </tr>
           ))}</tbody>

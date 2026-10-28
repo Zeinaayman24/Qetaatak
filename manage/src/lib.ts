@@ -26,10 +26,11 @@ export type Request = {
 export type Quote = { id: string; request_id: string; shop_id: string; price: number; condition: string; warranty_days: number; created_at: string };
 export type Ticket = {
   id: string; ticket_no: number; reporter_id: string; request_id: string | null; category: string; body: string;
-  status: 'open' | 'in_progress' | 'resolved'; priority: 'low' | 'normal' | 'high'; assigned_to: string | null;
+  status: 'bot' | 'open' | 'in_progress' | 'resolved'; priority: 'low' | 'normal' | 'high'; assigned_to: string | null;
   admin_reply: string; created_at: string; updated_at: string; resolved_at: string | null;
+  escalated_at: string | null; resolved_by: 'bot' | 'agent' | 'customer' | null;
 };
-export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; internal: boolean; created_at: string };
+export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; internal: boolean; kind: 'user' | 'bot' | 'system'; created_at: string };
 export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; created_at: string };
 
 /* ---------------------------------------------------------------- labels */
@@ -41,7 +42,10 @@ export const orderId = (n: number) => '#' + n;
 export const REQUEST_STATUS: Record<string, string> = { open: 'مستني عروض', chosen: 'اتأكد', done: 'اتسلّم', cancelled: 'اتلغى' };
 export const ORDER_STATUS: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز للاستلام', out_for_delivery: 'خرج للتوصيل', delivered: 'اتسلّم' };
 export const SHOP_STATUS: Record<string, string> = { pending: 'مستني موافقة', approved: 'شغال', suspended: 'موقوف' };
-export const TICKET_STATUS: Record<string, string> = { open: 'جديدة', in_progress: 'جاري الحل', resolved: 'اتحلّت' };
+export const TICKET_STATUS: Record<string, string> = { bot: 'مع المساعد الآلي', open: 'مستنية موظف', in_progress: 'مع موظف', resolved: 'انتهت' };
+export const RESOLVED_BY: Record<string, string> = { bot: 'المساعد حلّها', agent: 'موظف قفلها', customer: 'العميل قفلها' };
+/** Tickets that need a person: escalated by the assistant or already with an agent. */
+export const needsPeople = (t: { status: string }) => t.status === 'open' || t.status === 'in_progress';
 export const PRIORITY: Record<string, string> = { low: 'منخفضة', normal: 'عادية', high: 'عاجلة' };
 export const CATEGORY: Record<string, string> = { order: 'مشكلة في طلب', shop: 'شكوى من محل', customer: 'شكوى من عميل', app: 'مشكلة في التطبيق', other: 'حاجة تانية' };
 export const CONDITION: Record<string, string> = { used_original: 'مستعمل أصلي', used_clean: 'مستعمل نضيف جداً', new_aftermarket: 'تجاري جديد', new_original: 'أصلي جديد' };
