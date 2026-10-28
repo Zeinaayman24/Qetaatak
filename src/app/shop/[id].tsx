@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Row, Screen, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, CONDITIONS, WANTED, WARRANTY_DAYS, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request } from '@/lib/data';
+import { COMMISSION, CONDITIONS, ORDER_STEPS, SIDES, URGENCY, WANTED, WARRANTY_DAYS, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -41,6 +41,14 @@ export default function ShopRequest() {
   const mine = data!.mine;
   const p = parseInt(price.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))), 10) || 0;
   const approved = shop?.status === 'approved';
+  const extras = [
+    r.side ? 'الجهة: ' + SIDES[r.side] : '', r.urgency !== 'normal' ? URGENCY[r.urgency] : '',
+    r.budget ? 'ميزانية العميل ' + money(r.budget) + ' ج.م' : '', r.vin ? 'شاسيه ' + r.vin : '',
+  ].filter(Boolean);
+  async function setOrder(status: string) {
+    const { error } = await supabase.rpc('update_order_status', { p_request: r!.id, p_status: status });
+    if (error) toast(friendlyError(error)); else { toast('اتبعت للعميل'); reload(); }
+  }
 
   async function choosePhoto() {
     try { const uri = await pickPhoto(); if (uri) setPhoto(uri); } catch { toast('الصورة دي مش مدعومة. جرّب صورة تانية.'); }
@@ -117,6 +125,18 @@ export default function ShopRequest() {
             ) : null}
           </View>
         ) : null}
+        {r.status === 'chosen' ? (
+          <View style={{ gap: 8 }}>
+            <T w="semibold" size={14}>حالة الطلب: {ORDER_STEPS.find((s) => s.key === (r.order_status ?? 'preparing'))?.[r.delivery_mode === 'pickup' ? 'pickupLabel' : 'label'] ?? ORDER_STEPS.find((s) => s.key === (r.order_status ?? 'preparing'))?.label}</T>
+            <Row gap={8} style={{ flexWrap: 'wrap' }}>
+              {(r.delivery_mode === 'delivery' ? ['preparing', 'out_for_delivery', 'delivered'] : ['preparing', 'ready', 'delivered']).map((k) => {
+                const step = ORDER_STEPS.find((s) => s.key === k)!;
+                const on = r.order_status === k;
+                return <Btn key={k} kind={on ? 'small' : 'link'} title={(r.delivery_mode === 'pickup' && step.pickupLabel) || step.label} onPress={() => setOrder(k)} />;
+              })}
+            </Row>
+          </View>
+        ) : null}
         <Lines rows={[['سعر البيع', money(mine.price) + ' ج.م'], ['عمولة قطعتك ٥٪', money(mine.price * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(mine.price * (1 - COMMISSION)) + ' ج.م']} />
         {r.status === 'done' ? <T size={13} color={colors.good} w="semibold">العميل أكد الاستلام{r.rating ? ' وقيّمك ' + ar(r.rating) + ' من ٥' : ''}.</T> : null}
       </Card>
@@ -138,7 +158,11 @@ export default function ShopRequest() {
           <Muted>عايزها {WANTED[r.wanted_condition]} · {r.area} · {ago(r.created_at)}</Muted>
         </View>
       </Row>
+      {extras.length ? <Row gap={6} style={{ flexWrap: 'wrap' }}>{extras.map((e) => <Pill key={e} label={e} tone={e === URGENCY.urgent ? 'wait' : 'plain'} />)}</Row> : null}
       {r.notes ? <View style={{ backgroundColor: colors.card, borderRadius: 14, padding: 12 }}><Muted size={12}>ملاحظة العميل</Muted><T size={14}>{r.notes}</T></View> : null}
+      {approved && (st === 'open' || st === 'quoted' || st === 'declined' || st === 'sold') ? (
+        <Btn kind="secondary" title="رسالة للعميل" onPress={() => router.push(`/chat/${r.id}/${uid}`)} />
+      ) : null}
       {body}
     </Screen>
   );

@@ -39,11 +39,11 @@ export function BottomNav({ role }: { role: 'customer' | 'shop' }) {
     ? [
         { href: '/customer', label: 'الرئيسية', icon: 'home', match: (p) => p === '/customer' || p === '/customer/new' },
         { href: '/customer/requests', label: 'طلباتي', icon: 'receipt', match: (p) => p.startsWith('/customer/') && p !== '/customer/new' },
-        { href: '/account', label: 'حسابي', icon: 'person', match: (p) => p === '/account' || p === '/profile' },
+        { href: '/account', label: 'حسابي', icon: 'person', match: (p) => ['/account', '/profile', '/cars', '/favorites', '/support', '/notifications'].includes(p) },
       ]
     : [
         { href: '/shop', label: 'الطلبات', icon: 'file-tray-full', match: (p) => p.startsWith('/shop') && p !== '/shop-setup' },
-        { href: '/account', label: 'المحل', icon: 'storefront', match: (p) => p === '/account' || p === '/shop-setup' },
+        { href: '/account', label: 'المحل', icon: 'storefront', match: (p) => ['/account', '/shop-setup', '/support', '/notifications'].includes(p) },
       ];
   return (
     <View style={{ flexDirection: 'row', height: 62 }} accessibilityRole="tablist">

@@ -3,29 +3,32 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { customerPill } from '@/components/status';
-import { BackBar, Btn, Card, Empty, Lines, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, Empty, Field, Lines, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, SHOP_TYPES, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
+import { COMMISSION, SHOP_TYPES, addressLine, ago, ar, friendlyError, money, reqNo, REPORT_CATEGORIES, type Profile, type Quote, type Report, type Request, type Shop, type ShopPrivate } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 
 export default function Admin() {
   const { ready, session, profile } = useAuth();
   const [openId, setOpenId] = useState<string | null>(null);
-  const { data, loading } = useLive(async () => {
-    const [shops, priv, reqs, quotes, people] = await Promise.all([
+  const [replies, setReplies] = useState<Record<string, string>>({});
+  const { data, loading, reload } = useLive(async () => {
+    const [shops, priv, reqs, quotes, people, reports] = await Promise.all([
       supabase.from('shops').select('*').order('created_at', { ascending: false }),
       supabase.from('shop_private').select('*'),
       supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('quotes').select('*'),
       supabase.from('profiles').select('id, full_name, phone, email'),
+      supabase.from('reports').select('*').order('created_at', { ascending: false }).limit(100),
     ]);
     return {
       shops: must(shops) as Shop[], priv: Object.fromEntries((must(priv) as ShopPrivate[]).map((p) => [p.id, p])),
       reqs: must(reqs) as Request[], quotes: must(quotes) as Quote[],
+      reports: must(reports) as Report[],
       people: Object.fromEntries((must(people) as Pick<Profile, 'id' | 'full_name' | 'phone' | 'email'>[]).map((p) => [p.id, p])),
     };
-  }, ['shops', 'requests', 'quotes'], [profile?.is_admin]);
+  }, ['shops', 'requests', 'quotes', 'reports'], [profile?.is_admin]);
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && !profile.is_admin) return <Redirect href="/" />;
@@ -83,6 +86,29 @@ export default function Admin() {
             </View>
           );
         }) : <Empty text="لسه مفيش محلات مسجلة." />}
+      </Section>
+
+      <Section title={'الشكاوى (' + ar(d.reports.filter((x) => x.status === 'open').length) + ' مفتوحة)'}>
+        {d.reports.length ? d.reports.map((rp) => (
+          <Card key={rp.id} style={{ marginTop: 10 }}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <T w="semibold" size={14}>{REPORT_CATEGORIES[rp.category]}</T>
+              <Pill label={rp.status === 'resolved' ? 'اتحلّت' : 'مفتوحة'} tone={rp.status === 'resolved' ? 'good' : 'wait'} />
+            </Row>
+            <T size={14}>{rp.body}</T>
+            <Muted size={12}>{d.people[rp.reporter_id]?.full_name || d.priv[rp.reporter_id]?.name || ''} · {d.people[rp.reporter_id]?.email ?? ''} · {ago(rp.created_at)}</Muted>
+            {rp.admin_reply ? <Muted size={13}>ردّك: {rp.admin_reply}</Muted> : null}
+            {rp.status === 'open' ? (
+              <>
+                <Field value={replies[rp.id] ?? ''} onChangeText={(t) => setReplies((x) => ({ ...x, [rp.id]: t }))} placeholder="اكتب ردّك للعميل أو المحل" multiline />
+                <Btn kind="dark" title="ابعت الرد واقفل الشكوى" onPress={async () => {
+                  const { error } = await supabase.from('reports').update({ admin_reply: (replies[rp.id] ?? '').trim() || 'تم حل المشكلة.', status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', rp.id);
+                  toast(error ? friendlyError(error) : 'اتبعت الرد'); reload();
+                }} />
+              </>
+            ) : null}
+          </Card>
+        )) : <Empty text="مفيش شكاوى." />}
       </Section>
 
       <Section title="كل الطلبات">

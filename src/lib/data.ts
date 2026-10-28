@@ -47,7 +47,7 @@ export const toLatin = (s: string) => s.replace(/[٠-٩]/g, (d) => String('٠١�
 
 export type Profile = {
   id: string; full_name: string; phone: string; area: string;
-  car_make: string | null; car_model: string | null; car_year: number | null;
+  car_make: string | null; car_model: string | null; car_year: number | null; car_vin: string;
   is_customer: boolean; is_shop: boolean; is_admin: boolean;
   email: string; country: string; governorate: string; street: string; building: string;
   floor: string; apartment: string; landmark: string; postal_code: string;
@@ -69,7 +69,23 @@ export type Request = {
   wanted_condition: 'used' | 'new' | 'any'; area: string; notes: string; photo_path: string | null;
   status: 'open' | 'chosen' | 'done' | 'cancelled'; chosen_quote_id: string | null; delivery_mode: 'delivery' | 'pickup' | null;
   rating: number | null; created_at: string;
+  vin: string; side: '' | 'right' | 'left' | 'front' | 'rear'; urgency: 'normal' | 'today' | 'urgent'; budget: number | null;
+  order_status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | null; review: string; done_at?: string | null;
 };
+export type Car = { id: string; make: string; model: string; year: number; vin: string };
+export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; created_at: string };
+export type Notification = { id: string; title: string; body: string; link: string; read_at: string | null; created_at: string };
+export type Report = { id: string; reporter_id: string; request_id: string | null; category: string; body: string; status: 'open' | 'resolved'; admin_reply: string; created_at: string };
+
+export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', front: 'قدام', rear: 'ورا' };
+export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };
+export const ORDER_STEPS: { key: string; label: string; pickupLabel?: string }[] = [
+  { key: 'preparing', label: 'المحل بيجهّز' },
+  { key: 'ready', label: 'جاهزة', pickupLabel: 'جاهزة للاستلام' },
+  { key: 'out_for_delivery', label: 'خرجت للتوصيل' },
+  { key: 'delivered', label: 'اتسلّمت' },
+];
+export const REPORT_CATEGORIES: Record<string, string> = { order: 'مشكلة في طلب', shop: 'شكوى من محل', customer: 'شكوى من عميل', app: 'مشكلة في التطبيق', other: 'حاجة تانية' };
 export type Quote = {
   id: string; request_id: string; shop_id: string; price: number; condition: string; warranty_days: number;
   photo_path: string | null; created_at: string;
@@ -82,6 +98,7 @@ export function friendlyError(e: any): string {
   if (/Password should be/i.test(msg)) return 'كلمة السر لازم تكون ٦ حروف أو أكتر.';
   if (/Email not confirmed/i.test(msg)) return 'لازم تأكد إيميلك الأول من الرسالة اللي وصلتك.';
   if (/rate limit/i.test(msg)) return 'محاولات كتير. استنى شوية وجرّب تاني.';
+  if (/profiles_one_role/i.test(msg)) return 'الحساب ده متسجل بدور تاني. كل حساب يا عميل يا محل.';
   if (/does not deliver/i.test(msg)) return 'المحل ده مش بيوصّل. اختار الاستلام من المحل.';
   if (/request is closed|cannot choose/i.test(msg)) return 'الطلب ده اتقفل.';
   if (/postal_code/i.test(msg)) return 'الرقم البريدي لازم يكون ٥ أرقام.';

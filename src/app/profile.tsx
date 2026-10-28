@@ -12,7 +12,7 @@ export default function ProfileScreen() {
   const { ready, session, profile, refresh } = useAuth();
   const [f, setF] = useState({
     name: '', phone: '', country: 'مصر', governorate: 'القاهرة', area: '', street: '', building: '', floor: '', apartment: '',
-    landmark: '', postal: '', make: MAKES[0], model: '', year: 2015,
+    landmark: '', postal: '', make: MAKES[0], model: '', year: 2015, vin: '',
   });
   const set = (k: keyof typeof f) => (v: any) => setF((x) => ({ ...x, [k]: v }));
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export default function ProfileScreen() {
       name: profile.full_name || '', phone: profile.phone || '', country: profile.country || 'مصر',
       governorate: profile.governorate || 'القاهرة', area: profile.area || '', street: profile.street || '', building: profile.building || '',
       floor: profile.floor || '', apartment: profile.apartment || '', landmark: profile.landmark || '', postal: profile.postal_code || '',
-      make: profile.car_make || MAKES[0], model: profile.car_model || '', year: profile.car_year || 2015,
+      make: profile.car_make || MAKES[0], model: profile.car_model || '', year: profile.car_year || 2015, vin: profile.car_vin || '',
     }));
   }, [profile?.id]);
 
@@ -47,7 +47,7 @@ export default function ProfileScreen() {
       full_name: f.name.trim(), phone: toLatin(f.phone).replace(/\s/g, ''), email,
       country: f.country, governorate: f.governorate, area: f.area.trim(), street: f.street.trim(), building: f.building.trim(),
       floor: f.floor.trim(), apartment: f.apartment.trim(), landmark: f.landmark.trim(), postal_code: toLatin(f.postal.trim()),
-      car_make: f.make, car_model: f.model.trim(), car_year: f.year, is_customer: true,
+      car_make: f.make, car_model: f.model.trim(), car_year: f.year, car_vin: f.vin.trim().toUpperCase(), is_customer: true,
     }).eq('id', profile!.id);
     setBusy(false);
     if (error) return setErr(friendlyError(error));
@@ -99,6 +99,7 @@ export default function ProfileScreen() {
             <Select label="سنة الصنع" value={f.year} options={YEARS.map((y) => ({ v: y, label: ar(y) }))} onPick={set('year')} />
           </Row>
           <Field label="الموديل" value={f.model} onChangeText={set('model')} placeholder="مثلاً: فيرنا، سنترا، لانسر" />
+          <Field label="رقم الشاسيه VIN (اختياري)" value={f.vin} onChangeText={set('vin')} ltr placeholder="17 حرف ورقم" hint="مكتوب في رخصة العربية. بيخلّي المحل يجيب القطعة الصح." />
         </View>
       </Section>
     </Screen>

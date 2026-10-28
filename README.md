@@ -28,6 +28,17 @@ src/lib/            Supabase client, auth, live data, photos, constants
 supabase/migrations database schema and security rules
 ```
 
+## Features
+
+- One role per account: customer **or** shop (enforced in the database)
+- Customers: several cars with chassis number (VIN), part side, urgency and budget on requests
+- Chat between a customer and each shop on a request, with photos
+- In-app notifications (new quote, new request in your brands, approval, messages, order updates, ratings, support replies)
+- Order tracking updated by the shop: preparing → ready / out for delivery → delivered
+- Shop public pages with rating, sales and written reviews; favorite shops; "request again"
+- Shop inbox search and filters (my brands, area, condition, urgent first)
+- Support and complaints, answered from the admin page
+
 ## Security model (Supabase row level security)
 
 - Customers see only their own requests and the quotes on them.

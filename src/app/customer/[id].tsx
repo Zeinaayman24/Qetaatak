@@ -1,9 +1,12 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { BackBar, Btn, Card, CopyBox, Empty, Labeled, Lines, ListRow, Loading, Muted, Photo, Row, Screen, Section, Seg, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, CopyBox, Empty, Field, Icon, Labeled, Lines, ListRow, Loading, Muted, Photo, Pill, Row, Screen, Section, Seg, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { CONDITIONS, DELIVERY_FEE, WANTED, addressLine, ago, ar, friendlyError, money, reqNo, type Quote, type Request, type Shop, type ShopPrivate } from '@/lib/data';
+import {
+  CONDITIONS, DELIVERY_FEE, ORDER_STEPS, SIDES, URGENCY, WANTED, addressLine, ago, ar, friendlyError, money, reqNo,
+  type Quote, type Request, type Shop, type ShopPrivate,
+} from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
@@ -16,6 +19,8 @@ export default function CustomerRequest() {
   const [picked, setPicked] = useState<Quote | null>(null);
   const [mode, setMode] = useState<'delivery' | 'pickup'>('delivery');
   const [busy, setBusy] = useState(false);
+  const [stars, setStars] = useState(0);
+  const [review, setReview] = useState('');
 
   const { data, loading } = useLive<Data>(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
@@ -30,11 +35,10 @@ export default function CustomerRequest() {
   }, ['requests', 'quotes'], [id]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  const back = () => (picked ? setPicked(null) : router.replace('/customer/requests'));
-  const header = undefined;
-  if (loading && !data) return <Screen header={header}><Loading /></Screen>;
+  const back = () => (picked ? setPicked(null) : router.canGoBack() ? router.back() : router.replace('/customer/requests'));
+  if (loading && !data) return <Screen><Loading /></Screen>;
   const r = data?.req;
-  if (!r) return <Screen header={header}><BackBar title="الطلب" onBack={back} /><Empty text="الطلب ده مش موجود." /></Screen>;
+  if (!r) return <Screen><BackBar title="الطلب" onBack={back} /><Empty text="الطلب ده مش موجود." /></Screen>;
   const quotes = data!.quotes;
 
   async function rpc(fn: string, args: Record<string, unknown>, ok: string) {
@@ -44,9 +48,15 @@ export default function CustomerRequest() {
     if (error) { toast(friendlyError(error)); return false; }
     toast(ok); return true;
   }
+  const again = () => router.push({ pathname: '/customer/new', params: { part: r.part, cond: r.wanted_condition, notes: r.notes, side: r.side } });
+  const chat = (shopId: string) => router.push(`/chat/${r.id}/${shopId}`);
+  const extras = [
+    r.side ? 'الجهة: ' + SIDES[r.side] : '', r.urgency !== 'normal' ? URGENCY[r.urgency] : '',
+    r.budget ? 'ميزانية ' + money(r.budget) + ' ج.م' : '', r.vin ? 'شاسيه ' + r.vin : '',
+  ].filter(Boolean);
 
   const summary = (
-    <View style={{ gap: 16 }}>
+    <View style={{ gap: 14 }}>
       <Row style={{ alignItems: 'flex-start' }} gap={14}>
         <Photo uri={photoUrl(r.photo_path)} size={64} />
         <View style={{ flex: 1 }}>
@@ -55,7 +65,7 @@ export default function CustomerRequest() {
           {r.notes ? <Muted>«{r.notes}»</Muted> : null}
         </View>
       </Row>
-      <Track r={r} n={quotes.length} />
+      {extras.length ? <Row gap={6} style={{ flexWrap: 'wrap' }}>{extras.map((e) => <Pill key={e} label={e} />)}</Row> : null}
     </View>
   );
 
@@ -64,7 +74,7 @@ export default function CustomerRequest() {
     const shop = data!.shops[picked.shop_id];
     const total = picked.price + (mode === 'delivery' ? DELIVERY_FEE : 0);
     return (
-      <Screen header={header} footer={
+      <Screen footer={
         <Btn title={'أكّد الطلب · ' + money(total) + ' ج.م'} loading={busy} onPress={async () => {
           if (await rpc('choose_quote', { p_request: r.id, p_quote: picked.id, p_mode: mode }, 'تمام! طلبك اتأكد')) setPicked(null);
         }} />
@@ -96,23 +106,48 @@ export default function CustomerRequest() {
     const q = quotes.find((x) => x.id === r.chosen_quote_id);
     const sp = data!.chosenShop;
     const shop = q ? data!.shops[q.shop_id] : undefined;
+    const stepIdx = Math.max(0, ORDER_STEPS.findIndex((s) => s.key === (r.order_status ?? 'preparing')));
+    const steps = ORDER_STEPS.filter((s) => (r.delivery_mode === 'delivery' ? s.key !== 'ready' : s.key !== 'out_for_delivery'));
     const footer = r.status === 'chosen'
       ? <Btn title="استلمت القطعة" loading={busy} onPress={() => rpc('mark_received', { p_request: r.id }, 'تمام! قيّم المحل لو سمحت')} />
-      : undefined;
+      : !r.rating
+        ? <Btn title="ابعت التقييم" disabled={!stars} loading={busy} onPress={() => rpc('rate_request', { p_request: r.id, p_rating: stars, p_review: review.trim() }, 'شكراً على تقييمك')} />
+        : <Btn kind="secondary" title="اطلب نفس القطعة تاني" onPress={again} />;
     return (
-      <Screen header={header} footer={footer}>
+      <Screen footer={footer}>
         <BackBar title={'طلب ' + reqNo(r.num)} onBack={back} />
         {summary}
-        <View style={{ alignItems: 'center', gap: 6, paddingVertical: 8 }}>
-          <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.good, alignItems: 'center', justifyContent: 'center' }}><T color="#fff" size={26} w="bold">✓</T></View>
-          <T w="bold" size={20}>{r.status === 'done' ? 'الطلب اتسلّم' : 'طلبك اتأكد'}</T>
-          <Muted center size={14}>{r.delivery_mode === 'delivery' ? 'المحل هيكلمك ويبعتها مع مندوب. الدفع عند الاستلام.' : 'روح المحل وقول رقم الطلب ' + reqNo(r.num) + '.'}</Muted>
-        </View>
+
+        <Card>
+          <T w="bold" size={16}>{r.status === 'done' ? 'الطلب اتسلّم ✓' : 'متابعة الطلب'}</T>
+          <View>
+            {steps.map((s, i) => {
+              const realIdx = ORDER_STEPS.findIndex((x) => x.key === s.key);
+              const on = r.status === 'done' || realIdx <= stepIdx;
+              const last = i === steps.length - 1;
+              return (
+                <Row key={s.key} style={{ alignItems: 'flex-start' }} gap={12}>
+                  <View style={{ alignItems: 'center', width: 22 }}>
+                    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: on ? colors.ink : colors.ground, borderWidth: 2, borderColor: on ? colors.ink : colors.line, alignItems: 'center', justifyContent: 'center' }}>
+                      {on ? <Icon name="checkmark" size={13} color="#fff" /> : null}
+                    </View>
+                    {!last ? <View style={{ width: 2, height: 22, backgroundColor: on ? colors.ink : colors.line }} /> : null}
+                  </View>
+                  <T w={on ? 'semibold' : 'regular'} color={on ? colors.ink : colors.faint} size={14}>{r.delivery_mode === 'pickup' && s.pickupLabel ? s.pickupLabel : s.label}</T>
+                </Row>
+              );
+            })}
+          </View>
+        </Card>
+
         {q && sp ? (
           <Card>
             <Row style={{ justifyContent: 'space-between' }}>
-              <View><Muted size={12}>المحل</Muted><T w="bold" size={17}>{sp.name}</T></View>
-              <Muted>{shop?.area}</Muted>
+              <Pressable onPress={() => router.push(`/shop-profile/${q.shop_id}`)}>
+                <Muted size={12}>المحل</Muted>
+                <Row gap={6}><T w="bold" size={17}>{sp.name}</T><Icon name="chevron-back" size={14} color={colors.muted} /></Row>
+              </Pressable>
+              <Btn kind="small" title="رسالة" onPress={() => chat(q.shop_id)} />
             </Row>
             <CopyBox text={sp.phone} />
             {sp.phone2 ? <CopyBox text={sp.phone2} /> : null}
@@ -122,25 +157,35 @@ export default function CustomerRequest() {
             <Muted>ضمان {ar(q.warranty_days)} يوم: لو القطعة مركبتش، المحل يبدّلها.</Muted>
           </Card>
         ) : null}
+
         {r.status === 'done' ? (
-          <View style={{ alignItems: 'center', gap: 6 }}>
-            <T w="semibold">القطعة ركبت تمام؟ قيّم المحل</T>
-            <Row gap={6}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <Pressable key={n} onPress={() => rpc('rate_request', { p_request: r.id, p_rating: n }, 'شكراً على التقييم')} accessibilityLabel={ar(n) + ' نجوم'} hitSlop={4}>
-                  <T size={34} color={(r.rating ?? 0) >= n ? colors.accent : colors.line}>★</T>
-                </Pressable>
-              ))}
-            </Row>
-          </View>
+          r.rating ? (
+            <Card>
+              <Row gap={4}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={20} color={r.rating! >= n ? colors.accent : colors.line} />)}</Row>
+              {r.review ? <T size={14}>«{r.review}»</T> : <Muted>قيّمت المحل. شكراً!</Muted>}
+            </Card>
+          ) : (
+            <View style={{ gap: 12 }}>
+              <T w="bold" size={17}>القطعة ركبت تمام؟ قيّم المحل</T>
+              <Row gap={8} style={{ justifyContent: 'center' }}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <Pressable key={n} onPress={() => setStars(n)} accessibilityLabel={ar(n) + ' نجوم'} hitSlop={4}>
+                    <Icon name={stars >= n ? 'star' : 'star-outline'} size={36} color={stars >= n ? colors.accent : colors.faint} />
+                  </Pressable>
+                ))}
+              </Row>
+              <Field value={review} onChangeText={setReview} multiline placeholder="اكتب رأيك في المحل والقطعة (اختياري)" />
+            </View>
+          )
         ) : null}
+        <Btn kind="link" title="عندك مشكلة في الطلب؟" style={{ alignSelf: 'center' }} onPress={() => router.push({ pathname: '/support', params: { request: r.id } })} />
       </Screen>
     );
   }
 
   /* ---- open / cancelled ---- */
   return (
-    <Screen header={header}>
+    <Screen footer={r.status === 'cancelled' ? <Btn kind="secondary" title="اطلبها تاني" onPress={again} /> : undefined}>
       <BackBar title={'طلب ' + reqNo(r.num)} onBack={back} />
       {summary}
       {r.status === 'cancelled' ? <Empty text="الطلب ده اتلغى." /> : (
@@ -149,35 +194,38 @@ export default function CustomerRequest() {
             <View style={{ alignItems: 'center', gap: 10, paddingVertical: 28 }}>
               <ActivityIndicator color={colors.ink} />
               <T w="semibold" size={16}>بندوّر عند {ar(data!.shopCount)} محل</T>
-              <Muted center>هنبلغك أول ما يوصل عرض. ممكن تقفل الصفحة.</Muted>
+              <Muted center>هيوصلك إشعار أول ما يوصل عرض.</Muted>
             </View>
           ) : (
             <Section title={'العروض (' + ar(quotes.length) + ')'} note="الأرخص الأول">
-              {quotes.map((q, i) => (
-                <ListRow key={q.id} last={i === quotes.length - 1}
-                  leading={<Photo uri={photoUrl(q.photo_path)} size={56} />}
-                  title={<T w="bold" size={22} style={{ lineHeight: 30 }}>{money(q.price)} <T size={13} color={colors.muted}>ج.م</T></T>}
-                  subtitle={CONDITIONS[q.condition] + ' · ضمان ' + ar(q.warranty_days) + ' يوم'}
-                  meta={'محل في ' + (data!.shops[q.shop_id]?.area ?? '—') + (data!.shops[q.shop_id]?.offers_delivery ? ' · بيوصّل' : ' · استلام بس') + ' · ' + ago(q.created_at)}
-                  trailing={<Btn kind="small" title="اختار" onPress={() => { setMode(data!.shops[q.shop_id]?.offers_delivery ? 'delivery' : 'pickup'); setPicked(q); }} />} />
-              ))}
-              <Muted center size={12}>اسم المحل ورقمه بيظهروا بعد ما تختار.</Muted>
+              {quotes.map((q, i) => {
+                const shop = data!.shops[q.shop_id];
+                return (
+                  <ListRow key={q.id} last={i === quotes.length - 1}
+                    leading={<Photo uri={photoUrl(q.photo_path)} size={56} />}
+                    title={<T w="bold" size={22} style={{ lineHeight: 30 }}>{money(q.price)} <T size={13} color={colors.muted}>ج.م</T></T>}
+                    subtitle={CONDITIONS[q.condition] + ' · ضمان ' + ar(q.warranty_days) + ' يوم'}
+                    meta={
+                      <Pressable onPress={() => router.push(`/shop-profile/${q.shop_id}`)} hitSlop={4}>
+                        <T size={12} color={colors.muted} style={{ textDecorationLine: 'underline' }}>
+                          محل في {shop?.area ?? '—'}{shop?.offers_delivery ? ' · بيوصّل' : ' · استلام بس'} · {ago(q.created_at)}
+                        </T>
+                      </Pressable>
+                    }
+                    trailing={
+                      <View style={{ gap: 8, alignItems: 'center' }}>
+                        <Btn kind="small" title="اختار" onPress={() => { setMode(shop?.offers_delivery ? 'delivery' : 'pickup'); setPicked(q); }} />
+                        <Pressable onPress={() => chat(q.shop_id)} accessibilityLabel="رسالة للمحل" hitSlop={6}><Icon name="chatbubble-ellipses-outline" size={20} /></Pressable>
+                      </View>
+                    } />
+                );
+              })}
+              <Muted center size={12}>اسم المحل ورقمه بيظهروا بعد ما تختار. تقدر تسأل المحل في رسالة الأول.</Muted>
             </Section>
           )}
           <Btn kind="link" title="إلغاء الطلب" loading={busy} onPress={() => rpc('cancel_request', { p_request: r.id }, 'الطلب اتلغى')} style={{ alignSelf: 'center' }} />
         </>
       )}
     </Screen>
-  );
-}
-
-function Track({ r, n }: { r: Request; n: number }) {
-  const chosen = r.status === 'chosen' || r.status === 'done';
-  const steps: [boolean, string][] = [[true, 'اتبعت'], [n > 0, 'وصلت عروض'], [chosen, 'اخترت'], [r.status === 'done', 'استلمت']];
-  return (
-    <View style={{ gap: 6 }}>
-      <Row gap={4}>{steps.map(([on], i) => <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: on ? colors.ink : colors.line }} />)}</Row>
-      <Row gap={4}>{steps.map(([on, label], i) => <T key={i} size={11.5} color={on ? colors.ink : colors.faint} w={on ? 'semibold' : 'regular'} style={{ flex: 1 }}>{label}</T>)}</Row>
-    </View>
   );
 }

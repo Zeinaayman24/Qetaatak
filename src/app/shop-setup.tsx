@@ -55,6 +55,10 @@ export default function ShopSetup() {
         name: f.name.trim(), owner_name: f.owner.trim(), phone: toLatin(f.phone).replace(/\s/g, ''), phone2: toLatin(f.phone2).replace(/\s/g, ''),
         street: f.street.trim(), building: f.building.trim(), landmark: f.landmark.trim(), postal_code: toLatin(f.postal.trim()), commercial_register: f.register.trim(),
       };
+      const c = await supabase.from('profiles').update({
+        is_shop: true, email: session?.user.email ?? '', full_name: profile!.full_name || priv.owner_name, phone: profile!.phone || priv.phone,
+      }).eq('id', uid);
+      if (c.error) throw c.error;
       if (shop) {
         const a = await supabase.from('shops').update(pub).eq('id', uid); if (a.error) throw a.error;
         const b = await supabase.from('shop_private').update(priv).eq('id', uid); if (b.error) throw b.error;
@@ -62,10 +66,6 @@ export default function ShopSetup() {
         const a = await supabase.from('shops').insert({ id: uid, ...pub }); if (a.error) throw a.error;
         const b = await supabase.from('shop_private').insert({ id: uid, ...priv }); if (b.error) throw b.error;
       }
-      const c = await supabase.from('profiles').update({
-        is_shop: true, email: session?.user.email ?? '', full_name: profile!.full_name || priv.owner_name, phone: profile!.phone || priv.phone,
-      }).eq('id', uid);
-      if (c.error) throw c.error;
       await refresh();
       toast(shop ? 'اتحفظت بيانات المحل' : 'اتبعت للمراجعة. هنبلغك أول ما نوافق.');
       router.replace('/shop');

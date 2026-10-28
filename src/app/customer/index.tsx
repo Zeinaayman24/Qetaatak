@@ -2,6 +2,7 @@ import { Redirect, router } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { BottomNav, Logo, rememberRole } from '@/components/AppHeader';
+import { Bell } from '@/components/Bell';
 import { customerPill } from '@/components/status';
 import { Icon, Loading, Muted, Photo, Row, Screen, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -43,12 +44,14 @@ export default function CustomerHome() {
     <Screen nav={<BottomNav role="customer" />}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Logo size={22} />
-        <Pressable onPress={() => router.push('/profile')} accessibilityRole="button"
+        <View style={{ flex: 1 }} />
+        <Pressable onPress={() => router.push('/cars')} accessibilityRole="button"
           style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
           <Icon name="car-sport-outline" size={16} />
           <T size={13} w="medium">{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')}</T>
           <Icon name="chevron-down" size={12} color={colors.muted} />
         </Pressable>
+        <Bell />
       </Row>
 
       <View style={{ gap: 4 }}>
