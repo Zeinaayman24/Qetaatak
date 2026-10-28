@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { Field, Page, Pill, useData } from '../App';
-import { CATEGORY, CONDITION, ORDER_STATUS, REQUEST_STATUS, SIDE, TICKET_STATUS, URGENCY, WANTED, batchOf, dateTime, memberId, money, must, orderId, photoUrl, supabase, ticketId, useLive, type Message } from '../lib';
+import { CATEGORY, CONDITION, ORDER_STATE, ORDER_STATUS, REQUEST_STATUS, SIDE, TICKET_STATUS, URGENCY, WANTED, batchOf, dateTime, memberId, money, must, orderId, photoUrl, supabase, ticketId, useLive, type Message } from '../lib';
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -37,6 +37,9 @@ export default function OrderDetail() {
             <Field label="الاستعجال">{URGENCY[r.urgency]}</Field>
             <Field label="الميزانية">{r.budget ? money(r.budget) : ''}</Field>
             <Field label="ملاحظات">{r.notes}</Field>
+            {(() => { const o = r.order_id ? all.orders.find((x) => x.id === r.order_id) : undefined; return o ? (
+              <Field label="الأوردر"><span className="mono strong">#{o.order_no}</span> · {ORDER_STATE[o.status]} · {money(Number(o.items_total) + Number(o.delivery_fee))}{o.rating ? ` · ${'★'.repeat(o.rating)}` : ''}</Field>
+            ) : null; })()}
             <Field label="التوصيل">{r.delivery_mode === 'delivery' ? 'توصيل للبيت' : r.delivery_mode === 'pickup' ? 'استلام من المحل' : ''}</Field>
             <Field label="التقييم">{r.rating ? '★'.repeat(r.rating) : ''}{r.review ? <div className="small">«{r.review}»</div> : null}</Field>
           </div>
@@ -74,8 +77,8 @@ export default function OrderDetail() {
           <div key={shopId} className="thread">
             <h3>مع {all.priv[shopId]?.name} <span className="mono small muted">{memberId(all.byId[shopId])}</span></h3>
             {(msgs ?? []).filter((m) => m.shop_id === shopId).map((m) => (
-              <div key={m.id} className={'bubble ' + (m.sender_id === shopId ? 'them' : 'us')}>
-                <span className="small muted">{m.sender_id === shopId ? 'المحل' : 'العميل'} · {dateTime(m.created_at)}</span>
+              <div key={m.id} className={'bubble ' + (m.sender_id === shopId ? 'them' : 'us') + (m.flagged ? ' flagged' : '')}>
+                <span className="small muted">{m.sender_id === shopId ? 'المحل' : 'العميل'} · {dateTime(m.created_at)}{m.flagged ? ' · 🔒 حاول يبعت رقم أو لينك واتشال' : ''}</span>
                 {m.body ? <p>{m.body}</p> : null}
                 {m.photo_path ? <img src={photoUrl(m.photo_path)!} alt="صورة" /> : null}
               </div>

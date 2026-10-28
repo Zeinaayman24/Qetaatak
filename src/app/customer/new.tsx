@@ -1,67 +1,75 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Image, ScrollView, View } from 'react-native';
-import {
-  BackBar, Btn, Chips, ErrorText, Field, Icon, Labeled, Loading, Muted, Plate, Press, Row, Screen, Seg, Sheet, T, toast,
-} from '@/components/ui';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Image, Platform, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Btn, Chips, ErrorText, Field, Icon, IconButton, Labeled, Loading, Muted, Plate, Press, Row, Seg, T, ToastHost, toast } from '@/components/ui';
 import { partIsSided } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
-import { COMMON_PARTS, SIDES, URGENCY, WANTED, ar, friendlyError, newId, reqNo, toLatin, type Car } from '@/lib/data';
+import { SIDES, URGENCY, WANTED, ar, friendlyError, newId, reqNo, toLatin, type Car } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
-import { colors, lift } from '@/lib/theme';
+import { colors, fonts, lift } from '@/lib/theme';
 
-type CarOpt = { key: string; make: string; model: string; year: number; vin: string };
 type Cond = 'used' | 'new' | 'any';
 type Item = { key: string; part: string; side: string; cond: Cond; qty: number; photo: string | null; notes: string; budget: string };
-const blank = (): Item => ({ key: newId(), part: '', side: '', cond: 'used', qty: 1, photo: null, notes: '', budget: '' });
+type CarOpt = { key: string; make: string; model: string; year: number; vin: string };
+const item = (part: string): Item => ({ key: newId(), part, side: '', cond: 'used', qty: 1, photo: null, notes: '', budget: '' });
 
-const PART_ICONS: Record<string, string> = {
-  'فانوس أمامي': 'car-light-high', 'مراية جانبية': 'mirror', 'رديتر مياه': 'radiator', 'كمبروسر تكييف': 'air-conditioner',
-  'طقم دبرياج': 'car-clutch', 'تيل فرامل': 'car-brake-alert', 'دينامو': 'car-battery', 'مارش': 'engine', 'رفرف': 'car-door', 'أكصدام': 'car-side',
-};
+const CATALOG: { part: string; icon: string }[] = [
+  { part: 'فانوس أمامي', icon: 'car-light-high' }, { part: 'فانوس خلفي', icon: 'car-light-dimmed' }, { part: 'مراية جانبية', icon: 'mirror' },
+  { part: 'رديتر مياه', icon: 'radiator' }, { part: 'كمبروسر تكييف', icon: 'air-conditioner' }, { part: 'طقم دبرياج', icon: 'car-clutch' },
+  { part: 'تيل فرامل', icon: 'car-brake-alert' }, { part: 'دينامو', icon: 'car-battery' }, { part: 'مارش', icon: 'engine' },
+  { part: 'رفرف', icon: 'car-door' }, { part: 'أكصدام أمامي', icon: 'car-side' }, { part: 'مساعدين', icon: 'car-cog' },
+];
+const iconOf = (p: string) => CATALOG.find((c) => c.part === p)?.icon ?? 'car-wrench';
+const STEPS = ['القطع', 'التفاصيل', 'العربية', 'المراجعة'];
 
-/** A new request: one car, one or more parts (a basket), sent to every matching shop at once. */
+/** New price request, one step per screen: parts → details → car and timing → review. */
 export default function NewRequest() {
   const { ready, session, profile } = useAuth();
   const params = useLocalSearchParams<{ part?: string; cond?: string; notes?: string; side?: string }>();
   const str = (v: unknown) => (typeof v === 'string' ? v : '');
-  const [items, setItems] = useState<Item[]>([]);
-  const [editing, setEditing] = useState<Item | null>(null);
+  const insets = useSafeAreaInsets();
+  const [step, setStep] = useState(0);
+  const [items, setItems] = useState<Item[]>(() => {
+    const p = str(params.part);
+    if (!p) return [];
+    const cond = str(params.cond);
+    return [{ ...item(p), notes: str(params.notes), side: Object.keys(SIDES).includes(str(params.side)) ? str(params.side) : '', cond: (['used', 'new', 'any'].includes(cond) ? cond : 'used') as Cond }];
+  });
+  const [q, setQ] = useState('');
   const [urgency, setUrgency] = useState<'normal' | 'today' | 'urgent'>('normal');
   const [carKey, setCarKey] = useState('main');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const slide = useRef(new Animated.Value(0)).current;
   const uid = session?.user.id;
   const { data: extra } = useLive(async () => (uid ? (must(await supabase.from('cars').select('*').eq('owner_id', uid).order('created_at')) as Car[]) : []), ['cars'], [uid]);
 
-  // A part chosen from the home screen (or "order again") arrives ready to fill in.
   useEffect(() => {
-    const p = str(params.part);
-    const cond = str(params.cond);
-    const it = { ...blank(), part: p, notes: str(params.notes), side: Object.keys(SIDES).includes(str(params.side)) ? str(params.side) : '', cond: (['used', 'new', 'any'].includes(cond) ? cond : 'used') as Cond };
-    setEditing(it);
-  }, []);
+    slide.setValue(1);
+    Animated.timing(slide, { toValue: 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start();
+  }, [step, slide]);
 
   if (ready && !session) return <Redirect href="/login" />;
-  if (!profile) return <Screen><Loading /></Screen>;
+  if (!profile) return <View style={{ flex: 1, backgroundColor: colors.ground, padding: 20 }}><Loading /></View>;
   const cars: CarOpt[] = [
     { key: 'main', make: profile.car_make ?? '', model: profile.car_model ?? '', year: profile.car_year ?? 0, vin: profile.car_vin ?? '' },
     ...(extra ?? []).map((c) => ({ key: c.id, make: c.make, model: c.model, year: c.year, vin: c.vin })),
   ];
   const car = cars.find((c) => c.key === carKey) ?? cars[0];
-
-  function saveItem(it: Item) {
-    if (it.part.trim().length < 2) return toast('اكتب اسم القطعة');
-    const clean = { ...it, part: it.part.trim(), side: partIsSided(it.part) ? it.side : '' };
-    setItems((xs) => (xs.some((x) => x.key === it.key) ? xs.map((x) => (x.key === it.key ? clean : x)) : [...xs, clean]));
-    setEditing(null);
-  }
+  const upd = (key: string, p: Partial<Item>) => setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...p } : x)));
+  const add = (part: string) => {
+    const name = part.trim();
+    if (name.length < 2) return;
+    if (items.some((x) => x.part === name)) return toast('القطعة دي في الطلب بالفعل');
+    setItems((xs) => [...xs, item(name)]); setQ('');
+  };
+  const leave = () => (router.canGoBack() ? router.back() : router.replace('/customer'));
 
   async function send() {
     setErr(null);
-    if (!items.length) return setErr('ضيف قطعة واحدة على الأقل.');
     for (const it of items) {
       if (it.budget.trim()) { const b = parseInt(toLatin(it.budget), 10); if (!b || b < 1) return setErr(`الميزانية بتاعة «${it.part}» لازم تكون رقم.`); }
     }
@@ -73,132 +81,190 @@ export default function NewRequest() {
         const photo_path = it.photo ? await uploadPhoto(it.photo, profile!.id) : null;
         rows.push({
           customer_id: profile!.id, part: it.part, qty: it.qty, car_make: car.make, car_model: car.model, car_year: car.year, vin: car.vin,
-          wanted_condition: it.cond, side: it.side, urgency, budget: it.budget.trim() ? parseInt(toLatin(it.budget), 10) : null,
+          wanted_condition: it.cond, side: partIsSided(it.part) ? it.side : '', urgency, budget: it.budget.trim() ? parseInt(toLatin(it.budget), 10) : null,
           area: profile!.area, notes: it.notes.trim(), photo_path, batch_id: batch,
         });
       }
       const { data, error } = await supabase.from('requests').insert(rows).select('id, num');
       if (error) throw error;
-      const firstRow = [...(data ?? [])].sort((a, b) => a.num - b.num)[0];
-      toast(`طلبك ${reqNo(firstRow.num)} اتبعت للمحلات`);
-      router.replace(`/customer/${firstRow.id}`);
+      const first = [...(data ?? [])].sort((a, b) => a.num - b.num)[0];
+      toast(`طلبك ${reqNo(first.num)} اتبعت للمحلات`);
+      router.replace(`/customer/${first.id}`);
     } catch (x) { setErr(friendlyError(x)); }
     finally { setBusy(false); }
   }
 
+  const canNext = step === 0 ? items.length > 0 : true;
+  const next = () => (step < 3 ? setStep(step + 1) : send());
+  const suggestions = CATALOG.filter((c) => !items.some((x) => x.part === c.part) && (!q.trim() || c.part.includes(q.trim())));
+
   return (
-    <Screen footer={
-      <>
-        <ErrorText text={err} />
-        <Btn kind="accent" icon="paper-plane" loading={busy} disabled={!items.length}
-          title={items.length > 1 ? `ابعت ${ar(items.length)} قطع للمحلات` : 'ابعت الطلب للمحلات'} onPress={send} />
-      </>
-    }>
-      <BackBar title="طلب جديد" onBack={() => (router.canGoBack() ? router.back() : router.replace('/customer'))}
-        right={<Press onPress={() => router.push({ pathname: '/assistant', params: { mode: 'request' } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Icon name="sparkles" size={15} color={colors.accentDeep} /><T size={13} w="medium" color={colors.accentDeep}>بالمساعد</T>
-        </Press>} />
-
-      <Labeled label="العربية">
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, padding: 2 }}>
-          {cars.map((c) => {
-            const on = c.key === car.key;
-            return (
-              <Press key={c.key} onPress={() => setCarKey(c.key)} selected={on}
-                style={[{ backgroundColor: colors.surface, borderRadius: 18, padding: 12, gap: 8, borderWidth: 2, borderColor: on ? colors.ink : 'transparent', minWidth: 150 }, lift]}>
-                <Plate top={c.model || '—'} bottom={ar(c.year)} size="sm" />
-                <T size={13} w={on ? 'semibold' : 'medium'}>{c.make} {c.model}</T>
-              </Press>
-            );
-          })}
-          <Press onPress={() => router.push('/cars')} style={{ borderRadius: 18, padding: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.faint, alignItems: 'center', justifyContent: 'center', minWidth: 110, gap: 4 }}>
-            <Icon name="add" size={22} /><T size={12.5} w="medium">عربية تانية</T>
-          </Press>
-        </ScrollView>
-      </Labeled>
-
-      <View style={{ gap: 10 }}>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <T w="bold" size={18}>القطع {items.length ? `(${ar(items.length)})` : ''}</T>
-          {items.length ? <Muted size={12}>كل محل يسعّر اللي عنده</Muted> : null}
-        </Row>
-        {items.map((it) => (
-          <View key={it.key} style={[{ backgroundColor: colors.surface, borderRadius: 20, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 }, lift]}>
-            {it.photo ? <Image source={{ uri: it.photo }} style={{ width: 56, height: 56, borderRadius: 14 }} /> : (
-              <View style={{ width: 56, height: 56, borderRadius: 14, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon set="mci" name={PART_ICONS[it.part] ?? 'car-wrench'} size={26} />
+    <View style={{ flex: 1, backgroundColor: colors.ground }}>
+      {/* top: close, progress, step title */}
+      <View style={{ paddingTop: insets.top + 8, backgroundColor: colors.ground }}>
+        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, gap: 14 }}>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <IconButton name={step ? 'chevron-forward' : 'close'} label={step ? 'رجوع' : 'اقفل'} onPress={() => (step ? setStep(step - 1) : leave())} />
+            <T w="semibold" size={14} color={colors.muted}>خطوة {ar(step + 1)} من {ar(4)}</T>
+            <Press onPress={() => router.push({ pathname: '/assistant', params: { mode: 'request' } })} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Icon name="sparkles" size={15} color={colors.accentDeep} /><T size={13} w="medium" color={colors.accentDeep}>بالمساعد</T>
+            </Press>
+          </Row>
+          <Row gap={6}>
+            {STEPS.map((sname, i) => (
+              <View key={sname} style={{ flex: 1, gap: 6 }}>
+                <View style={{ height: 5, borderRadius: 3, backgroundColor: i <= step ? colors.accent : colors.line }} />
+                <T size={11.5} w={i === step ? 'semibold' : 'regular'} color={i <= step ? colors.ink : colors.faint}>{sname}</T>
               </View>
-            )}
-            <View style={{ flex: 1, gap: 2 }}>
-              <T w="semibold" size={15} numberOfLines={1}>{it.part}{it.qty > 1 ? ` × ${ar(it.qty)}` : ''}</T>
-              <Muted size={12} numberOfLines={1}>{[WANTED[it.cond], it.side ? SIDES[it.side] : '', it.budget ? `لحد ${it.budget} ج` : '', it.notes].filter(Boolean).join(' · ')}</Muted>
-            </View>
-            <Press onPress={() => setEditing(it)} label="عدّل" hitSlop={6}><Icon name="create-outline" size={20} color={colors.muted} /></Press>
-            <Press onPress={() => setItems((xs) => xs.filter((x) => x.key !== it.key))} label="شيل" hitSlop={6}><Icon name="trash-outline" size={20} color={colors.bad} /></Press>
-          </View>
-        ))}
-        <Press onPress={() => setEditing(blank())}
-          style={{ borderRadius: 20, paddingVertical: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.accentDeep, backgroundColor: colors.accentSoft, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-          <Icon name="add-circle" size={22} color={colors.accentDeep} />
-          <T w="semibold" size={15} color={colors.accentDeep}>{items.length ? 'ضيف قطعة تانية' : 'ضيف القطعة اللي محتاجها'}</T>
-        </Press>
+            ))}
+          </Row>
+        </View>
       </View>
 
-      <Labeled label="محتاجها إمتى؟">
-        <Seg options={Object.entries(URGENCY).map(([v, label]) => ({ v: v as 'normal' | 'today' | 'urgent', label }))} value={urgency} onPick={setUrgency} />
-      </Labeled>
-
-      <ItemSheet item={editing} onClose={() => setEditing(null)} onSave={saveItem} isNew={!!editing && !items.some((x) => x.key === editing.key)} />
-    </Screen>
-  );
-}
-
-function ItemSheet({ item, onClose, onSave, isNew }: { item: Item | null; onClose: () => void; onSave: (i: Item) => void; isNew: boolean }) {
-  const [it, setIt] = useState<Item>(item ?? blank());
-  useEffect(() => { if (item) setIt(item); }, [item]);
-  const set = (p: Partial<Item>) => setIt((x) => ({ ...x, ...p }));
-  async function photo() {
-    try { const uri = await pickPhoto(); if (uri) set({ photo: uri }); }
-    catch { toast('الصورة دي مش مدعومة. جرّب صورة تانية.'); }
-  }
-  return (
-    <Sheet open={!!item} onClose={onClose} title={isNew ? 'ضيف قطعة' : 'عدّل القطعة'}>
-      <ScrollView style={{ maxHeight: 560 }} contentContainerStyle={{ gap: 16, paddingBottom: 8 }} keyboardShouldPersistTaps="handled">
-        <Field big icon="search" value={it.part} onChangeText={(v) => set({ part: v })} placeholder="اسم القطعة" />
-        <Chips options={COMMON_PARTS.map((p) => ({ v: p, label: p }))} selected={[it.part]} onPick={(v) => set({ part: v })} />
-        {partIsSided(it.part) ? (
-          <Labeled label="الجهة">
-            <Chips options={Object.entries(SIDES).map(([v, label]) => ({ v, label }))} selected={[it.side]} onPick={(v) => set({ side: v })} />
-          </Labeled>
-        ) : null}
-        <Labeled label="عايزها">
-          <Seg options={[{ v: 'used', label: 'مستعمل' }, { v: 'new', label: 'جديد' }, { v: 'any', label: 'أي حاجة' }]} value={it.cond} onPick={(v) => set({ cond: v as Cond })} />
-        </Labeled>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <T w="medium" size={13} color={colors.muted}>العدد</T>
-          <Row gap={14}>
-            <Press onPress={() => set({ qty: Math.max(1, it.qty - 1) })} label="أقل" style={qtyBtn}><Icon name="remove" size={18} /></Press>
-            <T w="bold" size={18}>{ar(it.qty)}</T>
-            <Press onPress={() => set({ qty: Math.min(20, it.qty + 1) })} label="أكتر" style={qtyBtn}><Icon name="add" size={18} /></Press>
-          </Row>
-        </Row>
-        <Press onPress={photo} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.line }}>
-          {it.photo ? <Image source={{ uri: it.photo }} style={{ width: 52, height: 52, borderRadius: 12 }} /> : (
-            <View style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={22} color={colors.accentDeep} /></View>
+      <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 22, paddingBottom: 40, gap: 18,
+          opacity: slide.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }), transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, -40] }) }] }}>
+          {step === 0 ? (
+            <>
+              <T w="bold" size={28} style={{ lineHeight: 38, letterSpacing: -0.4 }}>محتاج إيه؟</T>
+              <Muted size={14} style={{ marginTop: -10 }}>ضيف كل القطع اللي محتاجها؛ كل محل هيسعّر اللي عنده.</Muted>
+              <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: 18, paddingStart: 16, paddingEnd: 6, height: 58 }, lift]}>
+                <Icon name="search" size={20} color={colors.faint} />
+                <TextInput value={q} onChangeText={setQ} placeholder="اكتب اسم القطعة" placeholderTextColor={colors.faint} onSubmitEditing={() => add(q)} returnKeyType="done"
+                  style={[{ flex: 1, fontFamily: fonts.medium, fontSize: 16, color: colors.ink, textAlign: 'right' }, { outlineStyle: 'none' } as any]} />
+                {q.trim().length > 1 ? <Btn kind="small" title="ضيف" icon="add" onPress={() => add(q)} style={{ alignSelf: 'center' }} /> : null}
+              </View>
+              {items.length ? (
+                <View style={{ gap: 8 }}>
+                  {items.map((it) => (
+                    <View key={it.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.ink, borderRadius: 18, padding: 12 }}>
+                      <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: 'rgba(255,255,255,.1)', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon set="mci" name={iconOf(it.part)} size={22} color={colors.accent} />
+                      </View>
+                      <T w="semibold" size={15} color="#fff" style={{ flex: 1 }}>{it.part}</T>
+                      <Press onPress={() => setItems((xs) => xs.filter((x) => x.key !== it.key))} label="شيل" hitSlop={8}><Icon name="close-circle" size={22} color="rgba(255,255,255,.6)" /></Press>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              <T w="semibold" size={14} color={colors.muted}>{q.trim() ? 'اقتراحات' : 'الأكتر طلباً'}</T>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {suggestions.map((c) => (
+                  <Press key={c.part} onPress={() => add(c.part)} label={c.part}
+                    style={[{ width: '31%', flexGrow: 1, backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 14, alignItems: 'center', gap: 8 }, lift]}>
+                    <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon set="mci" name={c.icon} size={24} />
+                    </View>
+                    <T size={12.5} w="medium" center numberOfLines={1}>{c.part}</T>
+                  </Press>
+                ))}
+              </View>
+            </>
+          ) : step === 1 ? (
+            <>
+              <T w="bold" size={28} style={{ lineHeight: 38, letterSpacing: -0.4 }}>تفاصيل القطع</T>
+              <Muted size={14} style={{ marginTop: -10 }}>كل ما التفاصيل أوضح، السعر أدق. الصورة بتفرق جداً.</Muted>
+              {items.map((it, i) => (
+                <View key={it.key} style={[{ backgroundColor: colors.surface, borderRadius: 24, padding: 16, gap: 14 }, lift]}>
+                  <Row gap={10}>
+                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}><T size={12} w="bold" style={{ lineHeight: 16 }}>{ar(i + 1)}</T></View>
+                    <T w="bold" size={17} style={{ flex: 1 }}>{it.part}</T>
+                    <Row gap={10}>
+                      <Press onPress={() => upd(it.key, { qty: Math.max(1, it.qty - 1) })} label="أقل" style={qtyBtn}><Icon name="remove" size={16} /></Press>
+                      <T w="bold" size={16}>{ar(it.qty)}</T>
+                      <Press onPress={() => upd(it.key, { qty: Math.min(20, it.qty + 1) })} label="أكتر" style={qtyBtn}><Icon name="add" size={16} /></Press>
+                    </Row>
+                  </Row>
+                  {partIsSided(it.part) ? <Chips options={Object.entries(SIDES).map(([v, label]) => ({ v, label }))} selected={[it.side]} onPick={(v) => upd(it.key, { side: v })} /> : null}
+                  <Seg options={[{ v: 'used', label: 'مستعمل' }, { v: 'new', label: 'جديد' }, { v: 'any', label: 'أي حاجة' }]} value={it.cond} onPick={(v) => upd(it.key, { cond: v as Cond })} />
+                  <Press onPress={async () => { try { const uri = await pickPhoto(); if (uri) upd(it.key, { photo: uri }); } catch { toast('الصورة دي مش مدعومة.'); } }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: it.photo ? colors.good : colors.line }}>
+                    {it.photo ? <Image source={{ uri: it.photo }} style={{ width: 44, height: 44, borderRadius: 10 }} /> : (
+                      <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={20} color={colors.accentDeep} /></View>
+                    )}
+                    <T size={13.5} w="medium" style={{ flex: 1 }}>{it.photo ? 'الصورة اتضافت ✓' : 'صوّر القطعة القديمة'}</T>
+                  </Press>
+                  <Row gap={10} style={{ alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1 }}><Field value={it.budget} onChangeText={(v) => upd(it.key, { budget: v })} keyboardType="number-pad" ltr placeholder="ميزانية (اختياري)" /></View>
+                    <View style={{ flex: 1.4 }}><Field value={it.notes} onChangeText={(v) => upd(it.key, { notes: v })} placeholder="ملاحظة (اختياري)" /></View>
+                  </Row>
+                </View>
+              ))}
+            </>
+          ) : step === 2 ? (
+            <>
+              <T w="bold" size={28} style={{ lineHeight: 38, letterSpacing: -0.4 }}>لأنهي عربية؟</T>
+              <View style={{ gap: 10 }}>
+                {cars.map((c) => {
+                  const on = c.key === car.key;
+                  return (
+                    <Press key={c.key} onPress={() => setCarKey(c.key)} selected={on}
+                      style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surface, borderRadius: 20, padding: 14, borderWidth: 2, borderColor: on ? colors.ink : 'transparent' }, lift]}>
+                      <Plate top={c.model || '—'} bottom={ar(c.year)} />
+                      <View style={{ flex: 1 }}><T w="semibold" size={15}>{c.make} {c.model}</T>{c.vin ? <Muted size={12}>شاسيه {c.vin}</Muted> : null}</View>
+                      <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? colors.ink : colors.faint} />
+                    </Press>
+                  );
+                })}
+                <Btn kind="secondary" icon="add" title="عربية تانية" onPress={() => router.push('/cars')} />
+              </View>
+              <T w="bold" size={20} style={{ marginTop: 6 }}>محتاجها إمتى؟</T>
+              <View style={{ gap: 10 }}>
+                {([['normal', 'time-outline', 'مش مستعجل', 'المحلات ترد براحتها'], ['today', 'today-outline', 'النهارده', 'عايزها النهارده'], ['urgent', 'flash', 'مستعجل جداً', 'العربية واقفة']] as const).map(([v, icon, t, sub]) => {
+                  const on = urgency === v;
+                  return (
+                    <Press key={v} onPress={() => setUrgency(v)} selected={on}
+                      style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: on ? colors.ink : colors.surface, borderRadius: 20, padding: 16 }, lift]}>
+                      <Icon name={icon} size={24} color={on ? colors.accent : colors.ink} />
+                      <View style={{ flex: 1 }}><T w="semibold" size={15} color={on ? '#fff' : colors.ink}>{t}</T><T size={12.5} color={on ? 'rgba(255,255,255,.7)' : colors.muted}>{sub}</T></View>
+                    </Press>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
+            <>
+              <T w="bold" size={28} style={{ lineHeight: 38, letterSpacing: -0.4 }}>راجع طلبك</T>
+              <View style={[{ backgroundColor: colors.surface, borderRadius: 24, overflow: 'hidden' }, lift]}>
+                <View style={{ backgroundColor: colors.ink, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Plate top={car.model || '—'} bottom={ar(car.year)} size="sm" />
+                  <View style={{ flex: 1 }}>
+                    <T w="semibold" color="#fff">{car.make} {car.model}</T>
+                    <T size={12.5} color="rgba(255,255,255,.7)">{URGENCY[urgency]} · {profile.area}</T>
+                  </View>
+                </View>
+                {items.map((it, i) => (
+                  <View key={it.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
+                    {it.photo ? <Image source={{ uri: it.photo }} style={{ width: 44, height: 44, borderRadius: 12 }} /> : (
+                      <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}><Icon set="mci" name={iconOf(it.part)} size={22} /></View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <T w="semibold" size={14.5}>{it.part}{it.qty > 1 ? ` × ${ar(it.qty)}` : ''}</T>
+                      <Muted size={12}>{[WANTED[it.cond], partIsSided(it.part) && it.side ? SIDES[it.side] : '', it.budget ? `لحد ${it.budget} ج` : '', it.notes].filter(Boolean).join(' · ')}</Muted>
+                    </View>
+                  </View>
+                ))}
+              </View>
+              <Row gap={10} style={{ alignItems: 'flex-start', backgroundColor: colors.accentSoft, borderRadius: 18, padding: 14 }}>
+                <Icon name="shield-checkmark" size={20} color={colors.accentDeep} />
+                <T size={13} style={{ flex: 1 }}>بنبعت طلبك لمحلات {car.make} الموثّقة بس. رقمك وعنوانك مش بيظهروا لأي محل غير اللي هتختاره.</T>
+              </Row>
+              <ErrorText text={err} />
+            </>
           )}
-          <View style={{ flex: 1 }}>
-            <T w="semibold" size={14}>{it.photo ? 'الصورة اتضافت' : 'صوّر القطعة القديمة'}</T>
-            <Muted size={12}>{it.photo ? 'اضغط لو عايز تغيّرها' : 'المحل يعرفها أسرع ويديك سعر مظبوط'}</Muted>
-          </View>
-        </Press>
-        <Row gap={10} style={{ alignItems: 'flex-start' }}>
-          <View style={{ flex: 1 }}><Field label="ميزانيتك (اختياري)" value={it.budget} onChangeText={(v) => set({ budget: v })} keyboardType="number-pad" ltr placeholder="جنيه" /></View>
-        </Row>
-        <Field label="ملاحظات (اختياري)" value={it.notes} onChangeText={(v) => set({ notes: v })} placeholder="مثلاً: لون فضي، فتيس أوتوماتيك" />
+        </Animated.View>
       </ScrollView>
-      <Btn title={isNew ? 'ضيف للطلب' : 'احفظ'} icon={isNew ? 'add' : 'checkmark'} onPress={() => onSave(it)} style={{ marginTop: 12 }} />
-    </Sheet>
+
+      <View style={[{ backgroundColor: colors.surface, paddingTop: 12, paddingBottom: insets.bottom + 12, borderTopLeftRadius: 24, borderTopRightRadius: 24 }, lift]}>
+        <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18 }}>
+          <Btn kind={step === 3 ? 'accent' : 'primary'} icon={step === 3 ? 'paper-plane' : 'arrow-back'} loading={busy} disabled={!canNext}
+            title={step === 0 ? (items.length ? `التالي · ${ar(items.length)} ${items.length > 1 ? 'قطع' : 'قطعة'}` : 'ضيف قطعة الأول') : step === 3 ? 'ابعت للمحلات' : 'التالي'}
+            onPress={next} />
+        </View>
+      </View>
+      <ToastHost bottom={100} />
+    </View>
   );
 }
 
-const qtyBtn = { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.soft, alignItems: 'center' as const, justifyContent: 'center' as const };
+const qtyBtn = { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.soft, alignItems: 'center' as const, justifyContent: 'center' as const };

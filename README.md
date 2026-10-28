@@ -102,3 +102,9 @@ Each complaint is one conversation (`reports` + `ticket_messages`).
 
 ## Several parts in one request
 A request can hold several parts (a basket). Each part is its own row in `requests` (own quotes, chosen shop, tracking, rating and commission); parts sent together share `batch_id`. Shops quote the parts they have; the customer picks the best offer per part, or takes "everything from one shop" when a shop quoted all of them, and confirms all choices at once with `choose_quotes`. Shops get one alert per batch.
+
+## Price requests and orders
+- A **price request** (`requests`, one row per part) collects offers. Shops quote per part or say a part isn't available (`declines.reason`); customers see counts and reasons via `decline_counts`.
+- Accepting offers (`accept_offers`) creates one **order** per shop (`orders`, numbered from 5001) holding the parts bought from it; parts still waiting stay in the price request.
+- Orders move `preparing → ready | out_for_delivery → delivered` (shop, `set_order_status`) `→ received` (customer, `receive_order`), then `rate_order`. The customer can `cancel_order` while it's still being prepared; the parts return to choosing offers.
+- **Contact details stay in the app:** before a deal, phone numbers, emails, links and social handles are replaced with ••• in chat messages and request text by database triggers (`private.mask_contacts`), and such messages are marked `flagged` for staff.

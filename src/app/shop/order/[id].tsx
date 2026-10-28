@@ -1,0 +1,124 @@
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
+import { Linking, View } from 'react-native';
+import { BackBar, Btn, Card, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Row, Screen, T, toast } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+import {
+  COMMISSION, CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
+  type Order, type Profile, type Quote, type Request,
+} from '@/lib/data';
+import { must, useLive } from '@/lib/live';
+import { photoUrl, supabase } from '@/lib/supabase';
+import { colors } from '@/lib/theme';
+
+/** The shop's side of an order: one big button that moves it to the next step. */
+export default function ShopOrder() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { ready, session } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const { data, loading } = useLive(async () => {
+    const order = must(await supabase.from('orders').select('*').eq('id', id).maybeSingle()) as Order | null;
+    if (!order) return { order: null, parts: [] as Request[], quotes: [] as Quote[], customer: null as Profile | null };
+    const parts = must(await supabase.from('requests').select('*').eq('order_id', id).order('num')) as Request[];
+    const qids = parts.map((p) => p.chosen_quote_id).filter(Boolean) as string[];
+    const quotes = qids.length ? (must(await supabase.from('quotes').select('*').in('id', qids)) as Quote[]) : [];
+    const customer = must(await supabase.from('profiles').select('*').eq('id', order.customer_id).maybeSingle()) as Profile | null;
+    return { order, parts, quotes, customer };
+  }, ['orders', 'requests'], [id]);
+
+  if (ready && !session) return <Redirect href="/login" />;
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/shop'));
+  if (loading && !data) return <Screen><Loading /></Screen>;
+  const o = data?.order;
+  if (!o) return <Screen><BackBar title="الأوردر" onBack={back} /><Empty text="الأوردر ده مش موجود." /></Screen>;
+  const { parts, quotes, customer: c } = data!;
+  const steps = orderSteps(o.delivery_mode);
+  const at = steps.indexOf(o.status);
+  const next = o.status === 'preparing' ? (o.delivery_mode === 'delivery' ? 'out_for_delivery' : 'ready') : o.status === 'ready' || o.status === 'out_for_delivery' ? 'delivered' : null;
+  const nextLabel = next === 'out_for_delivery' ? 'جهّزت الأوردر · خرج للتوصيل' : next === 'ready' ? 'جهّزت الأوردر · جاهز للاستلام' : next === 'delivered' ? 'سلّمت الأوردر للعميل' : '';
+  const total = Number(o.items_total);
+
+  async function move() {
+    if (!next) return;
+    setBusy(true);
+    const { error } = await supabase.rpc('set_order_status', { p_order: o!.id, p_status: next });
+    setBusy(false);
+    if (error) toast(friendlyError(error)); else toast('اتبعت للعميل');
+  }
+
+  const footer = next && o.status !== 'cancelled' ? <Btn kind="accent" icon="arrow-back-circle" title={nextLabel} loading={busy} onPress={move} /> : undefined;
+
+  return (
+    <Screen footer={footer}>
+      <BackBar title={'أوردر ' + orderNo(o.order_no)} onBack={back} right={<Pill label={ORDER_LABEL[o.status].short} tone={o.status === 'received' ? 'good' : o.status === 'cancelled' ? 'plain' : 'new'} />} />
+
+      <View style={{ backgroundColor: colors.ink, borderRadius: 26, padding: 18, gap: 16 }}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <View>
+            <T size={12.5} color="rgba(255,255,255,.65)">صافي ليك بعد عمولة ٥٪</T>
+            <T w="bold" size={30} color="#fff">{money(total * (1 - COMMISSION))} <T size={14} color="rgba(255,255,255,.6)">ج.م</T></T>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <T size={12.5} color="rgba(255,255,255,.65)">{o.delivery_mode === 'delivery' ? 'توصيل للعميل' : 'العميل جاي يستلم'}</T>
+            <T size={12.5} color="rgba(255,255,255,.65)">{ago(o.created_at)}</T>
+          </View>
+        </Row>
+        {o.status !== 'cancelled' ? (
+          <Row gap={6}>
+            {steps.map((s, i) => (
+              <View key={s} style={{ flex: 1, gap: 6 }}>
+                <View style={{ height: 6, borderRadius: 3, backgroundColor: i <= at ? colors.accent : 'rgba(255,255,255,.15)' }} />
+                <T size={11.5} w={i === at ? 'bold' : 'regular'} color={i <= at ? '#fff' : 'rgba(255,255,255,.5)'}>{s === 'ready' ? 'جاهز' : ORDER_STEP_NAME[s]}</T>
+              </View>
+            ))}
+          </Row>
+        ) : <T color="#fff">العميل لغى الأوردر ده.</T>}
+      </View>
+
+      <Card>
+        <T w="bold" size={16}>جهّز القطع دي ({ar(parts.length)})</T>
+        {parts.map((p) => {
+          const q = quotes.find((x) => x.id === p.chosen_quote_id);
+          return (
+            <Row key={p.id} gap={12}>
+              <Photo uri={photoUrl(q?.photo_path ?? p.photo_path)} size={48} />
+              <View style={{ flex: 1 }}>
+                <T w="semibold" size={14.5}>{p.part}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
+                <Muted size={12}>{p.car_make} {p.car_model} {ar(p.car_year)}{q ? ` · ${CONDITIONS[q.condition]} · ضمان ${ar(q.warranty_days)} يوم` : ''}</Muted>
+              </View>
+              {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))}</T> : null}
+            </Row>
+          );
+        })}
+        <View style={{ height: 1, backgroundColor: colors.line }} />
+        <Lines rows={[['قيمة البيع', money(total) + ' ج.م'], ['عمولة قطعتك ٥٪', money(total * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(total * (1 - COMMISSION)) + ' ج.م']} />
+        <Muted size={12}>اكتب رقم الأوردر {orderNo(o.order_no)} على الكيس.</Muted>
+      </Card>
+
+      {c && o.status !== 'cancelled' ? (
+        <Card>
+          <Row gap={12}>
+            <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}><Icon name="person" size={22} /></View>
+            <View style={{ flex: 1 }}><T w="bold" size={15}>{c.full_name}</T><Muted size={12.5}>العميل</Muted></View>
+          </Row>
+          <Row gap={10}>
+            <Btn kind="dark" icon="call" title="اتصل" onPress={() => Linking.openURL('tel:' + c.phone)} style={{ flex: 1 }} />
+            {parts[0] ? <Btn kind="secondary" icon="chatbubble-ellipses" title="رسالة" onPress={() => router.push(`/chat/${parts[0].id}/${o.shop_id}`)} style={{ flex: 1, minHeight: 46 }} /> : null}
+          </Row>
+          {o.delivery_mode === 'delivery' ? (
+            <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
+              <Muted size={13} style={{ flex: 1 }}>{addressLine(c)}{c.landmark ? ` (${c.landmark})` : ''}</Muted></Row>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {o.status === 'received' ? (
+        <Card style={{ backgroundColor: colors.goodSoft }}>
+          <T w="bold" size={15}>العميل استلم الأوردر{o.rating ? ` وقيّمك ${ar(o.rating)} من ٥` : ''}</T>
+          {o.rating ? <Row gap={3}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={18} color={o.rating! >= n ? colors.accent : colors.line} />)}</Row> : null}
+          {o.review ? <T size={14}>«{o.review}»</T> : null}
+        </Card>
+      ) : o.status === 'delivered' ? <Muted center>مستنيين العميل يأكد إنه استلم.</Muted> : null}
+    </Screen>
+  );
+}

@@ -5,7 +5,7 @@ import { BottomNav, Logo, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { Icon, Loading, Muted, Plate, Press, Row, Screen, Section, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { ar, groupProgress, groupRequests, partsLabel, reqNo, type Quote, type Request } from '@/lib/data';
+import { ORDER_LABEL, ar, groupRequests, orderNo, orderSteps, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
@@ -26,19 +26,21 @@ export default function CustomerHome() {
   const uid = session?.user.id;
   useEffect(() => { rememberRole('customer'); }, []);
   const { data } = useLive(async () => {
-    if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[] };
-    const reqs = must(await supabase.from('requests').select('*').eq('customer_id', uid).in('status', ['open', 'chosen']).order('created_at', { ascending: false }).limit(20)) as Request[];
-    const ids = reqs.map((r) => r.id);
+    if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[], orders: [] as Order[] };
+    const reqs = must(await supabase.from('requests').select('*').eq('customer_id', uid).in('status', ['open', 'chosen']).order('created_at', { ascending: false }).limit(30)) as Request[];
+    const ids = reqs.filter((r) => r.status === 'open').map((r) => r.id);
     const quotes = ids.length ? (must(await supabase.from('quotes').select('id, request_id').in('request_id', ids)) as Pick<Quote, 'id' | 'request_id'>[]) : [];
-    return { reqs, quotes };
-  }, ['requests', 'quotes'], [uid]);
+    const orders = must(await supabase.from('orders').select('*').eq('customer_id', uid).in('status', ['preparing', 'ready', 'out_for_delivery', 'delivered']).order('created_at', { ascending: false }).limit(10)) as Order[];
+    return { reqs, quotes, orders };
+  }, ['requests', 'quotes', 'orders'], [uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && (!profile.is_customer || !profile.street)) return <Redirect href="/profile" />;
   if (!profile) return <Screen><Loading /></Screen>;
   const first = (profile.full_name || '').split(' ')[0];
   const newReq = (part?: string) => router.push(part ? { pathname: '/customer/new', params: { part } } : '/customer/new');
-  const groups = groupRequests(data?.reqs ?? []).slice(0, 6);
+  const groups = groupRequests((data?.reqs ?? []).filter((r) => r.status === 'open')).slice(0, 6);
+  const orders = data?.orders ?? [];
 
   const hero = (
     <View style={{ backgroundColor: colors.accent, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingBottom: 64 }}>
@@ -88,26 +90,48 @@ export default function CustomerHome() {
         </View>
       </View>
 
+      {orders.length ? (
+        <Section title="أوردراتك" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>
+          {orders.slice(0, 3).map((o) => {
+            const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
+            const steps = orderSteps(o.delivery_mode); const at = steps.indexOf(o.status);
+            return (
+              <Press key={o.id} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}
+                style={{ backgroundColor: colors.ink, borderRadius: 22, padding: 16, gap: 12 }}>
+                <Row gap={12}>
+                  <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name={ORDER_LABEL[o.status].icon} size={22} color={colors.ink} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <T w="bold" size={15} color="#fff">{ORDER_LABEL[o.status].title}</T>
+                    <T size={12.5} color="rgba(255,255,255,.7)" numberOfLines={1}>{orderNo(o.order_no)} · {ps.length ? partsLabel(ps) : ''}</T>
+                  </View>
+                  <Icon name="chevron-back" size={18} color="rgba(255,255,255,.6)" />
+                </Row>
+                <Row gap={4}>{steps.map((st, i) => <View key={st} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: i <= at ? colors.accent : 'rgba(255,255,255,.15)' }} />)}</Row>
+              </Press>
+            );
+          })}
+        </Section>
+      ) : null}
+
       {groups.length ? (
-        <Section title="طلباتك الشغالة" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>
+        <Section title="عروض الأسعار" action={{ label: 'الكل', onPress: () => router.push({ pathname: '/customer/requests', params: { tab: 'quotes' } }) }}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 6, paddingHorizontal: 2 }} style={{ marginHorizontal: -2 }}>
             {groups.map((g) => {
               const n = data!.quotes.filter((q) => g.items.some((r) => r.id === q.request_id)).length;
-              const p = groupProgress(g.items, n);
               return (
                 <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)}
-                  style={[{ width: 250, backgroundColor: colors.surface, borderRadius: 20, padding: 14, gap: 12 }, lift]}>
+                  style={[{ width: 240, backgroundColor: colors.surface, borderRadius: 20, padding: 14, gap: 10, borderWidth: 2, borderColor: n ? colors.accent : 'transparent' }, lift]}>
                   <Row style={{ justifyContent: 'space-between' }}>
                     <Plate top="طلب" bottom={reqNo(g.first.num).replace('#', '')} size="sm" />
                     {g.items.length > 1 ? <View style={{ backgroundColor: colors.soft, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 2 }}><T size={11.5} w="semibold">{ar(g.items.length)} قطع</T></View> : null}
                   </Row>
                   <T w="bold" size={15} numberOfLines={1}>{partsLabel(g.items)}</T>
-                  <View style={{ gap: 6 }}>
-                    <Row gap={4}>
-                      {[1, 2, 3, 4].map((i) => <View key={i} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: i <= p.step ? (p.step === 2 ? colors.accent : colors.ink) : colors.line }} />)}
-                    </Row>
-                    <T size={12.5} w="semibold" color={p.step === 2 ? colors.accentDeep : colors.muted}>{p.label}</T>
-                  </View>
+                  <Row gap={6}>
+                    <Icon name={n ? 'pricetags' : 'time'} size={16} color={n ? colors.accentDeep : colors.muted} />
+                    <T size={12.5} w="semibold" color={n ? colors.accentDeep : colors.muted}>{n ? `${ar(n)} عروض مستنياك` : 'بندوّر عند المحلات'}</T>
+                  </Row>
                 </Press>
               );
             })}

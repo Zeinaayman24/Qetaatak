@@ -2,7 +2,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { shopState } from '@/components/status';
-import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { COMMISSION, CONDITIONS, ORDER_STEPS, SIDES, URGENCY, WANTED, WARRANTY_DAYS, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -20,6 +20,8 @@ export default function ShopRequest() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [ask, setAsk] = useState(false);
+  const [why, setWhy] = useState('');
 
   const { data, loading, reload } = useLive(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
@@ -79,9 +81,13 @@ export default function ShopRequest() {
     finally { setBusy(false); }
   }
 
-  async function decline() {
-    const { error } = await supabase.from('declines').insert({ request_id: r!.id, shop_id: uid });
-    if (error) toast(friendlyError(error)); else { toast('تمام، سجّلنا إنها مش متوفرة'); reload(); }
+  async function decline(reason: string) {
+    const { error } = await supabase.from('declines').insert({ request_id: r!.id, shop_id: uid, reason });
+    setAsk(false);
+    if (error) return toast(friendlyError(error));
+    const next = data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open');
+    if (next) { toast('اتسجّل · كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
+    else { toast('تمام، العميل هيعرف إنها مش متوفرة عندك'); reload(); }
   }
 
   const sum = mine ? (
@@ -95,7 +101,7 @@ export default function ShopRequest() {
     <>
       <ErrorText text={err} />
       <Btn kind="accent" icon="paper-plane" title={p ? 'ابعت العرض · ' + money(p) + ' ج.م' : 'ابعت العرض'} onPress={send} loading={busy} disabled={!approved} />
-      {st === 'open' ? <Btn kind="link" title="مش متوفر عندي" onPress={decline} style={{ alignSelf: 'center' }} /> : null}
+      {st === 'open' ? <Btn kind="link" title="مش متوفرة عندي" onPress={() => setAsk(true)} style={{ alignSelf: 'center' }} /> : null}
     </>
   ) : undefined;
 
@@ -120,36 +126,12 @@ export default function ShopRequest() {
   } else if (st === 'quoted') {
     body = <Card><Pill label="بعت عرض" tone="wait" /><T w="bold" size={17}>العرض اتبعت للعميل</T>{sum}<Muted>هنبلغك أول ما العميل يختار.</Muted></Card>;
   } else if (st === 'sold' && mine) {
-    const c = data!.customer;
     body = (
       <Card style={{ backgroundColor: colors.goodSoft }}>
-        <T w="bold" size={19}>مبروك! العميل اختار عرضك 🎉</T>
+        <T w="bold" size={19}>العميل اختار عرضك 🎉</T>
         {sum}
-        <T size={14}>{r.delivery_mode === 'pickup' ? 'العميل جاي ياخدها من المحل وهيقولك رقم الطلب ' + reqNo(r.num) + '.' : 'كلّم العميل واتفق على التوصيل. اكتب رقم الطلب ' + reqNo(r.num) + ' على الكيس.'}</T>
-        {c ? (
-          <View style={{ gap: 6 }}>
-            <T w="semibold">{c.full_name}</T>
-            <CopyBox text={c.phone} />
-            {r.delivery_mode === 'delivery' ? (
-              <Muted size={13}>العنوان: {addressLine(c)}{c.landmark ? ' (' + c.landmark + ')' : ''}{c.postal_code ? ' · ' + c.postal_code : ''}</Muted>
-            ) : null}
-          </View>
-        ) : null}
-        {r.qty > 1 ? <Muted size={13}>العميل طالب {ar(r.qty)} قطع؛ السعر لكل قطعة.</Muted> : null}
-        {r.status === 'chosen' ? (
-          <View style={{ gap: 8 }}>
-            <T w="semibold" size={14}>حالة الطلب: {ORDER_STEPS.find((s) => s.key === (r.order_status ?? 'preparing'))?.[r.delivery_mode === 'pickup' ? 'pickupLabel' : 'label'] ?? ORDER_STEPS.find((s) => s.key === (r.order_status ?? 'preparing'))?.label}</T>
-            <Row gap={8} style={{ flexWrap: 'wrap' }}>
-              {(r.delivery_mode === 'delivery' ? ['preparing', 'out_for_delivery', 'delivered'] : ['preparing', 'ready', 'delivered']).map((k) => {
-                const step = ORDER_STEPS.find((s) => s.key === k)!;
-                const on = r.order_status === k;
-                return <Btn key={k} kind={on ? 'small' : 'link'} title={(r.delivery_mode === 'pickup' && step.pickupLabel) || step.label} onPress={() => setOrder(k)} />;
-              })}
-            </Row>
-          </View>
-        ) : null}
-        <Lines rows={[['سعر البيع', money(mine.price) + ' ج.م'], ['عمولة قطعتك ٥٪', money(mine.price * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(mine.price * (1 - COMMISSION)) + ' ج.م']} />
-        {r.status === 'done' ? <T size={13} color={colors.good} w="semibold">العميل أكد الاستلام{r.rating ? ' وقيّمك ' + ar(r.rating) + ' من ٥' : ''}.</T> : null}
+        <Muted size={13}>القطعة دي بقت جزء من أوردر. جهّزه وحرّكه من صفحة الأوردر.</Muted>
+        {r.order_id ? <Btn icon="cube" title="افتح الأوردر" onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: r.order_id! } })} /> : null}
       </Card>
     );
   } else if (st === 'lost') {
@@ -192,6 +174,16 @@ export default function ShopRequest() {
         <Btn kind="secondary" title="رسالة للعميل" onPress={() => router.push(`/chat/${r.id}/${uid}`)} />
       ) : null}
       {body}
+      <Sheet open={ask} onClose={() => setAsk(false)} title="مش متوفرة؟ قول للعميل ليه">
+        <View style={{ gap: 10 }}>
+          {['مش متوفرة دلوقتي', 'متوفرة جديد بس', 'متوفرة مستعمل بس', 'مش بشتغل في الماركة دي'].map((x) => (
+            <Btn key={x} kind="secondary" title={x} onPress={() => decline(x)} />
+          ))}
+          <Field value={why} onChangeText={setWhy} placeholder="سبب تاني (اختياري)" />
+          <Btn title="ابعت" disabled={!why.trim()} onPress={() => decline(why.trim())} />
+          <Muted size={12}>العميل بيشوف السبب بس، مش اسم محلك.</Muted>
+        </View>
+      </Sheet>
     </Screen>
   );
 }

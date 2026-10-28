@@ -22,7 +22,7 @@ export type Request = {
   wanted_condition: string; side: string; urgency: string; budget: number | null; area: string; notes: string; photo_path: string | null;
   status: 'open' | 'chosen' | 'done' | 'cancelled'; chosen_quote_id: string | null; delivery_mode: string | null; order_status: string | null;
   rating: number | null; review: string; created_at: string; chosen_at: string | null; done_at: string | null;
-  batch_id: string | null; qty: number;
+  batch_id: string | null; qty: number; order_id: string | null;
 };
 export type Quote = { id: string; request_id: string; shop_id: string; price: number; condition: string; warranty_days: number; created_at: string };
 export type Ticket = {
@@ -32,7 +32,9 @@ export type Ticket = {
   escalated_at: string | null; resolved_by: 'bot' | 'agent' | 'customer' | null;
 };
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; internal: boolean; kind: 'user' | 'bot' | 'system'; created_at: string };
-export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; created_at: string };
+export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; flagged: boolean; created_at: string };
+export type Order = { id: string; order_no: number; customer_id: string; shop_id: string; delivery_mode: string; status: string; items_total: number; delivery_fee: number; rating: number | null; review: string; created_at: string; received_at: string | null };
+export const ORDER_STATE: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز للاستلام', out_for_delivery: 'في الطريق', delivered: 'المحل سلّم', received: 'العميل استلم', cancelled: 'اتلغى' };
 
 /* ---------------------------------------------------------------- labels */
 export const memberId = (p: Pick<Profile, 'member_no' | 'is_customer' | 'is_shop'> | undefined | null) =>
@@ -99,13 +101,14 @@ export function must<T>(res: { data: T | null; error: any }): T {
 
 /** Everything the lists need, loaded once and kept live. */
 export async function loadAll() {
-  const [profiles, shops, priv, requests, quotes, tickets] = await Promise.all([
+  const [profiles, shops, priv, requests, quotes, tickets, orders] = await Promise.all([
     supabase.from('profiles').select('*').order('member_no', { ascending: false }),
     supabase.from('shops').select('*'),
     supabase.from('shop_private').select('*'),
     supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(1000),
     supabase.from('quotes').select('*').limit(5000),
     supabase.from('reports').select('*').order('updated_at', { ascending: false }).limit(1000),
+    supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(1000),
   ]);
   const p = must(profiles) as Profile[];
   return {
@@ -116,10 +119,11 @@ export async function loadAll() {
     requests: must(requests) as Request[],
     quotes: must(quotes) as Quote[],
     tickets: must(tickets) as Ticket[],
+    orders: must(orders) as Order[],
   };
 }
 export type All = Awaited<ReturnType<typeof loadAll>>;
-export const ALL_TABLES = ['profiles', 'shops', 'requests', 'quotes', 'reports'];
+export const ALL_TABLES = ['profiles', 'shops', 'requests', 'quotes', 'reports', 'orders'];
 
 /** Where a part sits in a multi-part request: "1 of 3", with the batch's first order number. */
 export function batchOf(requests: Request[], r: Request) {

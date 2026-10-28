@@ -7,12 +7,12 @@ import { shopPill, shopState, type ShopState } from '@/components/status';
 import { Btn, Chips, Empty, Icon, Labeled, Loading, Muted, Notice, Photo, Pill, Press, Row, Screen, Seg, Select, T } from '@/components/ui';
 import { Pressable, TextInput } from 'react-native';
 import { useAuth } from '@/lib/auth';
-import { URGENCY, WANTED, ago, ar, money, reqNo, type Quote, type Request } from '@/lib/data';
+import { ORDER_LABEL, URGENCY, WANTED, ago, ar, money, orderActive, orderNo, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, fonts, lift } from '@/lib/theme';
 
-type Tab = 'open' | 'quoted' | 'sold' | 'all';
+type Tab = 'open' | 'quoted' | 'orders' | 'all';
 
 export default function ShopInbox() {
   const { ready, session, profile, shop, shopPrivate } = useAuth();
@@ -27,12 +27,13 @@ export default function ShopInbox() {
   useEffect(() => { rememberRole('shop'); }, []);
 
   const { data, loading } = useLive(async () => {
-    if (!uid) return { reqs: [] as Request[], mine: [] as Quote[], declined: new Set<string>() };
+    if (!uid) return { reqs: [] as Request[], mine: [] as Quote[], declined: new Set<string>(), orders: [] as Order[] };
     const reqs = must(await supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(200)) as Request[];
     const mine = must(await supabase.from('quotes').select('*').eq('shop_id', uid)) as Quote[];
     const dec = must(await supabase.from('declines').select('request_id').eq('shop_id', uid)) as { request_id: string }[];
-    return { reqs, mine, declined: new Set(dec.map((d) => d.request_id)) };
-  }, ['requests', 'quotes'], [uid, shop?.status]);
+    const orders = must(await supabase.from('orders').select('*').eq('shop_id', uid).order('created_at', { ascending: false }).limit(100)) as Order[];
+    return { reqs, mine, declined: new Set(dec.map((d) => d.request_id)), orders };
+  }, ['requests', 'quotes', 'orders'], [uid, shop?.status]);
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && (!shop || !shop.governorate)) return <Redirect href="/shop-setup" />;
@@ -55,7 +56,9 @@ export default function ShopInbox() {
     .sort((a, b) => (urgentFirst ? urgencyRank[a.r.urgency] - urgencyRank[b.r.urgency] : 0)
       || Number(!shop.brands.includes(a.r.car_make)) - Number(!shop.brands.includes(b.r.car_make)) || b.r.created_at.localeCompare(a.r.created_at));
   const activeFilters = Number(mineOnly) + Number(cond !== 'all') + Number(urgentFirst) + Number(area !== 'الكل');
-  const sales = rows.filter((x) => x.st === 'sold').reduce((s, x) => s + (x.mq?.price ?? 0), 0);
+  const orders = data?.orders ?? [];
+  const activeOrders = orders.filter(orderActive);
+  const sales = orders.filter((o) => o.status === 'received').reduce((s, o) => s + Number(o.items_total), 0);
   const waiting = rows.filter((x) => x.st === 'open').length;
 
   return (
@@ -70,7 +73,7 @@ export default function ShopInbox() {
             <Bell light />
           </Row>
           <Row gap={8}>
-            {[[ar(waiting), 'مستنية ردّك', true], [ar(data?.mine.length ?? 0), 'عروض بعتها', false], [money(sales), 'مبيعات ج.م', false]].map(([v, l, hot]) => (
+            {[[ar(waiting), 'طلبات مستنية ردّك', true], [ar(activeOrders.length), 'أوردرات تجهّزها', false], [money(sales), 'مبيعات ج.م', false]].map(([v, l, hot]) => (
               <View key={String(l)} style={{ flex: 1, backgroundColor: hot ? colors.accent : 'rgba(255,255,255,.08)', borderRadius: 18, padding: 12, gap: 2 }}>
                 <T w="bold" size={22} color={hot ? colors.ink : '#fff'}>{String(v)}</T>
                 <T size={12} color={hot ? colors.ink : 'rgba(255,255,255,.7)'}>{String(l)}</T>
@@ -84,7 +87,7 @@ export default function ShopInbox() {
       {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
       {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}
       <View style={[{ backgroundColor: colors.surface, borderRadius: 20, padding: 6 }, lift]}>
-      <Seg options={[{ v: 'open', label: 'جديد' }, { v: 'quoted', label: 'بعت عرض' }, { v: 'sold', label: 'مبيعات' }, { v: 'all', label: 'الكل' }] as { v: Tab; label: string }[]}
+      <Seg options={[{ v: 'open', label: 'جديد' }, { v: 'quoted', label: 'عروضي' }, { v: 'orders', label: `أوردرات${activeOrders.length ? ' ' + ar(activeOrders.length) : ''}` }, { v: 'all', label: 'الكل' }] as { v: Tab; label: string }[]}
         value={tab} onPick={setTab} />
       </View>
       </View>
@@ -111,7 +114,31 @@ export default function ShopInbox() {
           {activeFilters ? <Btn kind="link" title="امسح الفلاتر" onPress={() => { setMineOnly(false); setCond('all'); setUrgentFirst(false); setArea('الكل'); }} /> : null}
         </View>
       ) : null}
-      {loading && !data ? <Loading /> : groupShown(shown).some((g) => tab === 'all' || g.some((x) => x.st === tab)) ? (
+      {tab === 'orders' ? (
+        orders.length ? (
+          <View style={{ gap: 12 }}>
+            {orders.map((o) => {
+              const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
+              const live = orderActive(o);
+              return (
+                <Press key={o.id} onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: o.id } })}
+                  style={[{ backgroundColor: live ? colors.ink : colors.surface, borderRadius: 22, padding: 16, gap: 10 }, lift]}>
+                  <Row gap={12}>
+                    <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: live ? colors.accent : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name={ORDER_LABEL[o.status].icon} size={22} color={live ? colors.ink : colors.muted} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <T w="bold" size={15} color={live ? '#fff' : colors.ink}>أوردر {orderNo(o.order_no)} · {ORDER_LABEL[o.status].short}</T>
+                      <T size={12.5} color={live ? 'rgba(255,255,255,.7)' : colors.muted} numberOfLines={1}>{ps.length ? partsLabel(ps) : ''} · {o.delivery_mode === 'delivery' ? 'توصيل' : 'استلام'}</T>
+                    </View>
+                    <T w="bold" size={15} color={live ? colors.accent : colors.ink}>{money(Number(o.items_total))}</T>
+                  </Row>
+                </Press>
+              );
+            })}
+          </View>
+        ) : <Empty icon="cube-outline" text={'مفيش أوردرات لسه.\nلما عميل يختار عرضك، الأوردر بيظهر هنا.'} />
+      ) : loading && !data ? <Loading /> : groupShown(shown).some((g) => tab === 'all' || g.some((x) => x.st === tab)) ? (
         <View style={{ gap: 12 }}>
           {groupShown(shown).filter((g) => tab === 'all' || g.some((x) => x.st === tab)).map((g) => {
             const r = g[0].r;

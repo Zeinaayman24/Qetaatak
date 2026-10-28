@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Animated, Easing, FlatList, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, Easing, FlatList, Image, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type StyleProp, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -508,3 +508,70 @@ const s = StyleSheet.create({
   plateTop: { backgroundColor: colors.plate, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 7 },
   toast: { position: 'absolute', left: 18, right: 18, alignSelf: 'center', maxWidth: 520, backgroundColor: colors.ink, borderRadius: 16, paddingVertical: 13, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
 });
+
+/* ---------------------------------------------------------------- slide to confirm */
+/**
+ * A deliberate confirm: drag the knob across the track. Used where a mis-tap would cost money.
+ * In RTL the knob starts on the right and travels left.
+ */
+export function SlideToConfirm({ label, onConfirm, busy }: { label: string; onConfirm: () => void; busy?: boolean }) {
+  const [w, setW] = useState(0);
+  const x = useRef(new Animated.Value(0)).current;
+  const knob = 56;
+  const max = Math.max(0, w - knob - 8);
+  const done = useRef(false);
+  const pan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => !done.current,
+    onMoveShouldSetPanResponder: (_, g) => !done.current && Math.abs(g.dx) > 4,
+    onPanResponderMove: (_, g) => x.setValue(Math.min(maxRef.current, Math.max(0, -g.dx))),
+    onPanResponderRelease: (_, g) => {
+      if (-g.dx > maxRef.current * 0.85) {
+        done.current = true;
+        Animated.timing(x, { toValue: maxRef.current, duration: 120, useNativeDriver: false }).start();
+        if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        onConfirmRef.current();
+      } else Animated.spring(x, { toValue: 0, useNativeDriver: false, bounciness: 8 }).start();
+    },
+  })).current;
+  const maxRef = useRef(max); maxRef.current = max;
+  const onConfirmRef = useRef(onConfirm); onConfirmRef.current = onConfirm;
+  useEffect(() => { if (!busy && done.current) { done.current = false; Animated.spring(x, { toValue: 0, useNativeDriver: false }).start(); } }, [busy, x]);
+  const fill = x.interpolate({ inputRange: [0, Math.max(1, max)], outputRange: [knob + 8, Math.max(knob + 8, w)] });
+  return (
+    <View onLayout={(e) => setW(e.nativeEvent.layout.width)} accessibilityRole="button" accessibilityLabel={label}
+      accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={() => onConfirm()}
+      style={{ height: 64, borderRadius: 32, backgroundColor: colors.ink, justifyContent: 'center', overflow: 'hidden' }}>
+      <Animated.View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: fill, backgroundColor: colors.accent, borderRadius: 32 }} />
+      <T w="semibold" size={15.5} color="#fff" center style={{ paddingHorizontal: knob + 16 }}>{busy ? 'بنأكد…' : label}</T>
+      <Animated.View {...pan.panHandlers}
+        style={{ position: 'absolute', right: 4, width: knob, height: knob, borderRadius: knob / 2, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', transform: [{ translateX: Animated.multiply(x, -1) }], ...(Platform.OS === 'web' ? ({ cursor: 'grab' } as object) : {}) }}>
+        {busy ? <ActivityIndicator color={colors.ink} /> : <Icon name="chevron-back" size={26} color={colors.ink} />}
+      </Animated.View>
+    </View>
+  );
+}
+
+/** A row of tabs that scrolls sideways; each tab can carry a small status mark. */
+export function TabPills<V extends string>({ items, value, onPick }: {
+  items: { v: V; label: string; mark?: { icon: string; color: string } | { count: number } }[]; value: V; onPick: (v: V) => void;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, paddingVertical: 4, paddingHorizontal: 2, alignItems: 'center' }}>
+      {items.map((it) => {
+        const on = it.v === value;
+        return (
+          <Press key={it.v} onPress={() => onPick(it.v)} role="tab" selected={on}
+            style={[{ flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, paddingHorizontal: 14, height: 42, borderRadius: 21,
+              backgroundColor: on ? colors.ink : colors.surface }, !on && lift]}>
+            <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? '#fff' : colors.ink} numberOfLines={1}>{it.label}</T>
+            {it.mark && 'count' in it.mark ? (
+              <View style={{ minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+                <T size={11} w="bold" style={{ lineHeight: 15 }}>{String(it.mark.count)}</T>
+              </View>
+            ) : it.mark ? <Icon name={it.mark.icon} size={16} color={on ? colors.accent : it.mark.color} /> : null}
+          </Press>
+        );
+      })}
+    </ScrollView>
+  );
+}

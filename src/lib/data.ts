@@ -71,10 +71,10 @@ export type Request = {
   rating: number | null; created_at: string;
   vin: string; side: '' | 'right' | 'left' | 'front' | 'rear'; urgency: 'normal' | 'today' | 'urgent'; budget: number | null;
   order_status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | null; review: string; done_at?: string | null;
-  batch_id: string | null; qty: number;
+  batch_id: string | null; qty: number; order_id: string | null;
 };
 export type Car = { id: string; make: string; model: string; year: number; vin: string };
-export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; created_at: string };
+export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; flagged?: boolean; created_at: string };
 export type Notification = { id: string; title: string; body: string; link: string; read_at: string | null; created_at: string };
 export type Report = { id: string; ticket_no: number; reporter_id: string; request_id: string | null; category: string; body: string; status: 'bot' | 'open' | 'in_progress' | 'resolved'; admin_reply: string; created_at: string; updated_at: string };
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; kind: 'user' | 'bot' | 'system'; internal?: boolean; created_at: string };
@@ -140,3 +140,28 @@ export function groupProgress(items: Request[], quoteCount: number): { step: num
   if (quoteCount) return { step: 2, label: `${ar(quoteCount)} عروض مستنياك` };
   return { step: 1, label: 'بندوّر عند المحلات' };
 }
+
+/* ---------------------------------------------------------------- orders */
+export type Order = {
+  id: string; order_no: number; customer_id: string; shop_id: string; delivery_mode: 'delivery' | 'pickup';
+  status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'received' | 'cancelled';
+  items_total: number; delivery_fee: number; rating: number | null; review: string;
+  created_at: string; updated_at: string; received_at: string | null;
+};
+export const orderNo = (n: number) => '#' + ar(n);
+/** What the customer reads for each order status. */
+export const ORDER_LABEL: Record<Order['status'], { title: string; short: string; icon: string }> = {
+  preparing: { title: 'المحل بيجهّز أوردرك', short: 'بيتجهّز', icon: 'construct' },
+  ready: { title: 'أوردرك جاهز للاستلام', short: 'جاهز للاستلام', icon: 'bag-check' },
+  out_for_delivery: { title: 'أوردرك في الطريق ليك', short: 'في الطريق', icon: 'bicycle' },
+  delivered: { title: 'المحل سلّم الأوردر', short: 'اتسلّم من المحل', icon: 'checkmark-done' },
+  received: { title: 'استلمت الأوردر', short: 'اتسلّم', icon: 'checkmark-circle' },
+  cancelled: { title: 'الأوردر اتلغى', short: 'اتلغى', icon: 'close-circle' },
+};
+/** The steps an order goes through, depending on delivery or pickup. */
+export const orderSteps = (mode: Order['delivery_mode']): Order['status'][] =>
+  mode === 'delivery' ? ['preparing', 'out_for_delivery', 'delivered', 'received'] : ['preparing', 'ready', 'delivered', 'received'];
+export const ORDER_STEP_NAME: Record<string, string> = {
+  preparing: 'بيتجهّز', ready: 'جاهز', out_for_delivery: 'في الطريق', delivered: 'اتسلّم', received: 'تمام',
+};
+export const orderActive = (o: Pick<Order, 'status'>) => o.status !== 'received' && o.status !== 'cancelled';

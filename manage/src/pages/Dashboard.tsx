@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
-import { CATEGORY, PRIORITY, REQUEST_STATUS, TICKET_STATUS, ago, batchOf, memberId, money, needsPeople, orderId, ticketId } from '../lib';
+import { CATEGORY, PRIORITY, REQUEST_STATUS, TICKET_STATUS, ago, batchOf, memberId, money, must, needsPeople, orderId, supabase, ticketId, useLive, type Message } from '../lib';
 
 export default function Dashboard() {
   const { all, me } = useData();
+  const { data: flagged } = useLive(async () => must(await supabase.from('messages').select('*').eq('flagged', true).order('created_at', { ascending: false }).limit(8)) as Message[], ['messages'], []);
   const customers = all.profiles.filter((p) => p.is_customer);
   const shops = Object.values(all.shops);
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -72,6 +73,29 @@ export default function Dashboard() {
           ) : <p className="empty">مفيش محلات مستنية.</p>}
         </section>
       </div>
+
+      {flagged?.length ? (
+        <section className="panel">
+          <div className="panel-head"><h2>🔒 محاولات تبادل أرقام قبل الأوردر</h2><span className="muted small">اتشالت تلقائياً من الرسائل</span></div>
+          <table className="table">
+            <tbody>
+              {flagged.map((m) => {
+                const r = all.requests.find((x) => x.id === m.request_id);
+                const fromShop = m.sender_id === m.shop_id;
+                const who = all.byId[m.sender_id];
+                return (
+                  <tr key={m.id}>
+                    <td>{fromShop ? all.priv[m.shop_id]?.name : who?.full_name}<div className="mono small muted">{memberId(who)}</div></td>
+                    <td className="small">«{m.body}»</td>
+                    <td>{r ? <Link className="mono" to={`/orders/${r.id}`}>{orderId(r.num)}</Link> : null}</td>
+                    <td className="muted small">{ago(m.created_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       <section className="panel">
         <div className="panel-head"><h2>آخر الطلبات</h2><Link to="/orders">الكل</Link></div>

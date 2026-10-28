@@ -1,13 +1,13 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, TextInput, View } from 'react-native';
-import { BackBar, Empty, Icon, Loading, Muted, Photo, Row, Screen, T, toast } from '@/components/ui';
+import { ActivityIndicator, Image, ScrollView, TextInput, View } from 'react-native';
+import { BackBar, Empty, Icon, Loading, Muted, Photo, Pill, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { ago, ar, friendlyError, type Message, type Request, type Shop } from '@/lib/data';
+import { ago, ar, friendlyError, money, type Message, type Request, type Shop } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
-import { colors, fonts } from '@/lib/theme';
+import { colors, fonts, lift } from '@/lib/theme';
 
 /** One conversation between a request's customer and one shop. */
 export default function Chat() {
@@ -21,7 +21,8 @@ export default function Chat() {
     const req = must(await supabase.from('requests').select('*').eq('id', request).maybeSingle()) as Request | null;
     const sh = must(await supabase.from('shops').select('*').eq('id', shop).maybeSingle()) as Shop | null;
     const msgs = must(await supabase.from('messages').select('*').eq('request_id', request).eq('shop_id', shop).order('created_at')) as Message[];
-    return { req, sh, msgs };
+    const mine = (await supabase.from('quotes').select('id, price').eq('request_id', request).eq('shop_id', shop).maybeSingle()).data as { id: string; price: number } | null;
+    return { req, sh, msgs, quote: mine, deal: !!(req && mine && req.chosen_quote_id === mine.id) };
   }, ['messages'], [request, shop]);
 
   if (ready && !session) return <Redirect href="/login" />;
@@ -31,15 +32,15 @@ export default function Chat() {
   const title = iAmShop ? 'العميل' : 'محل في ' + (data?.sh?.area ?? '');
   const back = () => (router.canGoBack() ? router.back() : router.replace(iAmShop ? `/shop/${request}` : `/customer/${request}`));
 
-  async function send(photo?: string) {
-    const body = text.trim();
+  async function send(photo?: string, preset?: string) {
+    const body = (preset ?? text).trim();
     if (!body && !photo) return;
     setSending(true);
     try {
       const photo_path = photo ? await uploadPhoto(photo, uid!) : null;
       const { error } = await supabase.from('messages').insert({ request_id: request, shop_id: shop, body: photo ? '' : body, photo_path });
       if (error) throw error;
-      if (!photo) setText('');
+      if (!photo && !preset) setText('');
     } catch (x) { toast(friendlyError(x)); }
     finally { setSending(false); }
   }
@@ -47,45 +48,67 @@ export default function Chat() {
     try { const uri = await pickPhoto(); if (uri) await send(uri); } catch { toast('الصورة دي مش مدعومة.'); }
   }
 
+  const quick = iAmShop
+    ? ['القطعة متوفرة أصلي', 'ابعتلي صورة القطعة القديمة', 'محتاج رقم الشاسيه', 'السعر نهائي']
+    : ['لسه متوفرة؟', 'ابعتلي صورة للقطعة', 'أصلي ولا تجاري؟', 'ممكن توصيل النهارده؟'];
+  const deal = !!data?.deal;
+
   const input = (
-    <Row gap={8}>
-      <Pressable onPress={sendPhoto} accessibilityLabel="ابعت صورة" hitSlop={6}
-        style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="camera-outline" size={21} />
-      </Pressable>
-      <TextInput value={text} onChangeText={setText} placeholder="اكتب رسالة…" placeholderTextColor={colors.faint} multiline
-        onSubmitEditing={() => send()} blurOnSubmit={false}
-        style={[{ flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: colors.card, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, textAlign: 'right' }, { outlineStyle: 'none' } as any]} />
-      <Pressable onPress={() => send()} disabled={sending || !text.trim()} accessibilityLabel="ابعت"
-        style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: text.trim() ? colors.ink : colors.line, alignItems: 'center', justifyContent: 'center' }}>
-        {sending ? <ActivityIndicator color="#fff" /> : <Icon name="send" size={18} color="#fff" />}
-      </Pressable>
-    </Row>
+    <View style={{ gap: 10 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        {quick.map((q) => (
+          <Press key={q} onPress={() => send(undefined, q)} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, borderWidth: 1.5, borderColor: colors.line }}>
+            <T size={12.5} w="medium">{q}</T>
+          </Press>
+        ))}
+      </ScrollView>
+      <Row gap={8}>
+        <Press onPress={sendPhoto} label="ابعت صورة" style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="camera" size={21} />
+        </Press>
+        <TextInput value={text} onChangeText={setText} placeholder="اكتب رسالة…" placeholderTextColor={colors.faint}
+          onSubmitEditing={() => send()} submitBehavior="submit" returnKeyType="send"
+          style={[{ flex: 1, minHeight: 46, maxHeight: 120, backgroundColor: colors.soft, borderRadius: 23, paddingHorizontal: 16, paddingVertical: 11, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, textAlign: 'right' }, { outlineStyle: 'none' } as any]} />
+        <Press onPress={() => send()} disabled={sending || !text.trim()} label="ابعت"
+          style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: text.trim() ? colors.accent : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+          {sending ? <ActivityIndicator color={colors.ink} /> : <Icon name="arrow-up" size={20} color={text.trim() ? colors.ink : colors.faint} />}
+        </Press>
+      </Row>
+    </View>
   );
 
   return (
     <Screen footer={input}>
-      <BackBar title={title} onBack={back} />
+      <BackBar title={title} onBack={back} right={deal ? <Pill label="أوردر مؤكد" tone="good" icon="checkmark" /> : undefined} />
       {r ? (
-        <Pressable onPress={back} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.card, borderRadius: 16, padding: 10 }}>
+        <Press onPress={back} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 18, padding: 10 }, lift]}>
           <Photo uri={photoUrl(r.photo_path)} size={44} />
           <View style={{ flex: 1 }}>
             <T w="semibold" size={14}>{r.part}</T>
-            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
+            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}{data?.quote ? ` · عرض المحل ${money(data.quote.price)} ج.م` : ''}</Muted>
           </View>
-        </Pressable>
+          <Icon name="chevron-back" size={16} color={colors.faint} />
+        </Press>
       ) : null}
-      <Muted center size={12}>متبعتش أرقام تليفون أو تحويلات قبل ما العميل يختار العرض. كل حاجة مسجلة عشان أمانك.</Muted>
+      {!deal ? (
+        <Row gap={10} style={{ alignItems: 'flex-start', backgroundColor: colors.accentSoft, borderRadius: 16, padding: 12 }}>
+          <Icon name="lock-closed" size={18} color={colors.accentDeep} />
+          <T size={12.5} style={{ flex: 1 }}>قبل تأكيد الأوردر، الأرقام والإيميلات واللينكات وحسابات السوشيال بتتشال من الرسائل تلقائياً. اتعاملوا من خلال قطعتك عشان الضمان يكون محفوظ.</T>
+        </Row>
+      ) : null}
       {data?.msgs.length ? (
         <View style={{ gap: 8 }}>
           {data.msgs.map((m) => {
             const mine = m.sender_id === uid;
             return (
-              <View key={m.id} style={{ alignSelf: mine ? 'flex-start' : 'flex-end', maxWidth: '82%', gap: 2 }}>
-                <View style={{ backgroundColor: mine ? colors.ink : colors.card, borderRadius: 18, borderTopRightRadius: mine ? 4 : 18, borderTopLeftRadius: mine ? 18 : 4, padding: m.photo_path ? 4 : 12 }}>
-                  {m.photo_path ? <Image source={{ uri: photoUrl(m.photo_path)! }} style={{ width: 200, height: 200, borderRadius: 14 }} /> : null}
+              <View key={m.id} style={{ alignSelf: mine ? 'flex-start' : 'flex-end', maxWidth: '82%', gap: 3 }}>
+                <View style={[{ backgroundColor: mine ? colors.ink : colors.surface, borderRadius: 20, borderBottomRightRadius: mine ? 6 : 20, borderBottomLeftRadius: mine ? 20 : 6, padding: m.photo_path ? 4 : 12 }, !mine && lift]}>
+                  {m.photo_path ? <Image source={{ uri: photoUrl(m.photo_path)! }} style={{ width: 200, height: 200, borderRadius: 16 }} /> : null}
                   {m.body ? <T color={mine ? '#fff' : colors.ink} size={15}>{m.body}</T> : null}
                 </View>
+                {m.flagged ? (
+                  <Row gap={4} style={{ alignSelf: mine ? 'flex-start' : 'flex-end' }}><Icon name="eye-off" size={12} color={colors.bad} /><T size={11} color={colors.bad}>اتشال رقم أو لينك من الرسالة</T></Row>
+                ) : null}
                 <Muted size={10.5} style={{ textAlign: mine ? 'right' : 'left', color: colors.faint }}>{ago(m.created_at)}</Muted>
               </View>
             );
