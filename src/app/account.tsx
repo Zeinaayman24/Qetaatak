@@ -2,6 +2,7 @@ import { Redirect, router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { BottomNav } from '@/components/AppHeader';
 import { Icon, Loading, Muted, Pill, Row, Screen, T } from '@/components/ui';
+import { InstallCard } from '@/components/InstallCard';
 import { useAuth } from '@/lib/auth';
 import { SHOP_TYPES, addressLine, ar } from '@/lib/data';
 import { colors } from '@/lib/theme';
@@ -77,6 +78,7 @@ export default function Account() {
       <Group>
         <Item icon="log-out-outline" title="تسجيل خروج" onPress={signOut} danger />
       </Group>
+      <InstallCard />
       <Muted center size={12}>ضغطة، نسخة تجريبية</Muted>
     </Screen>
   );

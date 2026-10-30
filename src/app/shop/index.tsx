@@ -6,6 +6,7 @@ import { Bell } from '@/components/Bell';
 import { shopPill, shopState, type ShopState } from '@/components/status';
 import { Btn, Chips, Empty, Icon, Labeled, Loading, Muted, Notice, Photo, Pill, Press, Row, Screen, Seg, Select, T } from '@/components/ui';
 import { Pressable, TextInput } from 'react-native';
+import { InstallCard } from '@/components/InstallCard';
 import { useAuth } from '@/lib/auth';
 import { ORDER_LABEL, URGENCY, WANTED, ago, ar, money, orderActive, orderNo, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -176,6 +177,7 @@ export default function ShopInbox() {
           })}
         </View>
       ) : <Empty icon="file-tray-outline" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'مفيش حاجة هنا لسه.'} />}
+      <InstallCard />
     </Screen>
   );
 }

@@ -4,6 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { BottomNav, Logo, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { Icon, Loading, Muted, Plate, Press, Row, Screen, Section, T } from '@/components/ui';
+import { InstallCard } from '@/components/InstallCard';
 import { useAuth } from '@/lib/auth';
 import { ORDER_LABEL, ar, groupRequests, orderNo, orderStep, orderSteps, orderTitle, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -105,7 +106,7 @@ export default function CustomerHome() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <T w="bold" size={15}>{needsPayment(o) ? 'فاضل تدفع' : orderTitle(o)}</T>
-                    <T size={12.5} color={colors.muted} numberOfLines={1}>{orderNo(o.order_no)}، {ps.length ? partsLabel(ps) : ''}</T>
+                    <T size={12.5} color={colors.muted} numberOfLines={1}>{orderNo(o.order_no)}{ps.length ? '، ' + partsLabel(ps) : ''}</T>
                   </View>
                   <Icon name="chevron-back" size={18} color={colors.faint} />
                 </Row>
@@ -150,6 +151,8 @@ export default function CustomerHome() {
         </View>
         <Icon name="chevron-back" size={18} color="rgba(255,255,255,.6)" />
       </Press>
+
+      <InstallCard />
 
       <Section title="إزاي بيشتغل">
         <View style={{ flexDirection: 'row', gap: 10 }}>
