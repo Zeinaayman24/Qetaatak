@@ -46,10 +46,10 @@ export default function Login() {
         <Logo size={30} on="dark" />
         <View style={{ gap: 10 }}>
           <T w="bold" size={32} color="#fff" style={{ lineHeight: 44, letterSpacing: -0.5 }}>صوّر القطعة.{'\n'}المحلات تتسابق على سعرك.</T>
-          <T size={15} color="rgba(255,255,255,.7)">أسعار من محلات وتشاليح موثوقة خلال ساعة، بضمان وتوصيل لحد البيت.</T>
+          <T size={15} color="rgba(255,255,255,.7)">أسعار من محلات وتشاليح موثوقة خلال ساعة، والقطعة لازم تكون زي الوصف، وتوصيل لحد البيت.</T>
         </View>
         <Row gap={8} style={{ flexWrap: 'wrap' }}>
-          {[['flash', 'عروض في أقل من ساعة'], ['shield-checkmark', 'ضمان على كل قطعة'], ['bicycle', 'توصيل']].map(([i, t]) => (
+          {[['flash', 'عروض في أقل من ساعة'], ['shield-checkmark', 'القطعة زي الوصف أو ترجع'], ['bicycle', 'توصيل']].map(([i, t]) => (
             <Row key={t} gap={6} style={{ backgroundColor: 'rgba(255,255,255,.08)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 }}>
               <Icon name={i} size={14} color={colors.accent} /><T size={12.5} color="#fff">{t}</T>
             </Row>

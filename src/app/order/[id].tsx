@@ -5,7 +5,7 @@ import { PaymentPanel } from '@/components/Payment';
 import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
+  CONDITIONS, MATCH_HOURS, ORDER_LABEL, ORDER_STEP_NAME, warrantyLabel, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
   type Order, type Quote, type Request, type Shop, type ShopPrivate,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -46,7 +46,7 @@ export default function OrderPage() {
   const lbl = ORDER_LABEL[o.status];
   const quoteOf = (p: Request) => quotes.find((q) => q.id === p.chosen_quote_id);
   const warrantyDays = Math.max(0, ...quotes.map((q) => q.warranty_days));
-  const warrantyEnd = o.received_at ? new Date(new Date(o.received_at).getTime() + warrantyDays * 86400000) : null;
+  const warrantyEnd = o.received_at && warrantyDays > 0 ? new Date(new Date(o.received_at).getTime() + warrantyDays * 86400000) : null;
   const firstPart = parts[0];
   const unpaid = needsPayment(o);
 
@@ -131,7 +131,7 @@ export default function OrderPage() {
               <Photo uri={photoUrl(q?.photo_path ?? p.photo_path)} size={48} />
               <View style={{ flex: 1 }}>
                 <T w="semibold" size={14.5}>{p.part}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
-                <Muted size={12}>{q ? `${CONDITIONS[q.condition]}، ضمان ${ar(q.warranty_days)} يوم` : ''}</Muted>
+                <Muted size={12}>{q ? `${CONDITIONS[q.condition]}، ${warrantyLabel(q.warranty_days)}` : ''}</Muted>
               </View>
               {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))} ج.م</T> : null}
             </Row>
@@ -141,6 +141,15 @@ export default function OrderPage() {
         <Lines rows={[['القطع', money(o.items_total) + ' ج.م'], ['التوصيل', o.delivery_fee ? money(o.delivery_fee) + ' ج.م' : 'مجاناً']]} total={['الإجمالي', money(Number(o.items_total) + Number(o.delivery_fee)) + ' ج.م']} />
       </Card>
 
+      {!warrantyEnd && o.status !== 'cancelled' ? (
+        <Row gap={12} style={{ backgroundColor: colors.primarySoft, borderRadius: 16, padding: 16, alignItems: 'flex-start' }}>
+          <Icon name="shield-checkmark" size={24} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <T w="bold" size={14.5}>القطعة لازم تكون زي الوصف</T>
+            <Muted size={12.5}>افحصها وانت بتستلم. لو غلط في الموديل أو الجنب أو الحالة أو مش زي الصورة، ارفضها، أو بلّغنا خلال {ar(MATCH_HOURS)} ساعة من الاستلام ونرجّعلك حقك.</Muted>
+          </View>
+        </Row>
+      ) : null}
       {warrantyEnd ? (
         <Row gap={12} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 16 }}>
           <Icon name="shield-checkmark" size={26} color={colors.good} />

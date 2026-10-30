@@ -4,7 +4,7 @@ import { Linking, View } from 'react-native';
 import { BackBar, Btn, Card, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  COMMISSION, CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, orderStep, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
+  COMMISSION, CONDITIONS, ORDER_LABEL, warrantyLabel, ORDER_STEP_NAME, orderStep, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
   type Order, type Profile, type Quote, type Request,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -92,7 +92,7 @@ export default function ShopOrder() {
               <Photo uri={photoUrl(q?.photo_path ?? p.photo_path)} size={48} />
               <View style={{ flex: 1 }}>
                 <T w="semibold" size={14.5}>{p.part}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
-                <Muted size={12}>{p.car_make} {p.car_model} {ar(p.car_year)}{q ? `، ${CONDITIONS[q.condition]}، ضمان ${ar(q.warranty_days)} يوم` : ''}</Muted>
+                <Muted size={12}>{p.car_make} {p.car_model} {ar(p.car_year)}{q ? `، ${CONDITIONS[q.condition]}، ${warrantyLabel(q.warranty_days)}` : ''}</Muted>
               </View>
               {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))}</T> : null}
             </Row>

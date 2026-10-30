@@ -65,7 +65,7 @@ export default function OrderDetail() {
           <tbody>{qs.map((q) => (
             <tr key={q.id} className={q.id === r.chosen_quote_id ? 'highlight' : ''}>
               <td><Link to={`/shops/${q.shop_id}`}>{all.priv[q.shop_id]?.name}</Link> <span className="mono small muted">{memberId(all.byId[q.shop_id])}</span></td>
-              <td className="strong">{money(q.price)}</td><td>{CONDITION[q.condition]}</td><td>{q.warranty_days} يوم</td><td className="small muted">{dateTime(q.created_at)}</td>
+              <td className="strong">{money(q.price)}</td><td>{CONDITION[q.condition]}</td><td>{q.warranty_days ? `${q.warranty_days} يوم` : "بدون ضمان"}</td><td className="small muted">{dateTime(q.created_at)}</td>
               <td>{q.id === r.chosen_quote_id ? <Pill tone="good">العميل اختاره</Pill> : null}</td>
             </tr>
           ))}</tbody>

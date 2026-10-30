@@ -23,7 +23,11 @@ export const CONDITIONS: Record<string, string> = {
   new_original: 'أصلي جديد',
 };
 
-export const WARRANTY_DAYS = [3, 7, 14, 30];
+/** Warranty is optional: most shops sell parts without one. 0 = no warranty. */
+export const WARRANTY_DAYS = [0, 3, 7, 14, 30];
+export const warrantyLabel = (d: number) => (d > 0 ? `ضمان ${ar(d)} يوم` : 'بدون ضمان');
+/** What every order gets, warranty or not: the part must match what was described. */
+export const MATCH_HOURS = 48;
 export const DELIVERY_FEE = 60;
 export const COMMISSION = 0.05;
 

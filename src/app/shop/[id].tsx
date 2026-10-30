@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, CONDITIONS, ORDER_STEPS, SIDES, URGENCY, WANTED, WARRANTY_DAYS, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request } from '@/lib/data';
+import { COMMISSION, CONDITIONS, ORDER_STEPS, SIDES, URGENCY, WANTED, WARRANTY_DAYS, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -16,7 +16,7 @@ export default function ShopRequest() {
   const uid = session?.user.id;
   const [price, setPrice] = useState('');
   const [cond, setCond] = useState<string>('used_original');
-  const [warranty, setWarranty] = useState(7);
+  const [warranty, setWarranty] = useState(0);
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -92,7 +92,7 @@ export default function ShopRequest() {
 
   const sum = mine ? (
     <Row gap={6} style={{ flexWrap: 'wrap' }}>
-      <Pill label={money(mine.price) + ' ج.م'} /><Pill label={CONDITIONS[mine.condition]} /><Pill label={'ضمان ' + ar(mine.warranty_days) + ' يوم'} />
+      <Pill label={money(mine.price) + ' ج.م'} /><Pill label={CONDITIONS[mine.condition]} /><Pill label={warrantyLabel(mine.warranty_days)} tone={mine.warranty_days ? 'good' : 'plain'} />
     </Row>
   ) : null;
 
@@ -116,8 +116,9 @@ export default function ShopRequest() {
         <Labeled label="حالة القطعة">
           <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
         </Labeled>
-        <Labeled label="الضمان">
-          <Seg options={WARRANTY_DAYS.map((w) => ({ v: w, label: ar(w) + ' يوم' }))} value={warranty} onPick={setWarranty} />
+        <Labeled label="الضمان (اختياري)">
+          <Seg options={WARRANTY_DAYS.map((w) => ({ v: w, label: w ? ar(w) + ' يوم' : 'من غير' }))} value={warranty} onPick={setWarranty} />
+          <Muted size={12}>مش لازم تدي ضمان. بس العروض اللي عليها ضمان بتظهر بعلامة «بضمان» والعملاء بيختاروها أكتر.</Muted>
         </Labeled>
         <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر" />
         <Muted size={12}>السعر اللي تبعته هو اللي العميل هيدفعه وقت الاستلام.</Muted>

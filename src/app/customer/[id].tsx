@@ -7,7 +7,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  CONDITIONS, DELIVERY_FEE, ORDER_LABEL, SIDES, URGENCY, WANTED, addressLine, ago, ar, friendlyError, money, orderNo, reqNo,
+  CONDITIONS, DELIVERY_FEE, MATCH_HOURS, warrantyLabel, ORDER_LABEL, SIDES, URGENCY, WANTED, addressLine, ago, ar, friendlyError, money, orderNo, reqNo,
   type Order, type PayMethod, type Quote, type Request, type Shop,
 } from '@/lib/data';
 import { cardAvailable, payByCard } from '@/lib/payments';
@@ -222,7 +222,7 @@ export default function PriceRequest() {
                     <Photo uri={photoUrl(c.quote.photo_path ?? c.part.photo_path)} size={44} />
                     <View style={{ flex: 1 }}>
                       <T w="semibold" size={14}>{c.part.part}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
-                      <Muted size={12}>{CONDITIONS[c.quote.condition]}، ضمان {ar(c.quote.warranty_days)} يوم</Muted>
+                      <Muted size={12}>{CONDITIONS[c.quote.condition]}، {warrantyLabel(c.quote.warranty_days)}</Muted>
                     </View>
                     <T w="semibold" size={14} color={colors.primary}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
                   </Row>
@@ -257,7 +257,7 @@ export default function PriceRequest() {
             <Lines rows={[['القطع', money(partsTotal) + ' ج.م'], ['التوصيل', deliveryTotal ? money(deliveryTotal) + ' ج.م' : 'مجاناً']]} total={['الإجمالي', money(grand) + ' ج.م']} />
           </Card>
           {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في طلب الأسعار مستنية عروض.</Muted> : null}
-          <Muted size={12} center>بتأكيد الأوردر انت موافق على الشروط وسياسة الاسترجاع. كل قطعة عليها ضمان المحل المكتوب.</Muted>
+          <Muted size={12} center>بتأكيد الأوردر انت موافق على الشروط. افحص القطعة وانت بتستلم: لو مش زي الوصف ترفضها، أو بلّغنا خلال {ar(MATCH_HOURS)} ساعة.</Muted>
         </Section>
       </Screen>
     );
@@ -345,7 +345,7 @@ function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?
         {q.photo_path ? <Photo uri={photoUrl(q.photo_path)} size={60} /> : null}
       </Row>
       <Row gap={6} style={{ flexWrap: 'wrap' }}>
-        {[[CONDITIONS[q.condition], 'pricetag'], [`ضمان ${ar(q.warranty_days)} يوم`, 'shield-checkmark'], [shop?.offers_delivery ? 'بيوصّل' : 'استلام بس', shop?.offers_delivery ? 'bicycle' : 'walk']].map(([t, icon]) => (
+        {[[CONDITIONS[q.condition], 'pricetag'], [warrantyLabel(q.warranty_days), q.warranty_days ? 'shield-checkmark' : 'information-circle'], [shop?.offers_delivery ? 'بيوصّل' : 'استلام بس', shop?.offers_delivery ? 'bicycle' : 'walk']].map(([t, icon]) => (
           <Row key={t} gap={4} style={{ backgroundColor: on ? 'rgba(255,255,255,.1)' : colors.soft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
             <Icon name={icon} size={13} color={on ? colors.accent : colors.muted} /><T size={12} w="medium" color={on ? '#fff' : colors.ink}>{t}</T>
           </Row>
