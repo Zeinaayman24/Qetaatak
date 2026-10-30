@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, CONDITIONS, ORDER_STEPS, SIDES, URGENCY, WANTED, WARRANTY_DAYS, addressLine, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel } from '@/lib/data';
+import { COMMISSION, CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, URGENCY, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -16,7 +16,11 @@ export default function ShopRequest() {
   const uid = session?.user.id;
   const [price, setPrice] = useState('');
   const [cond, setCond] = useState<string>('used_original');
-  const [warranty, setWarranty] = useState(0);
+  const [hasWarranty, setHasWarranty] = useState(false);
+  const [days, setDays] = useState('');
+  const [brand, setBrand] = useState('');
+  const [note, setNote] = useState('');
+  const [adding, setAdding] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -26,7 +30,7 @@ export default function ShopRequest() {
   const { data, loading, reload } = useLive(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
     type Sib = { r: Request; quoted: boolean; declined: boolean };
-    if (!req || !uid) return { req, mine: undefined as Quote | undefined, declined: false, customer: null as Profile | null, sibs: [] as Sib[] };
+    if (!req || !uid) return { req, mine: undefined as Quote | undefined, offers: [] as Quote[], declined: false, customer: null as Profile | null, sibs: [] as Sib[] };
     let sibs: Sib[] = [];
     if (req.batch_id) {
       const rs = must(await supabase.from('requests').select('*').eq('batch_id', req.batch_id).order('num')) as Request[];
@@ -35,11 +39,12 @@ export default function ShopRequest() {
       const ds = must(await supabase.from('declines').select('request_id').eq('shop_id', uid).in('request_id', ids)) as { request_id: string }[];
       sibs = rs.map((x) => ({ r: x, quoted: qs.some((q) => q.request_id === x.id), declined: ds.some((d) => d.request_id === x.id) }));
     }
-    const mine = (must(await supabase.from('quotes').select('*').eq('request_id', id).eq('shop_id', uid).maybeSingle()) as Quote | null) ?? undefined;
+    const offers = must(await supabase.from('quotes').select('*').eq('request_id', id).eq('shop_id', uid).order('price')) as Quote[];
+    const mine = offers.find((q) => q.id === req.chosen_quote_id) ?? offers[0];
     const dec = must(await supabase.from('declines').select('request_id').eq('request_id', id).eq('shop_id', uid)) as unknown[];
     let customer: Profile | null = null;
     if (mine && req.chosen_quote_id === mine.id) customer = must(await supabase.from('profiles').select('*').eq('id', req.customer_id).maybeSingle()) as Profile | null;
-    return { req, mine, declined: dec.length > 0, customer, sibs };
+    return { req, mine, offers, declined: dec.length > 0, customer, sibs };
   }, ['requests', 'quotes'], [id, uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
@@ -50,16 +55,15 @@ export default function ShopRequest() {
   if (!r) return <Screen header={header}><BackBar title="الطلب" onBack={back} /><Empty text="الطلب ده مش موجود." /></Screen>;
   const st = shopState(r, data!.mine, data!.declined);
   const mine = data!.mine;
-  const p = parseInt(price.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))), 10) || 0;
+  const latin = (t: string) => t.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+  const p = parseInt(latin(price), 10) || 0;
+  const wd = parseInt(latin(days), 10) || 0;
+  const offers = data!.offers;
   const approved = shop?.status === 'approved';
   const extras = [
     r.side ? 'الجهة: ' + SIDES[r.side] : '', r.urgency !== 'normal' ? URGENCY[r.urgency] : '',
     r.budget ? 'ميزانية العميل ' + money(r.budget) + ' ج.م' : '', r.vin ? 'شاسيه ' + r.vin : '',
   ].filter(Boolean);
-  async function setOrder(status: string) {
-    const { error } = await supabase.rpc('update_order_status', { p_request: r!.id, p_status: status });
-    if (error) toast(friendlyError(error)); else { toast('اتبعت للعميل'); reload(); }
-  }
 
   async function choosePhoto() {
     try { const uri = await pickPhoto(); if (uri) setPhoto(uri); } catch { toast('الصورة دي مش مدعومة. جرّب صورة تانية.'); }
@@ -68,13 +72,16 @@ export default function ShopRequest() {
   async function send() {
     setErr(null);
     if (!p || p < 1) return setErr('اكتب السعر بالجنيه.');
+    if (hasWarranty && (wd < 1 || wd > MAX_WARRANTY_DAYS)) return setErr(`اكتب عدد أيام الضمان (من ١ لـ ${ar(MAX_WARRANTY_DAYS)} يوم).`);
     setBusy(true);
     try {
       const photo_path = photo ? await uploadPhoto(photo, uid!) : null;
-      const { error } = await supabase.from('quotes').insert({ request_id: r!.id, shop_id: uid, price: p, condition: cond, warranty_days: warranty, photo_path });
+      const { error } = await supabase.from('quotes').insert({
+        request_id: r!.id, shop_id: uid, price: p, condition: cond, warranty_days: hasWarranty ? wd : 0, photo_path, brand: brand.trim(), note: note.trim(),
+      });
       if (error) throw error;
-      setPrice(''); setPhoto(null);
-      const next = data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open');
+      setPrice(''); setPhoto(null); setBrand(''); setNote(''); setAdding(false);
+      const next = !offers.length ? data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open') : undefined;
       if (next) { toast('العرض اتبعت، كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
       else { toast('العرض اتبعت للعميل'); reload(); }
     } catch (x) { setErr(friendlyError(x)); }
@@ -90,18 +97,35 @@ export default function ShopRequest() {
     else { toast('تمام، العميل هيعرف إنها مش متوفرة عندك'); reload(); }
   }
 
-  const sum = mine ? (
-    <Row gap={6} style={{ flexWrap: 'wrap' }}>
-      <Pill label={money(mine.price) + ' ج.م'} /><Pill label={CONDITIONS[mine.condition]} /><Pill label={warrantyLabel(mine.warranty_days)} tone={mine.warranty_days ? 'good' : 'plain'} />
-    </Row>
-  ) : null;
+  async function removeOffer(q: Quote) {
+    const { error } = await supabase.from('quotes').delete().eq('id', q.id);
+    if (error) toast(friendlyError(error)); else { toast('العرض اتشال'); reload(); }
+  }
 
-  const canQuote = st === 'open' || st === 'declined';
+  /** One of this shop's offers: brand, price, condition, warranty (and remove while the request is open). */
+  const offerRow = (q: Quote, canRemove: boolean) => (
+    <View key={q.id} style={{ gap: 6, paddingVertical: 10, borderTopWidth: 1, borderColor: colors.line }}>
+      <Row style={{ justifyContent: 'space-between' }}>
+        <T w="bold" size={15}>{q.brand || 'بدون ماركة محددة'}</T>
+        <T w="bold" size={16} color={colors.primary}>{money(q.price)} ج.م</T>
+      </Row>
+      <Row gap={6} style={{ flexWrap: 'wrap' }}>
+        <Pill label={CONDITIONS[q.condition]} /><Pill label={warrantyLabel(q.warranty_days)} tone={q.warranty_days ? 'good' : 'plain'} />
+        {r.chosen_quote_id === q.id ? <Pill label="العميل اختاره" tone="good" icon="checkmark" /> : null}
+      </Row>
+      {q.note ? <Muted size={12.5}>{q.note}</Muted> : null}
+      {canRemove ? <Btn kind="link" title="شيل العرض ده" onPress={() => removeOffer(q)} /> : null}
+    </View>
+  );
+  const sum = offers.length ? <View>{offers.map((q) => offerRow(q, false))}</View> : null;
+
+  const canQuote = st === 'open' || st === 'declined' || (st === 'quoted' && adding);
   const footer = canQuote ? (
     <>
       <ErrorText text={err} />
-      <Btn kind="accent" icon="paper-plane" title={p ? 'ابعت العرض، ' + money(p) + ' ج.م' : 'ابعت العرض'} onPress={send} loading={busy} disabled={!approved} />
+      <Btn icon="paper-plane" title={p ? 'ابعت العرض، ' + money(p) + ' ج.م' : 'ابعت العرض'} onPress={send} loading={busy} disabled={!approved} />
       {st === 'open' ? <Btn kind="link" title="مش متوفرة عندي" onPress={() => setAsk(true)} style={{ alignSelf: 'center' }} /> : null}
+      {st === 'quoted' ? <Btn kind="link" title="إلغاء" onPress={() => setAdding(false)} style={{ alignSelf: 'center' }} /> : null}
     </>
   ) : undefined;
 
@@ -111,21 +135,36 @@ export default function ShopRequest() {
       <>
         {st === 'declined' ? <Notice>قلت إنها مش متوفرة. لو لقيتها، تقدر تبعت عرض.</Notice> : null}
         {!approved ? <Notice>محلك لسه تحت المراجعة، فمش هتقدر تبعت عروض دلوقتي.</Notice> : null}
+        {offers.length ? <Card><T w="bold" size={15}>عروضك على القطعة دي ({ar(offers.length)})</T>{offers.map((q) => offerRow(q, true))}</Card> : null}
+        <T w="bold" size={17}>{offers.length ? 'عرض جديد بماركة أو سعر تاني' : 'ابعت عرضك'}</T>
+        <Field label="الماركة / النوع" value={brand} onChangeText={setBrand} placeholder="مثلاً: أصلي هيونداي، Bosch، Valeo، صيني" icon="pricetag"
+          hint="لو عندك أكتر من ماركة، ابعت كل واحدة كعرض لوحدها بسعرها." />
         <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0"
           hint={p ? `عمولة ضغطة ٥٪ = ${money(p * COMMISSION)} ج.م، يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة ٥٪ بس لو العميل اشترى منك.'} />
         <Labeled label="حالة القطعة">
           <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
         </Labeled>
-        <Labeled label="الضمان (اختياري)">
-          <Seg options={WARRANTY_DAYS.map((w) => ({ v: w, label: w ? ar(w) + ' يوم' : 'من غير' }))} value={warranty} onPick={setWarranty} />
-          <Muted size={12}>مش لازم تدي ضمان. بس العروض اللي عليها ضمان بتظهر بعلامة «بضمان» والعملاء بيختاروها أكتر.</Muted>
+        <Labeled label="فيه ضمان على القطعة؟">
+          <Seg options={[{ v: 'no', label: 'لأ، من غير ضمان' }, { v: 'yes', label: 'أيوه، فيه ضمان' }]} value={hasWarranty ? 'yes' : 'no'} onPick={(v) => setHasWarranty(v === 'yes')} />
+          {hasWarranty
+            ? <Field label="مدة الضمان بالأيام (مطلوب)" value={days} onChangeText={setDays} keyboardType="number-pad" ltr placeholder="مثلاً 30" icon="shield-checkmark" />
+            : <Muted size={12}>مش لازم تدي ضمان. العروض اللي عليها ضمان بتظهر بعلامة «بضمان» والعملاء بيختاروها أكتر.</Muted>}
         </Labeled>
+        <Field label="ملاحظة للعميل (اختياري)" value={note} onChangeText={setNote} placeholder="مثلاً: فرز أول، متجربة على العربية" multiline />
         <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر" />
         <Muted size={12}>السعر اللي تبعته هو اللي العميل هيدفعه وقت الاستلام.</Muted>
       </>
     );
   } else if (st === 'quoted') {
-    body = <Card><Pill label="بعت عرض" tone="wait" /><T w="bold" size={17}>العرض اتبعت للعميل</T>{sum}<Muted>هنبلغك أول ما العميل يختار.</Muted></Card>;
+    body = (
+      <Card>
+        <Pill label={offers.length > 1 ? `بعت ${ar(offers.length)} عروض` : 'بعت عرض'} tone="wait" />
+        <T w="bold" size={17}>{offers.length > 1 ? 'عروضك اتبعتت للعميل' : 'العرض اتبعت للعميل'}</T>
+        <View>{offers.map((q) => offerRow(q, true))}</View>
+        <Muted>هنبلغك أول ما العميل يختار.</Muted>
+        {offers.length < MAX_OFFERS ? <Btn kind="secondary" icon="add" title="ضيف عرض بماركة أو سعر تاني" onPress={() => setAdding(true)} /> : null}
+      </Card>
+    );
   } else if (st === 'sold' && mine) {
     body = (
       <Card style={{ backgroundColor: colors.goodSoft }}>
@@ -136,7 +175,7 @@ export default function ShopRequest() {
       </Card>
     );
   } else if (st === 'lost') {
-    body = <Card><T w="bold">العميل اختار عرض تاني المرة دي</T>{sum}<Muted>العروض اللي فيها صورة وضمان أطول بتكسب أكتر.</Muted></Card>;
+    body = <Card><T w="bold">العميل اختار عرض تاني المرة دي</T>{sum}<Muted>العروض اللي فيها صورة وماركة واضحة وضمان بتكسب أكتر.</Muted></Card>;
   } else {
     body = <Card><T w="bold">الطلب ده اتقفل</T></Card>;
   }

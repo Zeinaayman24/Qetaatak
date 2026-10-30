@@ -23,8 +23,8 @@ export const CONDITIONS: Record<string, string> = {
   new_original: 'أصلي جديد',
 };
 
-/** Warranty is optional: most shops sell parts without one. 0 = no warranty. */
-export const WARRANTY_DAYS = [0, 3, 7, 14, 30];
+/** Warranty is optional: most shops sell parts without one. 0 = no warranty; otherwise the shop types the days. */
+export const MAX_WARRANTY_DAYS = 730;
 export const warrantyLabel = (d: number) => (d > 0 ? `ضمان ${ar(d)} يوم` : 'بدون ضمان');
 /** What every order gets, warranty or not: the part must match what was described. */
 export const MATCH_HOURS = 48;
@@ -96,8 +96,10 @@ export const ORDER_STEPS: { key: string; label: string; pickupLabel?: string }[]
 export const REPORT_CATEGORIES: Record<string, string> = { order: 'مشكلة في طلب', shop: 'شكوى من محل', customer: 'شكوى من عميل', app: 'مشكلة في التطبيق', other: 'حاجة تانية' };
 export type Quote = {
   id: string; request_id: string; shop_id: string; price: number; condition: string; warranty_days: number;
-  photo_path: string | null; created_at: string;
+  photo_path: string | null; created_at: string; brand: string; note: string;
 };
+/** A shop can send up to this many offers for one part (different brands / prices). */
+export const MAX_OFFERS = 5;
 
 export function friendlyError(e: any): string {
   const msg = String(e?.message || e || '');
@@ -110,6 +112,11 @@ export function friendlyError(e: any): string {
   if (/does not deliver/i.test(msg)) return 'المحل ده مش بيوصّل. اختار الاستلام من المحل.';
   if (/request is closed|cannot choose/i.test(msg)) return 'الطلب ده اتقفل.';
   if (/postal_code/i.test(msg)) return 'الرقم البريدي لازم يكون ٥ أرقام.';
+  if (/too many offers/i.test(msg)) return 'وصلت لأقصى عدد عروض (٥) على القطعة دي.';
+  if (/balance due/i.test(msg)) return 'عليك عمولة وصلت للحد. سدّد من «حسابك مع ضغطة» عشان تبعت عروض جديدة.';
+  if (/payment pending/i.test(msg)) return 'لسه الدفع ماتأكدش.';
+  if (/no transfer details/i.test(msg)) return 'المحل ده مش مفعّل الدفع بالتحويل.';
+  if (/warranty_days/i.test(msg)) return 'مدة الضمان لازم تكون من ١ لـ ٧٣٠ يوم.';
   if (/network|fetch/i.test(msg)) return 'مفيش اتصال بالإنترنت. جرّب تاني.';
   return 'حصلت مشكلة. جرّب تاني.';
 }

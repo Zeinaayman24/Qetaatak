@@ -21,8 +21,9 @@ export default function Chat() {
     const req = must(await supabase.from('requests').select('*').eq('id', request).maybeSingle()) as Request | null;
     const sh = must(await supabase.from('shops').select('*').eq('id', shop).maybeSingle()) as Shop | null;
     const msgs = must(await supabase.from('messages').select('*').eq('request_id', request).eq('shop_id', shop).order('created_at')) as Message[];
-    const mine = (await supabase.from('quotes').select('id, price').eq('request_id', request).eq('shop_id', shop).maybeSingle()).data as { id: string; price: number } | null;
-    return { req, sh, msgs, quote: mine, deal: !!(req && mine && req.chosen_quote_id === mine.id) };
+    const offers = ((await supabase.from('quotes').select('id, price').eq('request_id', request).eq('shop_id', shop).order('price')).data ?? []) as { id: string; price: number }[];
+    const chosen = offers.find((q) => req && q.id === req.chosen_quote_id);
+    return { req, sh, msgs, quote: chosen ?? offers[0] ?? null, offers: offers.length, deal: !!chosen };
   }, ['messages'], [request, shop]);
 
   // opening the chat (and every new message while it is open) marks it as read for the messages tab
@@ -89,7 +90,7 @@ export default function Chat() {
           <Photo uri={photoUrl(r.photo_path)} size={44} />
           <View style={{ flex: 1 }}>
             <T w="semibold" size={14}>{r.part}</T>
-            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}{data?.quote ? `، عرض المحل ${money(data.quote.price)} ج.م` : ''}</Muted>
+            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}{data?.quote ? (data.offers > 1 && !data.deal ? `، ${ar(data.offers)} عروض من ${money(data.quote.price)} ج.م` : `، عرض المحل ${money(data.quote.price)} ج.م`) : ''}</Muted>
           </View>
           <Icon name="chevron-back" size={16} color={colors.faint} />
         </Press>

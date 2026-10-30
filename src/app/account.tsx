@@ -54,6 +54,7 @@ export default function Account() {
               <Pill label={shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'} />
             </Row>
           ) : null}
+          {shop ? (<><Line /><Item icon="wallet-outline" title="حسابك مع ضغطة" sub="الأوردرات اللي اتباعت والعمولة" onPress={() => router.push('/shop/balance')} /></>) : null}
           {shop?.status === 'approved' ? (<><Line /><Item icon="star-outline" title="صفحة المحل والتقييمات" sub="زي ما العملاء بيشوفوها" onPress={() => router.push(`/shop-profile/${shop.id}`)} /></>) : null}
         </Group>
       ) : (

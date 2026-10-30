@@ -221,7 +221,7 @@ export default function PriceRequest() {
                   <Row key={c.part.id} gap={10}>
                     <Photo uri={photoUrl(c.quote.photo_path ?? c.part.photo_path)} size={44} />
                     <View style={{ flex: 1 }}>
-                      <T w="semibold" size={14}>{c.part.part}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
+                      <T w="semibold" size={14}>{c.part.part}{c.quote.brand ? ` (${c.quote.brand})` : ''}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
                       <Muted size={12}>{CONDITIONS[c.quote.condition]}، {warrantyLabel(c.quote.warranty_days)}</Muted>
                     </View>
                     <T w="semibold" size={14} color={colors.primary}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
@@ -331,7 +331,8 @@ function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?
     <Press onPress={onPick} selected={on}
       style={[{ backgroundColor: on ? colors.ink : colors.surface, borderRadius: 18, padding: 16, gap: 12 }, lift]}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <View style={{ gap: 2 }}>
+        <View style={{ gap: 2, flex: 1 }}>
+          {q.brand ? <T w="bold" size={15} color={on ? '#fff' : colors.ink}>{q.brand}</T> : null}
           <Row gap={8}>
             <T w="bold" size={26} color={on ? '#fff' : colors.ink} style={{ lineHeight: 34 }}>{money(q.price)}</T>
             <T size={13} color={on ? 'rgba(255,255,255,.6)' : colors.muted}>ج.م{qty > 1 ? ' للقطعة' : ''}</T>
@@ -344,6 +345,7 @@ function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?
         </View>
         {q.photo_path ? <Photo uri={photoUrl(q.photo_path)} size={60} /> : null}
       </Row>
+      {q.note ? <T size={13} color={on ? 'rgba(255,255,255,.85)' : colors.muted}>«{q.note}»</T> : null}
       <Row gap={6} style={{ flexWrap: 'wrap' }}>
         {[[CONDITIONS[q.condition], 'pricetag'], [warrantyLabel(q.warranty_days), q.warranty_days ? 'shield-checkmark' : 'information-circle'], [shop?.offers_delivery ? 'بيوصّل' : 'استلام بس', shop?.offers_delivery ? 'bicycle' : 'walk']].map(([t, icon]) => (
           <Row key={t} gap={4} style={{ backgroundColor: on ? 'rgba(255,255,255,.1)' : colors.soft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>

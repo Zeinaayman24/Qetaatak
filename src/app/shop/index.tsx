@@ -43,7 +43,8 @@ export default function ShopInbox() {
   const rows = (data?.reqs ?? [])
     .filter((r) => r.customer_id !== uid || profile.is_admin)
     .map((r) => {
-      const mq = data!.mine.find((q) => q.request_id === r.id);
+      const mqs = data!.mine.filter((q) => q.request_id === r.id);
+      const mq = mqs.find((q) => q.id === r.chosen_quote_id) ?? mqs[0];
       return { r, mq, st: shopState(r, mq, data!.declined.has(r.id)) as ShopState };
     });
   const areas = ['الكل', ...Array.from(new Set(rows.map((x) => x.r.area))).sort()];
