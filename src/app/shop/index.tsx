@@ -4,27 +4,28 @@ import { View } from 'react-native';
 import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { shopPill, shopState, type ShopState } from '@/components/status';
-import { Btn, Chips, Empty, Icon, Labeled, Loading, Muted, Notice, Photo, Pill, Press, Row, Screen, Seg, Select, T } from '@/components/ui';
+import { OrderRow, RowList, StatusTabs, bucketOf, type Bucket } from '@/components/OrderRows';
+import { Btn, Empty, Icon, Labeled, Loading, Muted, Notice, Pill, Press, Row, Screen, Seg, Select, T } from '@/components/ui';
 import { Pressable, TextInput } from 'react-native';
 import { InstallCard } from '@/components/InstallCard';
 import { useAuth } from '@/lib/auth';
-import { ORDER_LABEL, URGENCY, WANTED, ago, ar, money, orderActive, orderNo, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
-import { must, useLive } from '@/lib/live';
-import { photoUrl, supabase } from '@/lib/supabase';
+import { WANTED, ar, elapsed, minutesSince, money, orderActive, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
+import { must, useLive, useNow } from '@/lib/live';
+import { supabase } from '@/lib/supabase';
 import { colors, fonts, lift } from '@/lib/theme';
 
-type Tab = 'open' | 'quoted' | 'orders' | 'all';
+type Tab = 'open' | 'quoted' | 'preparing' | 'ready' | 'done';
+const SLOW_MIN = 15; // after this, an unanswered request turns red
 
 export default function ShopInbox() {
   const { ready, session, profile, shop, shopPrivate } = useAuth();
   const [tab, setTab] = useState<Tab>('open');
   const [q, setQ] = useState('');
-  const [mineOnly, setMineOnly] = useState(false);
   const [cond, setCond] = useState<'all' | 'used' | 'new'>('all');
-  const [urgentFirst, setUrgentFirst] = useState(false);
   const [area, setArea] = useState('الكل');
   const [showFilters, setShowFilters] = useState(false);
   const uid = session?.user.id;
+  const now = useNow(1000);
   useEffect(() => { rememberRole('shop'); }, []);
 
   const { data, loading } = useLive(async () => {
@@ -49,19 +50,19 @@ export default function ShopInbox() {
     });
   const areas = ['الكل', ...Array.from(new Set(rows.map((x) => x.r.area))).sort()];
   const needle = q.trim();
-  const urgencyRank = { urgent: 0, today: 1, normal: 2 } as const;
   const shown = rows
-    .filter((x) => !mineOnly || shop.brands.includes(x.r.car_make))
     .filter((x) => cond === 'all' || x.r.wanted_condition === cond || x.r.wanted_condition === 'any')
     .filter((x) => area === 'الكل' || x.r.area === area)
     .filter((x) => !needle || `${x.r.part} ${x.r.car_make} ${x.r.car_model} ${x.r.notes}`.includes(needle))
-    .sort((a, b) => (urgentFirst ? urgencyRank[a.r.urgency] - urgencyRank[b.r.urgency] : 0)
-      || Number(!shop.brands.includes(a.r.car_make)) - Number(!shop.brands.includes(b.r.car_make)) || b.r.created_at.localeCompare(a.r.created_at));
-  const activeFilters = Number(mineOnly) + Number(cond !== 'all') + Number(urgentFirst) + Number(area !== 'الكل');
+    .sort((a, b) => Number(!shop.brands.includes(a.r.car_make)) - Number(!shop.brands.includes(b.r.car_make)) || b.r.created_at.localeCompare(a.r.created_at));
+  const activeFilters = Number(cond !== 'all') + Number(area !== 'الكل');
   const orders = data?.orders ?? [];
   const activeOrders = orders.filter(orderActive);
   const sales = orders.filter((o) => o.status === 'received').reduce((s, o) => s + Number(o.items_total), 0);
   const waiting = rows.filter((x) => x.st === 'open').length;
+  const inTab = (b: Bucket) => orders.filter((o) => bucketOf(o) === b);
+  const isOrders = tab === 'preparing' || tab === 'ready' || tab === 'done';
+  const groups = groupShown(shown).filter((g) => g.some((x) => x.st === tab));
 
   return (
     <Screen nav={<BottomNav role="shop" />} top={
@@ -88,12 +89,15 @@ export default function ShopInbox() {
       <View style={{ marginTop: -40, gap: 12 }}>
       {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
       {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}
-      <View style={[{ backgroundColor: colors.surface, borderRadius: 20, padding: 6 }, lift]}>
-      <Seg options={[{ v: 'open', label: 'جديد' }, { v: 'quoted', label: 'عروضي' }, { v: 'orders', label: `أوردرات${activeOrders.length ? ' ' + ar(activeOrders.length) : ''}` }, { v: 'all', label: 'الكل' }] as { v: Tab; label: string }[]}
-        value={tab} onPick={setTab} />
+      <StatusTabs<Tab> value={tab} onPick={setTab} items={[
+        { v: 'open', label: 'جديد', n: waiting, hot: waiting > 0 },
+        { v: 'quoted', label: 'عروضي', n: rows.filter((x) => x.st === 'quoted').length },
+        { v: 'preparing', label: 'بيتجهز', n: inTab('preparing').length, hot: inTab('preparing').length > 0 },
+        { v: 'ready', label: 'جاهز', n: inTab('ready').length },
+        { v: 'done', label: 'خلصت' },
+      ]} />
       </View>
-      </View>
-      <Row gap={8}>
+      {!isOrders ? <Row gap={8}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 12, borderWidth: 1.5, borderColor: colors.line }}>
           <Icon name="search" size={18} color={colors.muted} />
           <TextInput value={q} onChangeText={setQ} placeholder="دوّر: فانوس، سنترا…" placeholderTextColor={colors.faint}
@@ -104,80 +108,60 @@ export default function ShopInbox() {
           <Icon name="options-outline" size={18} color={showFilters || activeFilters ? '#fff' : colors.ink} />
           {activeFilters ? <T size={13} w="bold" color="#fff">{ar(activeFilters)}</T> : null}
         </Pressable>
-      </Row>
-      {showFilters ? (
+      </Row> : null}
+      {showFilters && !isOrders ? (
         <View style={[{ gap: 14, backgroundColor: colors.surface, borderRadius: 20, padding: 14 }, lift]}>
-          <Chips options={[{ v: 'mine', label: 'ماركاتي بس' }, { v: 'urgent', label: 'المستعجل الأول' }]} selected={[...(mineOnly ? ['mine'] : []), ...(urgentFirst ? ['urgent'] : [])]}
-            onPick={(v) => (v === 'mine' ? setMineOnly((x) => !x) : setUrgentFirst((x) => !x))} />
           <Labeled label="العميل عايزها">
             <Seg options={[{ v: 'all', label: 'الكل' }, { v: 'used', label: 'مستعمل' }, { v: 'new', label: 'جديد' }] as { v: 'all' | 'used' | 'new'; label: string }[]} value={cond} onPick={setCond} />
           </Labeled>
           <Select label="المنطقة" value={area} options={areas.map((a) => ({ v: a, label: a }))} onPick={setArea} />
-          {activeFilters ? <Btn kind="link" title="امسح الفلاتر" onPress={() => { setMineOnly(false); setCond('all'); setUrgentFirst(false); setArea('الكل'); }} /> : null}
+          {activeFilters ? <Btn kind="link" title="امسح الفلاتر" onPress={() => { setCond('all'); setArea('الكل'); }} /> : null}
         </View>
       ) : null}
-      {tab === 'orders' ? (
-        orders.length ? (
-          <View style={{ gap: 12 }}>
-            {orders.map((o) => {
+      {isOrders ? (
+        inTab(tab).length ? (
+          <RowList>
+            {inTab(tab).map((o, i) => {
               const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
-              const live = orderActive(o);
-              return (
-                <Press key={o.id} onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: o.id } })}
-                  style={[{ backgroundColor: live ? colors.ink : colors.surface, borderRadius: 18, padding: 16, gap: 10 }, lift]}>
-                  <Row gap={12}>
-                    <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: live ? colors.accent : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={ORDER_LABEL[o.status].icon} size={22} color={live ? colors.ink : colors.muted} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <T w="bold" size={15} color={live ? '#fff' : colors.ink}>أوردر {orderNo(o.order_no)}، {ORDER_LABEL[o.status].short}</T>
-                      <T size={12.5} color={live ? 'rgba(255,255,255,.7)' : colors.muted} numberOfLines={1}>{ps.length ? partsLabel(ps) : ''}، {o.delivery_mode === 'delivery' ? 'توصيل' : 'استلام'}</T>
-                    </View>
-                    <T w="bold" size={15} color={live ? colors.accent : colors.ink}>{money(Number(o.items_total))}</T>
-                  </Row>
-                </Press>
-              );
+              return <OrderRow key={o.id} o={o} first={i === 0} title={ps.length ? partsLabel(ps) : 'أوردر'}
+                flag={o.payment_status === 'review' ? { label: 'راجع الدفع', tone: 'wait' } : undefined}
+                onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: o.id } })} />;
             })}
-          </View>
-        ) : <Empty icon="cube-outline" text={'مفيش أوردرات لسه.\nلما عميل يختار عرضك، الأوردر بيظهر هنا.'} />
-      ) : loading && !data ? <Loading /> : groupShown(shown).some((g) => tab === 'all' || g.some((x) => x.st === tab)) ? (
-        <View style={{ gap: 12 }}>
-          {groupShown(shown).filter((g) => tab === 'all' || g.some((x) => x.st === tab)).map((g) => {
+          </RowList>
+        ) : <Empty icon="cube-outline" text={tab === 'done' ? 'لسه مفيش أوردرات خلصت.' : tab === 'ready' ? 'مفيش أوردرات جاهزة مستنية تسليم.' : 'مفيش أوردرات تتجهز دلوقتي.\nلما عميل يختار عرضك، الأوردر بيظهر هنا.'} />
+      ) : loading && !data ? <Loading /> : groups.length ? (
+        <RowList>
+          {groups.map((g, i) => {
             const r = g[0].r;
-            const fresh = g.some((x) => x.st === 'open');
+            const open = g.some((x) => x.st === 'open');
+            const slow = open && minutesSince(r.created_at, now) >= SLOW_MIN;
             return (
-              <Press key={r.batch_id ?? r.id} onPress={() => router.push(`/shop/${(g.find((x) => x.st === 'open') ?? g[0]).r.id}`)}
-                style={[lift, { backgroundColor: colors.surface, borderRadius: 18, padding: 14, gap: 10, borderWidth: 2, borderColor: fresh ? colors.accent : colors.line }]}>
-                <Row gap={12}>
-                  <Photo uri={photoUrl(g.find((x) => x.r.photo_path)?.r.photo_path)} size={50} />
-                  <View style={{ flex: 1, gap: 1 }}>
-                    <Row gap={6}>
-                      <T w="bold" size={15} numberOfLines={1} style={{ flexShrink: 1 }}>{g.length > 1 ? `${ar(g.length)} قطع` : r.part}</T>
-                      {shop.brands.includes(r.car_make) ? <Pill label="تخصصك" tone="good" /> : null}
-                    </Row>
-                    <Muted size={12.5} numberOfLines={1}>{r.car_make} {r.car_model} {ar(r.car_year)}، {r.area}</Muted>
-                  </View>
-                  {g.length === 1 ? shopPill(g[0].st) : null}
-                </Row>
-                {g.length > 1 ? (
-                  <View style={{ gap: 6, backgroundColor: colors.soft, borderRadius: 14, padding: 10 }}>
-                    {g.map((x) => (
-                      <Row key={x.r.id} style={{ justifyContent: 'space-between' }}>
-                        <T size={13.5} w="medium" numberOfLines={1} style={{ flex: 1 }}>{x.r.part}{x.r.qty > 1 ? ` × ${ar(x.r.qty)}` : ''} <T size={12} color={colors.muted}>، {WANTED[x.r.wanted_condition]}</T></T>
-                        {shopPill(x.st)}
+              <Press key={r.batch_id ?? r.id} onPress={() => router.push(`/shop/${(g.find((x) => x.st === 'open') ?? g[0]).r.id}`)} label={r.part}
+                style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 14, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderColor: colors.line, backgroundColor: open ? colors.surface : colors.surface }}>
+                {open ? <View style={{ width: 4, borderRadius: 2, backgroundColor: slow ? colors.bad : colors.accent }} /> : null}
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Row gap={8}>
+                    <T w="bold" size={13.5} color={colors.muted}>{reqNo(r.num)}</T>
+                    <T w="bold" size={15} numberOfLines={1} style={{ flex: 1 }}>{g.length > 1 ? `${ar(g.length)} قطع: ${g.map((x) => x.r.part).join('، ')}` : r.part + (r.qty > 1 ? ` × ${ar(r.qty)}` : '')}</T>
+                    {open ? (
+                      <Row gap={3} style={{ backgroundColor: slow ? colors.badSoft : colors.soft, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                        <Icon name="time" size={12} color={slow ? colors.bad : colors.ink} />
+                        <T w="bold" size={12.5} color={slow ? colors.bad : colors.ink}>{elapsed(r.created_at, now)}</T>
                       </Row>
-                    ))}
-                  </View>
-                ) : null}
-                <Row gap={6}>
-                  <Icon name="time-outline" size={14} color={colors.faint} />
-                  <Muted size={12}>{reqNo(r.num)}، {ago(r.created_at)}{r.urgency !== 'normal' ? '، ' + URGENCY[r.urgency] : ''}{r.budget && g.length === 1 ? '، ميزانية ' + money(r.budget) : ''}</Muted>
-                </Row>
+                    ) : null}
+                  </Row>
+                  <Row gap={8}>
+                    <Muted size={12.5} numberOfLines={1} style={{ flex: 1 }}>{r.car_make} {r.car_model} {ar(r.car_year)}، {WANTED[r.wanted_condition]}، {r.area}</Muted>
+                    {shop.brands.includes(r.car_make) ? <Pill label="تخصصك" tone="good" /> : null}
+                    {g.length === 1 || !open ? shopPill(g[0].st) : null}
+                  </Row>
+                </View>
               </Press>
             );
           })}
-        </View>
-      ) : <Empty icon="file-tray-outline" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'مفيش حاجة هنا لسه.'} />}
+        </RowList>
+      ) : <Empty icon="file-tray-outline" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'لسه مابعتش عروض.'} />}
+      {tab === 'open' && waiting ? <Muted center size={12}>العميل بيشوف إنت بترد في قد إيه. المحلات اللي بترد بسرعة بتبيع أكتر.</Muted> : null}
       <InstallCard />
     </Screen>
   );

@@ -1,13 +1,16 @@
 import { Link, useParams } from 'react-router-dom';
 import { Field, Page, Pill, useData } from '../App';
+import { mins, useSpeed } from './Speed';
 import { CATEGORY, CONDITION, REQUEST_STATUS, SHOP_STATUS, SHOP_TYPE, TICKET_STATUS, address, date, memberId, money, orderId, supabase, ticketId } from '../lib';
 
 export default function ShopDetail() {
   const { id } = useParams();
   const { all, me, reload } = useData();
+  const { data: speed } = useSpeed();
   const s = all.shops[id!];
   const p = all.priv[id!];
   const pr = all.byId[id!];
+  const sp = speed?.find((x) => x.shop_id === id);
   if (!s) return <Page title="المحل"><p className="empty">المحل ده مش موجود.</p></Page>;
   const quotes = all.quotes.filter((q) => q.shop_id === s.id);
   const sales = all.requests.filter((r) => quotes.some((q) => q.id === r.chosen_quote_id));
@@ -42,7 +45,8 @@ export default function ShopDetail() {
           <button className={'btn ' + (pr?.is_blocked ? 'ghost' : 'danger')} onClick={toggleBlock}>{pr?.is_blocked ? 'إلغاء الحظر' : 'حظر'}</button>
         </>
       ) : null}>
-      <div className="kpis four">
+      <div className="kpis">
+        <div className="kpi"><span className="muted small">بيرد عادةً في</span><strong>{mins(sp?.median_min)}</strong><span className="muted small">{sp?.answered ? `${Math.round((sp.within_15 / sp.answered) * 100)}٪ في أقل من ١٥ د` : 'لسه مفيش ردود'}</span></div>
         <div className="kpi"><span className="muted small">عروض بعتها</span><strong>{quotes.length}</strong></div>
         <div className="kpi"><span className="muted small">مبيعات</span><strong>{sales.length}</strong></div>
         <div className="kpi"><span className="muted small">قيمة المبيعات</span><strong>{money(revenue)}</strong></div>

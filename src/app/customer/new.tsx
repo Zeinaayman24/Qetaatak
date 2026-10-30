@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Btn, Chips, ErrorText, Field, Icon, IconButton, Labeled, Loading, Muted, Plate, Press, Row, Seg, T, ToastHost, toast } from '@/components/ui';
 import { partIsSided } from '@/lib/assistant';
 import { useAuth } from '@/lib/auth';
-import { SIDES, URGENCY, WANTED, ar, friendlyError, newId, reqNo, toLatin, type Car } from '@/lib/data';
+import { SIDES, WANTED, ar, friendlyError, newId, reqNo, toLatin, type Car } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
@@ -39,7 +39,7 @@ export default function NewRequest() {
     return [{ ...item(p), notes: str(params.notes), side: Object.keys(SIDES).includes(str(params.side)) ? str(params.side) : '', cond: (['used', 'new', 'any'].includes(cond) ? cond : 'used') as Cond }];
   });
   const [q, setQ] = useState('');
-  const [urgency, setUrgency] = useState<'normal' | 'today' | 'urgent'>('normal');
+  const urgency = 'normal'; // every request is treated as fast; no "when do you need it" question
   const [carKey, setCarKey] = useState('main');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -208,19 +208,6 @@ export default function NewRequest() {
                 })}
                 <Btn kind="secondary" icon="add" title="عربية تانية" onPress={() => router.push('/cars')} />
               </View>
-              <T w="bold" size={20} style={{ marginTop: 6 }}>محتاجها إمتى؟</T>
-              <View style={{ gap: 10 }}>
-                {([['normal', 'time-outline', 'مش مستعجل', 'المحلات ترد براحتها'], ['today', 'today-outline', 'النهارده', 'عايزها النهارده'], ['urgent', 'flash', 'مستعجل جداً', 'العربية واقفة']] as const).map(([v, icon, t, sub]) => {
-                  const on = urgency === v;
-                  return (
-                    <Press key={v} onPress={() => setUrgency(v)} selected={on}
-                      style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: on ? colors.ink : colors.surface, borderRadius: 20, padding: 16 }, lift]}>
-                      <Icon name={icon} size={24} color={on ? colors.accent : colors.ink} />
-                      <View style={{ flex: 1 }}><T w="semibold" size={15} color={on ? '#fff' : colors.ink}>{t}</T><T size={12.5} color={on ? 'rgba(255,255,255,.7)' : colors.muted}>{sub}</T></View>
-                    </Press>
-                  );
-                })}
-              </View>
             </>
           ) : (
             <>
@@ -230,7 +217,7 @@ export default function NewRequest() {
                   <Plate top={car.model || '—'} bottom={ar(car.year)} size="sm" />
                   <View style={{ flex: 1 }}>
                     <T w="semibold" color="#fff">{car.make} {car.model}</T>
-                    <T size={12.5} color="rgba(255,255,255,.7)">{URGENCY[urgency]}، {profile.area}</T>
+                    <T size={12.5} color="rgba(255,255,255,.7)">{profile.area}</T>
                   </View>
                 </View>
                 {items.map((it, i) => (

@@ -1,23 +1,24 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
 import { BottomNav } from '@/components/AppHeader';
-import { Empty, Icon, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Seg, T } from '@/components/ui';
+import { OrderRow, RowList, StatusTabs, bucketOf, type Bucket } from '@/components/OrderRows';
+import { Empty, Icon, Loading, Muted, Press, Row, Screen, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { ORDER_LABEL, ago, ar, groupRequests, money, orderActive, orderNo, orderStep, orderSteps, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
-import { must, useLive } from '@/lib/live';
+import { ar, elapsed, groupRequests, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
+import { must, useLive, useNow } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
-import { photoUrl, supabase } from '@/lib/supabase';
-import { colors, lift } from '@/lib/theme';
+import { supabase } from '@/lib/supabase';
+import { colors } from '@/lib/theme';
 
-type Tab = 'orders' | 'quotes' | 'past';
+type Tab = 'quotes' | 'preparing' | 'ready' | 'done';
 
-/** Everything the customer started: orders on the way, price requests waiting for offers, and history. */
+/** Everything the customer started: price requests waiting for a choice, and orders by status. */
 export default function MyRequests() {
   const { ready, session } = useAuth();
   const params = useLocalSearchParams<{ tab?: string }>();
   const uid = session?.user.id;
-  const [tab, setTab] = useState<Tab>((['orders', 'quotes', 'past'].includes(String(params.tab)) ? params.tab : 'orders') as Tab);
+  const [picked, setTab] = useState<Tab | null>((['quotes', 'preparing', 'ready', 'done'].includes(String(params.tab)) ? params.tab : null) as Tab | null);
+  const now = useNow(1000);
   const { data, loading } = useLive(async () => {
     if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[], orders: [] as Order[] };
     const [reqs, orders] = await Promise.all([
@@ -33,78 +34,66 @@ export default function MyRequests() {
   if (ready && !session) return <Redirect href="/login" />;
   const reqs = data?.reqs ?? [];
   const orders = data?.orders ?? [];
-  const activeOrders = orders.filter(orderActive);
-  const pastOrders = orders.filter((o) => !orderActive(o));
   const openGroups = groupRequests(reqs).filter((g) => g.items.some((r) => r.status === 'open'));
+  const offersOf = (g: (typeof openGroups)[number]) => data!.quotes.filter((q) => g.items.some((r) => r.id === q.request_id && r.status === 'open')).length;
+  const withOffers = openGroups.filter((g) => offersOf(g) > 0).length;
+  const inTab = (b: Bucket) => orders.filter((o) => bucketOf(o) === b);
+  // open on whatever needs the customer most: offers to choose, then ready orders
+  const tab: Tab = picked ?? (withOffers ? 'quotes' : inTab('ready').length ? 'ready' : inTab('preparing').length ? 'preparing' : openGroups.length ? 'quotes' : 'done');
   const partsOf = (o: Order) => reqs.filter((r) => r.order_id === o.id);
-
-  const orderCard = (o: Order) => {
-    const ps = partsOf(o);
-    const steps = orderSteps(o.delivery_mode);
-    const at = orderStep(o);
-    const live = orderActive(o);
-    return (
-      <Press key={o.id} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}
-        style={[lift, { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 12 }]}>
-        <Row gap={12}>
-          <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: live ? colors.primarySoft : o.status === 'received' ? colors.goodSoft : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={ORDER_LABEL[o.status].icon} size={22} color={live ? colors.primary : o.status === 'received' ? colors.good : colors.faint} />
-          </View>
-          <View style={{ flex: 1, gap: 1 }}>
-            <T w="bold" size={15} numberOfLines={1}>{ps.length ? partsLabel(ps) : 'أوردر'}</T>
-            <Muted size={12}>أوردر {orderNo(o.order_no)}، {money(Number(o.items_total) + Number(o.delivery_fee))} ج.م، {ago(o.created_at)}</Muted>
-          </View>
-          {needsPayment(o) ? <Pill label="ادفع" tone="wait" icon="card" /> : o.status === 'received' && !o.rating ? <Pill label="قيّم" tone="wait" icon="star" /> : <Pill label={ORDER_LABEL[o.status].short} tone={live ? 'new' : o.status === 'received' ? 'good' : 'plain'} />}
-        </Row>
-        {live ? (
-          <Row gap={4}>{steps.map((s, i) => <View key={s} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: i <= at ? colors.primary : colors.soft }} />)}</Row>
-        ) : null}
-      </Press>
-    );
-  };
+  const list = tab === 'quotes' ? [] : inTab(tab);
 
   return (
     <Screen nav={<BottomNav role="customer" />}>
       <T w="bold" size={28} style={{ lineHeight: 40 }}>طلباتي</T>
-      <Seg options={[
-        { v: 'orders', label: `أوردرات${activeOrders.length ? '، ' + ar(activeOrders.length) : ''}` },
-        { v: 'quotes', label: `عروض أسعار${openGroups.length ? '، ' + ar(openGroups.length) : ''}` },
-        { v: 'past', label: 'خلصت' },
-      ] as { v: Tab; label: string }[]} value={tab} onPick={setTab} />
+      <StatusTabs<Tab> value={tab} onPick={setTab} items={[
+        { v: 'quotes', label: 'عروض الأسعار', n: openGroups.length, hot: withOffers > 0 },
+        { v: 'preparing', label: 'بيتجهز', n: inTab('preparing').length },
+        { v: 'ready', label: 'جاهز', n: inTab('ready').length, hot: inTab('ready').length > 0 },
+        { v: 'done', label: 'خلصت' },
+      ]} />
 
-      {loading && !data ? <Loading /> : tab === 'orders' ? (
-        activeOrders.length ? <View style={{ gap: 12 }}>{activeOrders.map(orderCard)}</View>
-          : <Empty icon="cube-outline" text={'مفيش أوردرات شغالة.\nلما تختار عرض، الأوردر بيظهر هنا.'} action={openGroups.length ? { label: 'شوف العروض', onPress: () => setTab('quotes') } : undefined} />
-      ) : tab === 'quotes' ? (
+      {loading && !data ? <Loading /> : tab === 'quotes' ? (
         openGroups.length ? (
-          <View style={{ gap: 12 }}>
-            {openGroups.map((g) => {
+          <RowList>
+            {openGroups.map((g, i) => {
               const open = g.items.filter((r) => r.status === 'open');
-              const n = data!.quotes.filter((q) => open.some((r) => r.id === q.request_id)).length;
-              const photo = g.items.find((r) => r.photo_path)?.photo_path;
+              const n = offersOf(g);
               return (
-                <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)}
-                  style={[lift, { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 12, borderWidth: n ? 1.5 : 1, borderColor: n ? colors.primary : colors.line }]}>
-                  <Row gap={12}>
-                    {photo ? <Photo uri={photoUrl(photo)} size={52} /> : <Plate top="طلب" bottom={reqNo(g.first.num).replace('#', '')} size="sm" />}
-                    <View style={{ flex: 1, gap: 1 }}>
-                      <T w="bold" size={15} numberOfLines={1}>{partsLabel(open)}</T>
-                      <Muted size={12}>{g.first.car_make} {g.first.car_model}، {reqNo(g.first.num)}، {ago(g.first.created_at)}</Muted>
-                    </View>
+                <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)} label={partsLabel(open)}
+                  style={{ paddingHorizontal: 14, paddingVertical: 13, gap: 6, borderTopWidth: i ? 1 : 0, borderColor: colors.line, backgroundColor: n ? colors.primarySoft : colors.surface }}>
+                  <Row gap={8}>
+                    <T w="bold" size={13.5} color={colors.muted}>{reqNo(g.first.num)}</T>
+                    <T w="bold" size={15} numberOfLines={1} style={{ flex: 1 }}>{partsLabel(open)}</T>
+                    <Row gap={3}><Icon name="time-outline" size={13} color={colors.muted} /><T size={12.5} w="semibold" color={colors.muted}>{elapsed(g.first.created_at, now)}</T></Row>
                   </Row>
                   <Row gap={8}>
-                    <Icon name={n ? 'pricetags' : 'time'} size={18} color={n ? colors.accentDeep : colors.muted} />
-                    <T size={13} w="semibold" color={n ? colors.accentDeep : colors.muted} style={{ flex: 1 }}>{n ? `${ar(n)} عروض مستنياك تختار` : 'بندوّر عند المحلات'}</T>
-                    {g.items.length > open.length ? <Muted size={12}>{ar(g.items.length - open.length)} في أوردرات</Muted> : null}
-                    <Icon name="chevron-back" size={15} color={colors.faint} />
+                    <Muted size={12.5} style={{ flex: 1 }}>{g.first.car_make} {g.first.car_model}{g.items.length > open.length ? `، ${ar(g.items.length - open.length)} في أوردرات` : ''}</Muted>
+                    {n ? (
+                      <Row gap={5} style={{ backgroundColor: colors.lime, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
+                        <Icon name="pricetags" size={13} color={colors.ink} /><T w="bold" size={12.5} color={colors.ink}>{ar(n)} {n > 1 ? 'عروض' : 'عرض'}، اختار</T>
+                      </Row>
+                    ) : <Muted size={12.5}>بندوّر عند المحلات…</Muted>}
                   </Row>
                 </Press>
               );
             })}
-          </View>
+          </RowList>
         ) : <Empty icon="pricetags-outline" text="مفيش طلبات أسعار مفتوحة." action={{ label: 'اطلب قطعة', onPress: () => router.push('/customer/new') }} />
+      ) : list.length ? (
+        <RowList>
+          {list.map((o, i) => {
+            const ps = partsOf(o);
+            return (
+              <OrderRow key={o.id} o={o} first={i === 0} title={ps.length ? partsLabel(ps) : 'أوردر'}
+                flag={needsPayment(o) ? { label: 'ادفع', tone: 'wait' } : o.status === 'received' && !o.rating ? { label: 'قيّم', tone: 'wait' } : undefined}
+                onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })} />
+            );
+          })}
+        </RowList>
       ) : (
-        pastOrders.length ? <View style={{ gap: 12 }}>{pastOrders.map(orderCard)}</View> : <Empty icon="time-outline" text="لسه مفيش أوردرات خلصت." />
+        <Empty icon={tab === 'done' ? 'time-outline' : 'cube-outline'}
+          text={tab === 'done' ? 'لسه مفيش أوردرات خلصت.' : tab === 'ready' ? 'مفيش أوردرات جاهزة دلوقتي.' : 'مفيش أوردرات بتتجهز دلوقتي.\nلما تختار عرض، الأوردر بيظهر هنا.'} />
       )}
     </Screen>
   );

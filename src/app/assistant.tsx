@@ -28,7 +28,7 @@ type Draft = {
 type CDraft = { category: string | null; requestId: string | null; requestAsked: boolean; body: string };
 type CarOpt = { key: string; label: string; make: string; model: string; year: number; vin: string };
 
-const emptyDraft = (): Draft => ({ part: '', carKey: null, side: null, cond: null, urgency: null, photo: null, photoAsked: false, budget: null, budgetAsked: false, notes: '' });
+const emptyDraft = (): Draft => ({ part: '', carKey: null, side: null, cond: null, urgency: 'normal', photo: null, photoAsked: false, budget: null, budgetAsked: false, notes: '' });
 const emptyC = (): CDraft => ({ category: null, requestId: null, requestAsked: false, body: '' });
 const STATUS: Record<string, string> = { open: 'بيستقبل عروض', chosen: 'اتأكد مع المحل', done: 'اتسلّم', cancelled: 'اتلغى' };
 
@@ -161,13 +161,11 @@ export default function Assistant() {
       lines: all.length > 1 ? [
         ...all.map((x, i) => [`قطعة ${ar(i + 1)}`, itemLine(x)] as [string, string]),
         ['العربية', car.label],
-        ['محتاجها', URGENCY[d.urgency]],
       ] : [
         ['القطعة', d.part],
         ['العربية', car.label],
         ...(d.side ? [['الجهة', SIDES[d.side]] as [string, string]] : []),
         ['الحالة', WANTED[d.cond]],
-        ['محتاجها', URGENCY[d.urgency]],
         ['الميزانية', d.budget ? money(d.budget) + ' ج' : 'مفتوحة'],
         ...(d.notes ? [['ملاحظات', d.notes] as [string, string]] : []),
       ],
@@ -421,7 +419,6 @@ export default function Assistant() {
       ...((cars?.length ?? 0) > 1 ? [tap('العربية', () => advance({ ...draft, carKey: null }))] : []),
       ...(partIsSided(draft.part) ? [tap('الجهة', () => advance({ ...draft, side: null }))] : []),
       tap('مستعمل/جديد', () => advance({ ...draft, cond: null })),
-      tap('الاستعجال', () => advance({ ...draft, urgency: null })),
       tap('الصورة', () => advance({ ...draft, photo: null, photoAsked: false })),
       tap('الميزانية', () => advance({ ...draft, budget: null, budgetAsked: false })),
     ]; break;

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 // ضغطة (Daghta) design tokens.
 // Deep navy carries the brand and the text; sky blue is the call to action; lime marks a "tap" / success moment.
 // Taken from the brand mark (gear + pressing finger + speed lines).
@@ -36,13 +37,19 @@ export const colors = {
   shadow: '#0B2545',
 };
 
+// Arabic text: Times New Roman where the device has it (Windows, Mac, iPhone), otherwise Noto Naskh Arabic,
+// the closest free match (Times New Roman itself can't be shipped inside the app, and Android doesn't have it).
+const naskh = { regular: 'NotoNaskhArabic_400Regular', medium: 'NotoNaskhArabic_500Medium', semibold: 'NotoNaskhArabic_600SemiBold', bold: 'NotoNaskhArabic_700Bold' };
+const stack = (f: string) => (Platform.OS === 'web' ? `"Times New Roman", ${f}, serif` : f);
 export const fonts = {
-  regular: 'ReadexPro_400Regular',
-  medium: 'ReadexPro_500Medium',
-  semibold: 'ReadexPro_600SemiBold',
-  bold: 'ReadexPro_700Bold',
-  display: 'ReadexPro_700Bold',
+  regular: stack(naskh.regular),
+  medium: stack(naskh.medium),
+  semibold: stack(naskh.semibold),
+  bold: stack(naskh.bold),
+  display: stack(naskh.bold),
 };
+/** Times New Roman only has regular and bold, so the browser needs the weight too. */
+export const fontWeights = { regular: '400', medium: '500', semibold: '600', bold: '700', display: '700' } as const;
 
 export const radius = { sm: 10, md: 12, lg: 16, xl: 22, pill: 999 };
 

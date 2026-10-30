@@ -1,6 +1,7 @@
 import { Logo } from './Logo';
 import Payments from './pages/Payments';
 import Ads from './pages/Ads';
+import SpeedPage from './pages/Speed';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
@@ -75,6 +76,7 @@ function Shell({ me }: { me: Profile }) {
               <Nav to="/tickets" icon="chat" label="خدمة العملاء" badge={openTickets} />
               <Nav to="/customers" icon="users" label="العملاء" />
               <Nav to="/shops" icon="store" label="المحلات" badge={pendingShops} />
+              <Nav to="/speed" icon="clock" label="سرعة الرد" />
               <Nav to="/orders" icon="receipt" label="الطلبات" />
               <Nav to="/payments" icon="card" label="المدفوعات" badge={data.orders.filter((o) => o.payment_status === 'review' || o.payment_status === 'refund_due').length} />
               <Nav to="/ads" icon="megaphone" label="الإعلانات" />
@@ -101,6 +103,7 @@ function Shell({ me }: { me: Profile }) {
               <Route path="/orders/:id" element={<OrderDetail />} />
               <Route path="/payments" element={<Payments />} />
               <Route path="/ads" element={<Ads />} />
+              <Route path="/speed" element={<SpeedPage />} />
               <Route path="/staff" element={me.is_admin ? <Staff /> : <Navigate to="/" />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
@@ -130,6 +133,7 @@ const GLYPHS: Record<string, string> = {
   receipt: 'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6 M9 12h6 M9 16h3',
   shield: 'M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z M9 12l2 2 4-4',
   card: 'M3 6h18v12H3z M3 10h18 M7 15h4',
+  clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2',
   megaphone: 'M3 10v4h3l7 5V5L6 10z M16 8.5a5 5 0 0 1 0 7 M18.5 6a8.5 8.5 0 0 1 0 12',
 };
 export function Glyph({ name }: { name: string }) {

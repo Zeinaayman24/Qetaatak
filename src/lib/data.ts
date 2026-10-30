@@ -43,6 +43,25 @@ export const ago = (iso: string) => {
   return 'من ' + ar(Math.round(h / 24)) + ' يوم';
 };
 
+/** A live stopwatch since `iso`: "٤٥ ث"، "١٢ د"، "١ س ٥ د"، "٢ يوم". */
+export const elapsed = (iso: string, now = Date.now()) => {
+  const sec = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+  if (sec < 60) return ar(sec) + ' ث';
+  const m = Math.floor(sec / 60);
+  if (m < 60) return ar(m) + ' د';
+  const h = Math.floor(m / 60);
+  if (h < 24) return ar(h) + ' س' + (m % 60 ? ' ' + ar(m % 60) + ' د' : '');
+  return ar(Math.floor(h / 24)) + ' يوم';
+};
+export const minutesSince = (iso: string, now = Date.now()) => (now - new Date(iso).getTime()) / 60000;
+
+/** How fast a shop usually answers, for the customer. */
+export const replyLabel = (min: number | null | undefined) =>
+  min == null ? 'محل جديد' : min <= 1 ? 'بيرد في دقيقة' : min < 60 ? `بيرد في ${ar(min)} د` : `بيرد في ${ar(Math.round(min / 60))} س`;
+
+/** What the customer sees about a shop that sent an offer. */
+export type ShopCard = { id: string; name: string; area: string; rating: number | null; ratings: number; sales: number; reply_min: number | null };
+
 export const validPhone = (p: string) => /^01\d{9}$/.test(p.replace(/\s/g, ''));
 export const validPostal = (p: string) => p.trim() === '' || /^\d{5}$/.test(toLatin(p.trim()));
 /** Converts Arabic-Indic digits typed on Arabic keyboards to 0-9. */

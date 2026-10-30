@@ -20,10 +20,11 @@ export default function Chat() {
   const { data, loading } = useLive(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', request).maybeSingle()) as Request | null;
     const sh = must(await supabase.from('shops').select('*').eq('id', shop).maybeSingle()) as Shop | null;
+    const name = ((await supabase.rpc('shop_cards', { p_shops: [shop] })).data as { name: string }[] | null)?.[0]?.name ?? null;
     const msgs = must(await supabase.from('messages').select('*').eq('request_id', request).eq('shop_id', shop).order('created_at')) as Message[];
     const offers = ((await supabase.from('quotes').select('id, price').eq('request_id', request).eq('shop_id', shop).order('price')).data ?? []) as { id: string; price: number }[];
     const chosen = offers.find((q) => req && q.id === req.chosen_quote_id);
-    return { req, sh, msgs, quote: chosen ?? offers[0] ?? null, offers: offers.length, deal: !!chosen };
+    return { req, sh, name, msgs, quote: chosen ?? offers[0] ?? null, offers: offers.length, deal: !!chosen };
   }, ['messages'], [request, shop]);
 
   // opening the chat (and every new message while it is open) marks it as read for the messages tab
@@ -34,7 +35,7 @@ export default function Chat() {
   if (loading && !data) return <Screen><Loading /></Screen>;
   const r = data?.req;
   const iAmShop = uid === shop;
-  const title = iAmShop ? 'العميل' : 'محل في ' + (data?.sh?.area ?? '');
+  const title = iAmShop ? 'عميل في ' + (data?.req?.area ?? '') : data?.name ?? 'محل في ' + (data?.sh?.area ?? '');
   const back = () => (router.canGoBack() ? router.back() : router.replace('/messages'));
 
   async function send(photo?: string, preset?: string) {

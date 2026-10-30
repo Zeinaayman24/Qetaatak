@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { FILLED, LINE } from './icons';
-import { colors, fonts, lift, liftStrong, radius } from '@/lib/theme';
+import { colors, fontWeights, fonts, lift, liftStrong, radius } from '@/lib/theme';
 
 /* ---------------------------------------------------------------- text */
 type W = 'regular' | 'medium' | 'semibold' | 'bold' | 'display';
@@ -18,7 +18,7 @@ export function T({ children, w = 'regular', size = 15, color = colors.ink, cent
 }) {
   return (
     <Text selectable={selectable} numberOfLines={numberOfLines}
-      style={[{ fontFamily: fonts[w], fontSize: size, color, lineHeight: Math.round(size * 1.55), writingDirection: 'rtl' }, center && { textAlign: 'center' }, style]}>
+      style={[{ fontFamily: fonts[w], fontWeight: fontWeights[w], fontSize: size, color, lineHeight: Math.round(size * 1.55), writingDirection: 'rtl' }, center && { textAlign: 'center' }, style]}>
       {children}
     </Text>
   );

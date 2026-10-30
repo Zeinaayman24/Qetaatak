@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
 import { SHOP_STATUS, SHOP_TYPE, date, memberId } from '../lib';
+import { mins, useSpeed } from './Speed';
 
 export default function Shops() {
   const { all } = useData();
   const nav = useNavigate();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const { data: speed } = useSpeed();
+  const sp = Object.fromEntries((speed ?? []).map((x) => [x.shop_id, x]));
   const shops = Object.values(all.shops).sort((a, b) => (a.status === 'pending' ? -1 : 0) - (b.status === 'pending' ? -1 : 0) || b.created_at.localeCompare(a.created_at));
   const n = q.trim().toLowerCase();
   const shown = shops.filter((s) => {
@@ -28,7 +31,7 @@ export default function Shops() {
       </div>
       <div className="panel flush">
         <table className="table clickable">
-          <thead><tr><th>رقم المحل</th><th>المحل</th><th>صاحبه</th><th>الموبايل</th><th>المنطقة</th><th>النوع</th><th>عروض</th><th>مبيعات</th><th>تقييم</th><th>الحالة</th><th>من</th></tr></thead>
+          <thead><tr><th>رقم المحل</th><th>المحل</th><th>صاحبه</th><th>الموبايل</th><th>المنطقة</th><th>النوع</th><th>بيرد في</th><th>عروض</th><th>مبيعات</th><th>تقييم</th><th>الحالة</th><th>من</th></tr></thead>
           <tbody>
             {shown.map((s) => {
               const p = all.priv[s.id]; const st = stats(s.id);
@@ -39,6 +42,7 @@ export default function Shops() {
                   <td className="mono" dir="ltr">{p?.phone}</td>
                   <td>{s.area}، {s.governorate}</td>
                   <td className="small">{SHOP_TYPE[s.shop_type]}{s.offers_delivery ? ' · بيوصّل' : ''}</td>
+                  <td><strong>{mins(sp[s.id]?.median_min)}</strong>{sp[s.id]?.waiting ? <div className="small muted">{sp[s.id].waiting} مستني ردّه</div> : null}</td>
                   <td>{st.quotes}</td><td>{st.sales}</td><td>{st.rating}</td>
                   <td><Pill tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'bad'}>{SHOP_STATUS[s.status]}</Pill>{all.byId[s.id]?.is_blocked ? <> <Pill tone="bad">محظور</Pill></> : null}</td>
                   <td className="small muted">{date(s.created_at)}</td>

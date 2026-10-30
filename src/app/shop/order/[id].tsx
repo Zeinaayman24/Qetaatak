@@ -1,6 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
+import { ReceiptButton } from '@/components/ReceiptButton';
 import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
@@ -130,6 +131,8 @@ export default function ShopOrder() {
         <Muted size={12}>اكتب رقم الأوردر {orderNo(o.order_no)} على الكيس.</Muted>
       </Card>
 
+      {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
+
       {c && o.status !== 'cancelled' ? (
         <Card>
           <Row gap={12}>
@@ -153,7 +156,7 @@ export default function ShopOrder() {
           {o.rating ? <Row gap={3}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={18} color={o.rating! >= n ? colors.accent : colors.line} />)}</Row> : null}
           {o.review ? <T size={14}>«{o.review}»</T> : null}
         </Card>
-      ) : o.status !== 'preparing' && o.status !== 'cancelled' ? <Muted center>مستنيين العميل يأكد إنه استلم الأوردر.</Muted> : null}
+      ) : o.status !== 'preparing' && o.status !== 'cancelled' ? <Muted center>بعد ما تسلّم، اكتب كود الاستلام اللي مع العميل عشان الأوردر يتقفل.</Muted> : null}
     </Screen>
   );
 }

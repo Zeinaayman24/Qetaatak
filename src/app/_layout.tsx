@@ -1,7 +1,7 @@
-import { ReadexPro_400Regular } from '@expo-google-fonts/readex-pro/400Regular';
-import { ReadexPro_500Medium } from '@expo-google-fonts/readex-pro/500Medium';
-import { ReadexPro_600SemiBold } from '@expo-google-fonts/readex-pro/600SemiBold';
-import { ReadexPro_700Bold } from '@expo-google-fonts/readex-pro/700Bold';
+import { NotoNaskhArabic_400Regular } from '@expo-google-fonts/noto-naskh-arabic/400Regular';
+import { NotoNaskhArabic_500Medium } from '@expo-google-fonts/noto-naskh-arabic/500Medium';
+import { NotoNaskhArabic_600SemiBold } from '@expo-google-fonts/noto-naskh-arabic/600SemiBold';
+import { NotoNaskhArabic_700Bold } from '@expo-google-fonts/noto-naskh-arabic/700Bold';
 import { Alexandria_900Black } from '@expo-google-fonts/alexandria/900Black';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
@@ -20,7 +20,7 @@ if (Platform.OS !== 'web' && !I18nManager.isRTL) {
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    ReadexPro_400Regular, ReadexPro_500Medium, ReadexPro_600SemiBold, ReadexPro_700Bold, Alexandria_900Black,
+    NotoNaskhArabic_400Regular, NotoNaskhArabic_500Medium, NotoNaskhArabic_600SemiBold, NotoNaskhArabic_700Bold, Alexandria_900Black,
   });
 
   useEffect(() => {

@@ -83,7 +83,7 @@ export default function ShopSetup() {
     <Screen footer={<><ErrorText text={err} /><Btn title={shop ? 'حفظ' : 'ابعت المحل للمراجعة'} onPress={save} loading={busy} /></>}>
       <BackBar title={shop ? 'بيانات المحل' : 'سجّل محلك'} onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       {shop?.status === 'pending' ? <Notice>محلك تحت المراجعة. تقدر تعدّل البيانات لحد ما نوافق.</Notice>
-        : !shop ? <Muted size={14}>بنراجع كل محل قبل ما يبدأ يستقبل طلبات. اسم المحل وأرقامه وعنوانه بالتفصيل بيظهروا للعميل بس بعد ما يختار عرضك.</Muted> : null}
+        : !shop ? <Muted size={14}>بنراجع كل محل قبل ما يبدأ يستقبل طلبات. اسم المحل بيظهر للعميل مع عروضك. أرقامك وعنوانك بالتفصيل بيظهروا بس بعد ما العميل يأكد الأوردر، وبيانات العميل كمان بتظهرلك بعد التأكيد.</Muted> : null}
 
       <Section title="المحل">
         <View style={{ gap: 14, marginTop: 8 }}>

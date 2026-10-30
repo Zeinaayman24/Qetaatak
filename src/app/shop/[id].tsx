@@ -4,8 +4,8 @@ import { ScrollView, View } from 'react-native';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, URGENCY, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel } from '@/lib/data';
-import { must, useLive } from '@/lib/live';
+import { CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel, elapsed, minutesSince } from '@/lib/data';
+import { must, useLive, useNow } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
@@ -65,7 +65,7 @@ export default function ShopRequest() {
   const offers = data!.offers;
   const approved = shop?.status === 'approved';
   const extras = [
-    r.side ? 'الجهة: ' + SIDES[r.side] : '', r.urgency !== 'normal' ? URGENCY[r.urgency] : '',
+    r.side ? 'الجهة: ' + SIDES[r.side] : '',
     r.budget ? 'ميزانية العميل ' + money(r.budget) + ' ج.م' : '', r.vin ? 'شاسيه ' + r.vin : '',
   ].filter(Boolean);
 
@@ -199,6 +199,7 @@ export default function ShopRequest() {
   return (
     <Screen header={header} footer={footer}>
       <BackBar title={'طلب ' + reqNo((data!.sibs[0]?.r ?? r).num)} onBack={back} />
+      {r.status === 'open' && !data!.offers.length && !data!.declined ? <WaitTimer since={r.created_at} /> : null}
       {data!.sibs.length > 1 ? (
         <View style={{ gap: 8 }}>
           <Muted size={12.5}>العميل طالب {ar(data!.sibs.length)} قطع؛ سعّر اللي عندك منهم.</Muted>
@@ -224,7 +225,7 @@ export default function ShopRequest() {
           <Muted>عايزها {WANTED[r.wanted_condition]}، {r.area}، {ago(r.created_at)}</Muted>
         </View>
       </Row>
-      {extras.length ? <Row gap={6} style={{ flexWrap: 'wrap' }}>{extras.map((e) => <Pill key={e} label={e} tone={e === URGENCY.urgent ? 'wait' : 'plain'} />)}</Row> : null}
+      {extras.length ? <Row gap={6} style={{ flexWrap: 'wrap' }}>{extras.map((e) => <Pill key={e} label={e} tone="plain" />)}</Row> : null}
       {r.notes ? <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.line }}><Muted size={12}>ملاحظة العميل</Muted><T size={14}>{r.notes}</T></View> : null}
       {approved && (st === 'open' || st === 'quoted' || st === 'declined' || st === 'sold') ? (
         <Btn kind="secondary" title="رسالة للعميل" onPress={() => router.push(`/chat/${r.id}/${uid}`)} />
@@ -241,5 +242,20 @@ export default function ShopRequest() {
         </View>
       </Sheet>
     </Screen>
+  );
+}
+
+/** The customer has been waiting this long: a live stopwatch that turns red after 15 minutes. */
+function WaitTimer({ since }: { since: string }) {
+  const now = useNow(1000);
+  const slow = minutesSince(since, now) >= 15;
+  return (
+    <Row gap={10} style={{ backgroundColor: slow ? colors.badSoft : colors.ink, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10 }}>
+      <Icon name="time" size={20} color={slow ? colors.bad : colors.accent} />
+      <View style={{ flex: 1 }}>
+        <T w="bold" size={14} color={slow ? colors.bad : '#fff'}>العميل مستني ردّك من {elapsed(since, now)}</T>
+        <T size={12} color={slow ? colors.bad : 'rgba(255,255,255,.7)'}>ابعت السعر أو قول مش متوفرة؛ سرعة ردّك بتظهر للعميل.</T>
+      </View>
+    </Row>
   );
 }

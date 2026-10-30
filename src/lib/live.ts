@@ -42,3 +42,10 @@ export function must<T>(res: { data: T | null; error: any }): T {
   if (res.error) throw res.error;
   return res.data as T;
 }
+
+/** Re-renders every `ms` so stopwatches tick. */
+export function useNow(ms = 1000) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  return now;
+}

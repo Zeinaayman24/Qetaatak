@@ -12,10 +12,13 @@ export default function Favorites() {
   const { ready, session } = useAuth();
   const uid = session?.user.id;
   const { data, loading } = useLive(async () => {
-    if (!uid) return [] as Shop[];
+    if (!uid) return [] as (Shop & { name?: string })[];
     const favs = must(await supabase.from('favorites').select('shop_id').eq('customer_id', uid)) as { shop_id: string }[];
-    if (!favs.length) return [] as Shop[];
-    return must(await supabase.from('shops').select('*').in('id', favs.map((f) => f.shop_id))) as Shop[];
+    if (!favs.length) return [] as (Shop & { name?: string })[];
+    const ids = favs.map((f) => f.shop_id);
+    const shops = must(await supabase.from('shops').select('*').in('id', ids)) as Shop[];
+    const names = Object.fromEntries((((await supabase.rpc('shop_cards', { p_shops: ids })).data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
+    return shops.map((s) => ({ ...s, name: names[s.id] as string | undefined }));
   }, ['shops'], [uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
@@ -28,8 +31,8 @@ export default function Favorites() {
           {list.map((s, i) => (
             <ListRow key={s.id} last={i === list.length - 1} onPress={() => router.push(`/shop-profile/${s.id}`)}
               leading={<View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront-outline" size={22} /></View>}
-              title={'محل في ' + s.area}
-              subtitle={`${s.governorate}، ${SHOP_TYPES[s.shop_type]}`}
+              title={s.name ?? 'محل في ' + s.area}
+              subtitle={`${s.area}، ${s.governorate}، ${SHOP_TYPES[s.shop_type]}`}
               meta={s.brands.join('، ')} />
           ))}
         </View>

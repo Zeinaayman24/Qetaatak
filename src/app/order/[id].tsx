@@ -2,7 +2,8 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Platform, View } from 'react-native';
 import { PaymentPanel } from '@/components/Payment';
-import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, T, toast } from '@/components/ui';
+import { ReceiptButton } from '@/components/ReceiptButton';
+import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   CONDITIONS, MATCH_HOURS, ORDER_LABEL, ORDER_STEP_NAME, warrantyLabel, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
@@ -17,7 +18,7 @@ type Data = { order: Order | null; parts: Request[]; quotes: Quote[]; shop: Shop
 
 /** One order with one shop: live status, the shop, the parts, the receipt and the warranty. */
 export default function OrderPage() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, done } = useLocalSearchParams<{ id: string; done?: string }>();
   const { ready, session } = useAuth();
   const [busy, setBusy] = useState(false);
   const [stars, setStars] = useState(0);
@@ -97,6 +98,14 @@ export default function OrderPage() {
           </Row>
         ) : null}
       </View>
+
+      {done && o.status !== 'cancelled' ? (
+        <Row gap={10} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 14 }}>
+          <Icon name="checkmark-circle" size={24} color={colors.good} />
+          <View style={{ flex: 1 }}><T w="bold" size={15}>الأوردر اتأكد مع المحل</T><Muted size={12.5}>إيصالك جاهز، حمّله من تحت.</Muted></View>
+        </Row>
+      ) : null}
+      {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
 
       {data!.code && o.status !== 'received' && o.status !== 'cancelled' ? (
         <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.primary, padding: 16, gap: 8, alignItems: 'center' }}>

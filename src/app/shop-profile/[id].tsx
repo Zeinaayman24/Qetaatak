@@ -3,13 +3,13 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { BackBar, Chips, Empty, Icon, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { SHOP_TYPES, ago, ar, friendlyError } from '@/lib/data';
+import { SHOP_TYPES, ago, ar, friendlyError, replyLabel } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 
 type Profile = {
-  shop: { id: string; area: string; governorate: string; shop_type: string; specialties: string[]; brands: string[]; offers_delivery: boolean; since: string } | null;
+  shop: { id: string; area: string; governorate: string; shop_type: string; specialties: string[]; brands: string[]; offers_delivery: boolean; since: string; name?: string; reply_min?: number | null } | null;
   sales: number; rating: number | null; ratings: number;
   reviews: { rating: number; review: string; part: string; at: string; first_name: string }[];
 };
@@ -48,7 +48,8 @@ export default function ShopProfile() {
           <Icon name="storefront" size={30} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <T w="bold" size={20}>محل في {s.area}</T>
+          <T w="bold" size={20}>{s.name ?? 'محل في ' + s.area}</T>
+          <Muted size={13}>{s.area}، {replyLabel(s.reply_min)}</Muted>
           {isFeatured({ featured_until: data?.featured }) ? <Pill label="محل مميز" icon="star" tone="wait" /> : null}
           <Muted>{s.governorate}، {SHOP_TYPES[s.shop_type]}</Muted>
           <Row gap={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>

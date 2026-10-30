@@ -1,13 +1,14 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { BottomNav, Logo, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { Icon, Loading, Muted, Plate, Press, Row, Screen, Section, T } from '@/components/ui';
 import { InstallCard } from '@/components/InstallCard';
+import { OrderRow, RowList } from '@/components/OrderRows';
 import { AdBanner } from '@/components/AdBanner';
 import { useAuth } from '@/lib/auth';
-import { ORDER_LABEL, ar, groupRequests, orderNo, orderStep, orderSteps, orderTitle, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
+import { ar, groupRequests, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
@@ -44,6 +45,9 @@ export default function CustomerHome() {
   const newReq = (part?: string) => router.push(part ? { pathname: '/customer/new', params: { part } } : '/customer/new');
   const groups = groupRequests((data?.reqs ?? []).filter((r) => r.status === 'open')).slice(0, 6);
   const orders = data?.orders ?? [];
+  const offersIn = (g: (typeof groups)[number]) => (data?.quotes ?? []).filter((q) => g.items.some((r) => r.id === q.request_id && r.status === 'open')).length;
+  const hot = groups.map((g) => ({ g, n: offersIn(g) })).filter((x) => x.n > 0);
+  const waiting = groups.filter((g) => !offersIn(g));
 
   const hero = (
     <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, paddingBottom: 64 }}>
@@ -70,8 +74,29 @@ export default function CustomerHome() {
 
   return (
     <Screen top={hero} nav={<BottomNav role="customer" />}>
+      {/* offers waiting: the first thing the customer sees */}
+      {hot.length ? (
+        <View style={{ marginTop: -60, gap: 8 }}>
+          {hot.slice(0, 3).map(({ g, n }) => (
+            <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)} label="شوف العروض"
+              style={[lift, { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.lime, borderRadius: 18, padding: 14 }]}>
+              <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+                <T w="bold" size={19} color={colors.lime} style={{ lineHeight: 26 }}>{ar(n)}</T>
+              </View>
+              <View style={{ flex: 1 }}>
+                <T w="bold" size={16} color={colors.ink}>{n > 1 ? `${ar(n)} عروض وصلتك` : 'وصلك عرض'}</T>
+                <T size={13} color={colors.ink} numberOfLines={1}>على {partsLabel(g.items.filter((r) => r.status === 'open'))}، اختار دلوقتي</T>
+              </View>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="chevron-back" size={18} color={colors.lime} />
+              </View>
+            </Press>
+          ))}
+        </View>
+      ) : null}
+
       {/* car + categories card overlapping the hero */}
-      <View style={[lift, { marginTop: -60, backgroundColor: colors.surface, borderRadius: 20, padding: 16, gap: 16 }]}>
+      <View style={[lift, { marginTop: hot.length ? 0 : -60, backgroundColor: colors.surface, borderRadius: 20, padding: 16, gap: 16 }]}>
         <Press onPress={() => router.push('/cars')} label="غيّر العربية" style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Plate top={profile.car_model || '—'} bottom={ar(profile.car_year ?? '')} size="sm" />
           <View style={{ flex: 1 }}>
@@ -97,50 +122,29 @@ export default function CustomerHome() {
 
       {orders.length ? (
         <Section title="أوردراتك" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>
-          {orders.slice(0, 3).map((o) => {
-            const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
-            const steps = orderSteps(o.delivery_mode); const at = orderStep(o);
-            return (
-              <Press key={o.id} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}
-                style={[lift, { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 12 }]}>
-                <Row gap={12}>
-                  <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name={ORDER_LABEL[o.status].icon} size={22} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <T w="bold" size={15}>{needsPayment(o) ? 'فاضل تدفع' : orderTitle(o)}</T>
-                    <T size={12.5} color={colors.muted} numberOfLines={1}>{orderNo(o.order_no)}{ps.length ? '، ' + partsLabel(ps) : ''}</T>
-                  </View>
-                  <Icon name="chevron-back" size={18} color={colors.faint} />
-                </Row>
-                <Row gap={4}>{steps.map((st, i) => <View key={st} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: i <= at ? colors.primary : colors.soft }} />)}</Row>
-              </Press>
-            );
-          })}
+          <RowList>
+            {orders.slice(0, 3).map((o, i) => {
+              const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
+              return <OrderRow key={o.id} o={o} first={i === 0} title={ps.length ? partsLabel(ps) : 'أوردر'}
+                flag={needsPayment(o) ? { label: 'ادفع', tone: 'wait' } : undefined}
+                onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })} />;
+            })}
+          </RowList>
         </Section>
       ) : null}
 
-      {groups.length ? (
-        <Section title="عروض الأسعار" action={{ label: 'الكل', onPress: () => router.push({ pathname: '/customer/requests', params: { tab: 'quotes' } }) }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 6, paddingHorizontal: 2 }} style={{ marginHorizontal: -2 }}>
-            {groups.map((g) => {
-              const n = data!.quotes.filter((q) => g.items.some((r) => r.id === q.request_id)).length;
-              return (
-                <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)}
-                  style={[lift, { width: 240, backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 10, borderWidth: n ? 1.5 : 1, borderColor: n ? colors.primary : colors.line }]}>
-                  <Row style={{ justifyContent: 'space-between' }}>
-                    <Plate top="طلب" bottom={reqNo(g.first.num).replace('#', '')} size="sm" />
-                    {g.items.length > 1 ? <View style={{ backgroundColor: colors.soft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 }}><T size={11.5} w="semibold">{ar(g.items.length)} قطع</T></View> : null}
-                  </Row>
-                  <T w="bold" size={15} numberOfLines={1}>{partsLabel(g.items)}</T>
-                  <Row gap={6}>
-                    <Icon name={n ? 'pricetags' : 'time'} size={16} color={n ? colors.primary : colors.muted} />
-                    <T size={12.5} w="semibold" color={n ? colors.primary : colors.muted}>{n ? `${ar(n)} عروض مستنياك` : 'بندوّر عند المحلات'}</T>
-                  </Row>
-                </Press>
-              );
-            })}
-          </ScrollView>
+      {waiting.length ? (
+        <Section title="مستنيين عروض" action={{ label: 'الكل', onPress: () => router.push({ pathname: '/customer/requests', params: { tab: 'quotes' } }) }}>
+          <RowList>
+            {waiting.map((g, i) => (
+              <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)} label={partsLabel(g.items)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
+                <T w="bold" size={13.5} color={colors.muted}>{reqNo(g.first.num)}</T>
+                <T w="bold" size={15} numberOfLines={1} style={{ flex: 1 }}>{partsLabel(g.items)}</T>
+                <Row gap={3}><Icon name="time-outline" size={13} color={colors.muted} /><Muted size={12.5}>بندوّر</Muted></Row>
+              </Press>
+            ))}
+          </RowList>
         </Section>
       ) : null}
 
