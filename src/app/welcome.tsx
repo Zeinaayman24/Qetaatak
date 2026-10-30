@@ -10,7 +10,7 @@ export default function Welcome() {
   if (ready && !session) return <Redirect href="/login" />;
   const option = (icon: string, title: string, sub: string, href: '/profile' | '/shop-setup', dark: boolean) => (
     <Press onPress={() => router.push(href)}
-      style={[{ backgroundColor: dark ? colors.ink : colors.surface, borderRadius: 26, padding: 22, gap: 18 }, lift]}>
+      style={[{ backgroundColor: dark ? colors.ink : colors.surface, borderRadius: 18, padding: 22, gap: 18 }, lift]}>
       <Row style={{ justifyContent: 'space-between' }}>
         <View style={{ width: 60, height: 60, borderRadius: 20, backgroundColor: dark ? colors.accent : colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
           <Icon set="mci" name={icon} size={30} color={colors.ink} />

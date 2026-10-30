@@ -165,7 +165,7 @@ export default function NewRequest() {
               <T w="bold" size={28} style={{ lineHeight: 38, letterSpacing: -0.4 }}>تفاصيل القطع</T>
               <Muted size={14} style={{ marginTop: -10 }}>كل ما التفاصيل أوضح، السعر أدق. الصورة بتفرق جداً.</Muted>
               {items.map((it, i) => (
-                <View key={it.key} style={[{ backgroundColor: colors.surface, borderRadius: 24, padding: 16, gap: 14 }, lift]}>
+                <View key={it.key} style={[{ backgroundColor: colors.surface, borderRadius: 18, padding: 16, gap: 14 }, lift]}>
                   <Row gap={10}>
                     <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}><T size={12} w="bold" style={{ lineHeight: 16 }}>{ar(i + 1)}</T></View>
                     <T w="bold" size={17} style={{ flex: 1 }}>{it.part}</T>
@@ -199,7 +199,7 @@ export default function NewRequest() {
                   const on = c.key === car.key;
                   return (
                     <Press key={c.key} onPress={() => setCarKey(c.key)} selected={on}
-                      style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surface, borderRadius: 20, padding: 14, borderWidth: 2, borderColor: on ? colors.ink : 'transparent' }, lift]}>
+                      style={[lift, { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.surface, borderRadius: 20, padding: 14, borderWidth: 2, borderColor: on ? colors.ink : colors.line }]}>
                       <Plate top={c.model || '—'} bottom={ar(c.year)} />
                       <View style={{ flex: 1 }}><T w="semibold" size={15}>{c.make} {c.model}</T>{c.vin ? <Muted size={12}>شاسيه {c.vin}</Muted> : null}</View>
                       <Icon name={on ? 'radio-button-on' : 'radio-button-off'} size={22} color={on ? colors.ink : colors.faint} />
@@ -225,7 +225,7 @@ export default function NewRequest() {
           ) : (
             <>
               <T w="bold" size={28} style={{ lineHeight: 38, letterSpacing: -0.4 }}>راجع طلبك</T>
-              <View style={[{ backgroundColor: colors.surface, borderRadius: 24, overflow: 'hidden' }, lift]}>
+              <View style={[{ backgroundColor: colors.surface, borderRadius: 18, overflow: 'hidden' }, lift]}>
                 <View style={{ backgroundColor: colors.ink, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <Plate top={car.model || '—'} bottom={ar(car.year)} size="sm" />
                   <View style={{ flex: 1 }}>

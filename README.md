@@ -115,3 +115,20 @@ A request can hold several parts (a basket). Each part is its own row in `reques
 - Mark: a gear (parts) around a button being pressed, with speed lines. Vector source in `assets/brand/mark.svg` (on navy) and `mark-light.svg` (on white); in the app it is `Mark` / `Logo` / `AppIcon` in `src/components/Brand.tsx`.
 - Colours: navy `#041D3F` (brand, text, primary buttons), sky `#0AABFE` (call to action), lime `#7CD035` (the "tap" accent). Tokens live in `src/lib/theme.ts` and `manage/src/styles.css`.
 - Type: Alexandria Black for the wordmark, Readex Pro for everything else.
+
+## Payments
+
+The customer picks how to pay on the checkout screen, before the order is confirmed:
+
+| Method | Flow |
+| --- | --- |
+| Cash on delivery | `unpaid` → `paid` automatically when the customer taps "استلمت الأوردر" |
+| Pay at the shop | only for pickup orders; same as cash |
+| InstaPay / wallet | `awaiting` → customer uploads the receipt (private `receipts` bucket) → `review` → staff confirm in **Management › المدفوعات** → `paid` (or `failed` with a reason, and the customer re-uploads) |
+| Card (Paymob) | `awaiting` → Paymob unified checkout → webhook → `paid` / `failed` |
+
+Shops can't move an InstaPay/card order past "preparing" until it is paid. A paid online order that is cancelled becomes `refund_due`, and staff record the refund.
+
+Database: `orders.payment_*` columns, `place_order`, `submit_payment_proof`, `review_payment`, `mark_refunded`, `set_setting` (migration `20261030000011_payments.sql`). The company's InstaPay / wallet details live in `app_settings` and are edited by admins on the Payments page.
+
+**Switching on card payments:** create a Paymob merchant account (Egypt), then in Supabase › Edge Functions › Secrets set `PAYMOB_SECRET_KEY`, `PAYMOB_PUBLIC_KEY`, `PAYMOB_HMAC` and `PAYMOB_INTEGRATION_IDS` (your card / wallet integration ids, comma separated). In the Paymob dashboard set the transaction processed callback to `https://ztnbyvfupadzhddnbdje.supabase.co/functions/v1/paymob`. The card option appears in the app on its own once the secrets are set.

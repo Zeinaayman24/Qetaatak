@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { FILLED, LINE } from './icons';
 import { colors, fonts, lift, liftStrong, radius } from '@/lib/theme';
 
 /* ---------------------------------------------------------------- text */
@@ -72,7 +73,7 @@ export function Screen({ children, header, footer, nav, top }: { children: React
         <View style={[s.column, s.body, { paddingBottom: nav ? 120 : footer ? 28 : insets.bottom + 40 }]}>{children}</View>
       </ScrollView>
       {footer ? (
-        <View style={[{ backgroundColor: colors.surface, paddingBottom: insets.bottom + 12, paddingTop: 12, borderTopLeftRadius: 24, borderTopRightRadius: 24 }, liftStrong]}>
+        <View style={{ backgroundColor: colors.surface, paddingBottom: insets.bottom + 12, paddingTop: 12, borderTopWidth: 1, borderColor: colors.line }}>
           <View style={[s.column, { gap: 8 }]}>{footer}</View>
         </View>
       ) : null}
@@ -87,10 +88,17 @@ export function Screen({ children, header, footer, nav, top }: { children: React
 }
 
 type IconSet = 'ion' | 'mci';
-/** Icons: Ionicons for interface, MaterialCommunityIcons for car parts. */
-export function Icon({ name, size = 22, color = colors.ink, set = 'ion' }: { name: string; size?: number; color?: string; set?: IconSet }) {
-  const C: any = set === 'mci' ? MaterialCommunityIcons : Ionicons;
-  return <C name={name} size={size} color={color} />;
+/**
+ * Icons: clean line icons (Lucide) for the interface, MaterialCommunityIcons for car parts.
+ * Screens keep using Ionicons-style names; "-outline" is ignored because every interface icon is a line icon.
+ */
+export function Icon({ name, size = 22, color = colors.ink, set = 'ion', stroke }: { name: string; size?: number; color?: string; set?: IconSet; stroke?: number }) {
+  if (set === 'mci') return <MaterialCommunityIcons name={name as any} size={size} color={color} />;
+  const outline = name.endsWith('-outline');
+  const base = outline ? name.slice(0, -8) : name;
+  const L = LINE[base];
+  if (L) return <L size={size} color={color} strokeWidth={stroke ?? (size <= 16 ? 2.2 : 1.9)} fill={!outline && FILLED.has(base) ? color : 'none'} />;
+  return <Ionicons name={name as any} size={size} color={color} />;
 }
 
 export function Row({ children, style, gap = 10 }: { children: ReactNode; style?: StyleProp<ViewStyle>; gap?: number }) {
@@ -108,8 +116,8 @@ export function Section({ title, note, action, children }: { title: string; note
   return (
     <View style={{ gap: 10 }}>
       <Row style={{ justifyContent: 'space-between' }}>
-        <T w="bold" size={18}>{title}</T>
-        {action ? <Pressable onPress={action.onPress} hitSlop={8}><T size={13} w="medium" color={colors.accentDeep}>{action.label}</T></Pressable>
+        <T w="bold" size={17}>{title}</T>
+        {action ? <Pressable onPress={action.onPress} hitSlop={8} accessibilityRole="link"><Row gap={2}><T size={13} w="semibold" color={colors.primary}>{action.label}</T><Icon name="chevron-back" size={14} color={colors.primary} /></Row></Pressable>
           : note ? <Muted>{note}</Muted> : null}
       </Row>
       {children}
@@ -140,21 +148,22 @@ export function ListRow({ title, subtitle, meta, leading, trailing, onPress, las
 export function IconButton({ name, onPress, label, tone = 'white', size = 42, set }: {
   name: string; onPress: () => void; label: string; tone?: 'white' | 'ink' | 'clear'; size?: number; set?: IconSet;
 }) {
-  const bg = tone === 'ink' ? colors.ink : tone === 'clear' ? 'rgba(255,255,255,.22)' : colors.surface;
+  const bg = tone === 'ink' ? colors.ink : tone === 'clear' ? 'rgba(255,255,255,.12)' : colors.surface;
   return (
     <Press onPress={onPress} label={label} hitSlop={6}
-      style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }, tone === 'white' && lift]}>
-      <Icon name={name} set={set} size={Math.round(size * 0.48)} color={tone === 'ink' ? '#fff' : colors.ink} />
+      style={[{ width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: bg, alignItems: 'center', justifyContent: 'center' },
+        tone === 'white' && { borderWidth: 1, borderColor: colors.line }, tone === 'clear' && { borderWidth: 1, borderColor: 'rgba(255,255,255,.14)' }]}>
+      <Icon name={name} set={set} size={Math.round(size * 0.46)} color={tone === 'white' ? colors.ink : '#fff'} />
     </Press>
   );
 }
 
 export function BackBar({ title, onBack, right }: { title: string; onBack: () => void; right?: ReactNode }) {
   return (
-    <Row style={{ marginBottom: 2 }} gap={12}>
-      <IconButton name="chevron-forward" onPress={onBack} label="رجوع" />
-      <T w="bold" size={21} style={{ flex: 1 }} numberOfLines={1}>{title}</T>
-      {right}
+    <Row style={{ marginBottom: 2, minHeight: 44 }} gap={12}>
+      <IconButton name="chevron-forward" onPress={onBack} label="رجوع" size={40} />
+      <T w="bold" size={17} center style={{ flex: 1 }} numberOfLines={1}>{title}</T>
+      <View style={{ minWidth: 40, alignItems: 'flex-end' }}>{right}</View>
     </Row>
   );
 }
@@ -186,8 +195,8 @@ export function Field({ label, value, onChangeText, placeholder, keyboardType, l
   return (
     <View style={{ gap: 6 }}>
       {label ? <T w="medium" size={13} color={colors.muted}>{label}</T> : null}
-      <View style={[s.inputBox, focus && { borderColor: colors.ink }, multiline && { alignItems: 'flex-start' }]}>
-        {icon ? <Icon name={icon} size={20} color={colors.faint} /> : null}
+      <View style={[s.inputBox, focus && { borderColor: colors.primary, backgroundColor: colors.surface }, multiline && { alignItems: 'flex-start' }]}>
+        {icon ? <Icon name={icon} size={19} color={focus ? colors.primary : colors.faint} /> : null}
         <TextInput
           value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.faint}
           keyboardType={keyboardType} secureTextEntry={secure} multiline={multiline}
@@ -210,10 +219,11 @@ export function Chips<V extends string | number>({ options, selected, onPick }: 
         const on = selected.includes(o.v);
         return (
           <Press key={String(o.v)} onPress={() => onPick(o.v)} selected={on}
-            style={[s.chip, on && { backgroundColor: colors.ink, borderColor: colors.ink }]}>
+            style={[s.chip, on && { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}>
             <Row gap={6}>
-              {o.icon ? <Icon name={o.icon} size={15} color={on ? '#fff' : colors.ink} /> : null}
-              <T size={13.5} w="medium" color={on ? colors.brandInk : colors.ink}>{o.label}</T>
+              {o.icon ? <Icon name={o.icon} size={15} color={on ? colors.primary : colors.muted} /> : null}
+              <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? colors.primary : colors.ink}>{o.label}</T>
+              {on ? <Icon name="checkmark" size={14} color={colors.primary} /> : null}
             </Row>
           </Press>
         );
@@ -230,7 +240,7 @@ export function Seg<V extends string | number>({ options, value, onPick }: { opt
         return (
           <Pressable key={String(o.v)} onPress={() => { tick(); onPick(o.v); }} accessibilityRole="button" accessibilityState={{ selected: on }}
             style={[s.segBtn, on && s.segOn]}>
-            <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? colors.ink : colors.muted} center>{o.label}</T>
+            <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? colors.primary : colors.muted} center>{o.label}</T>
           </Pressable>
         );
       })}
@@ -290,10 +300,10 @@ export function Select<V extends string | number>({ label, value, options, onPic
 /* ---------------------------------------------------------------- bits */
 type Tone = 'new' | 'good' | 'wait' | 'plain' | 'bad' | 'accent';
 export function Pill({ label, tone = 'plain', icon }: { label: string; tone?: Tone; icon?: string }) {
-  const bg = { new: colors.ink, good: colors.goodSoft, wait: colors.accentSoft, plain: colors.soft, bad: colors.badSoft, accent: colors.accent }[tone];
-  const fg = { new: colors.brandInk, good: colors.good, wait: '#00558A', plain: colors.muted, bad: colors.bad, accent: colors.ink }[tone];
+  const bg = { new: colors.primarySoft, good: colors.goodSoft, wait: colors.warnSoft, plain: colors.soft, bad: colors.badSoft, accent: colors.accent }[tone];
+  const fg = { new: colors.primary, good: colors.good, wait: colors.warn, plain: colors.muted, bad: colors.bad, accent: colors.ink }[tone];
   return (
-    <View style={{ backgroundColor: bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+    <View style={{ backgroundColor: bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       {icon ? <Icon name={icon} size={12} color={fg} /> : null}
       <T size={12} w="semibold" color={fg} style={{ lineHeight: 17 }}>{label}</T>
     </View>
@@ -301,16 +311,16 @@ export function Pill({ label, tone = 'plain', icon }: { label: string; tone?: To
 }
 
 export const Notice = ({ children, icon = 'information-circle' }: { children: ReactNode; icon?: string }) => (
-  <View style={{ backgroundColor: colors.accentSoft, borderRadius: radius.md, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
-    <Icon name={icon} size={20} color={colors.accentDeep} />
+  <View style={{ backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderWidth: 1, borderColor: '#D3E8FB' }}>
+    <Icon name={icon} size={20} color={colors.primary} />
     <View style={{ flex: 1, gap: 2 }}>{typeof children === 'string' ? <T size={14}>{children}</T> : children}</View>
   </View>
 );
 
 export const Empty = ({ text, icon = 'file-tray-outline', action }: { text: string; icon?: string; action?: { label: string; onPress: () => void } }) => (
   <View style={{ alignItems: 'center', paddingVertical: 36, gap: 12 }}>
-    <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', ...lift }}>
-      <Icon name={icon.length <= 2 ? 'file-tray-outline' : icon} size={30} color={colors.faint} />
+    <View style={{ width: 76, height: 76, borderRadius: 24, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+      <Icon name={icon.length <= 2 ? 'file-tray-outline' : icon} size={32} color={colors.primary} stroke={1.6} />
     </View>
     <Muted center size={14}>{text}</Muted>
     {action ? <Btn kind="small" title={action.label} onPress={action.onPress} style={{ alignSelf: 'center' }} /> : null}
@@ -356,7 +366,7 @@ export function PhotoPicker({ uri, onPick, hint }: { uri: string | null; onPick:
   return (
     <Press onPress={onPick} style={s.upload}>
       {uri ? <Image source={{ uri }} style={[s.photo, { width: 56, height: 56 }]} /> : (
-        <View style={[s.photo, { width: 56, height: 56, backgroundColor: colors.accentSoft }]}><Icon name="camera" size={24} color={colors.accentDeep} /></View>
+        <View style={[s.photo, { width: 56, height: 56, backgroundColor: colors.primarySoft }]}><Icon name="camera" size={24} color={colors.primary} /></View>
       )}
       <View style={{ flex: 1 }}>
         <T w="semibold" size={14}>{uri ? 'الصورة اتضافت' : 'ضيف صورة'}</T>
@@ -400,8 +410,8 @@ export function Steps({ items, current = -1 }: { items: string[]; current?: numb
         return (
           <Row key={i} style={{ alignItems: 'flex-start' }} gap={12}>
             <View style={{ alignItems: 'center', width: 26 }}>
-              <View style={[s.stepNum, (done || current < 0) && { backgroundColor: colors.ink }, now && { backgroundColor: colors.accent }]}>
-                {done ? <Icon name="checkmark" size={14} color="#fff" /> : <T w="bold" size={12} color={now ? colors.ink : current < 0 ? '#fff' : colors.faint}>{['١', '٢', '٣', '٤', '٥', '٦'][i]}</T>}
+              <View style={[s.stepNum, (done || current < 0) && { backgroundColor: colors.ink }, now && { backgroundColor: colors.primary }]}>
+                {done ? <Icon name="checkmark" size={14} color="#fff" /> : <T w="bold" size={12} color={now || current < 0 ? '#fff' : colors.faint}>{['١', '٢', '٣', '٤', '٥', '٦'][i]}</T>}
               </View>
               {i < items.length - 1 ? <View style={{ width: 2, height: 22, backgroundColor: done ? colors.ink : colors.line }} /> : null}
             </View>
@@ -468,45 +478,45 @@ export function ToastHost({ bottom }: { bottom: number }) {
   if (!msg) return null;
   return (
     <Animated.View pointerEvents="none" style={[s.toast, liftStrong, { bottom: insets.bottom + bottom, transform: [{ translateY: y }] }]} accessibilityLiveRegion="polite">
-      <Icon name="checkmark-circle" size={20} color={colors.accent} />
+      <Icon name="checkmark-circle" size={20} color={colors.lime} />
       <T color={colors.brandInk} w="medium" size={14} style={{ flex: 1 }}>{msg}</T>
     </Animated.View>
   );
 }
 
 /* ---------------------------------------------------------------- styles */
-const base: ViewStyle = { borderRadius: 16, minHeight: 56, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18 };
+const base: ViewStyle = { borderRadius: 14, minHeight: 54, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18 };
 const btnStyles: Record<Kind, { box: ViewStyle; color: string; size: number }> = {
-  primary: { box: { ...base, backgroundColor: colors.ink }, color: colors.brandInk, size: 16 },
-  accent: { box: { ...base, backgroundColor: colors.accent }, color: colors.ink, size: 16 },
-  dark: { box: { ...base, minHeight: 46, borderRadius: 14, backgroundColor: colors.ink }, color: colors.brandInk, size: 14.5 },
-  secondary: { box: { ...base, minHeight: 52, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.line }, color: colors.ink, size: 15 },
+  primary: { box: { ...base, backgroundColor: colors.primary }, color: colors.primaryInk, size: 16 },
+  accent: { box: { ...base, backgroundColor: colors.primary }, color: colors.primaryInk, size: 16 },
+  dark: { box: { ...base, minHeight: 46, borderRadius: 12, backgroundColor: colors.ink }, color: colors.brandInk, size: 14.5 },
+  secondary: { box: { ...base, minHeight: 50, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }, color: colors.ink, size: 15 },
   danger: { box: { ...base, minHeight: 48, backgroundColor: colors.badSoft }, color: colors.bad, size: 14 },
-  small: { box: { backgroundColor: colors.ink, borderRadius: radius.pill, paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'flex-start' }, color: colors.brandInk, size: 13 },
-  link: { box: { paddingVertical: 4, alignSelf: 'flex-start' }, color: colors.accentDeep, size: 13.5 },
+  small: { box: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, alignSelf: 'flex-start' }, color: colors.primaryInk, size: 13 },
+  link: { box: { paddingVertical: 4, alignSelf: 'flex-start' }, color: colors.primary, size: 13.5 },
 };
 
 const s = StyleSheet.create({
   column: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18 },
   body: { flexGrow: 1, paddingTop: 16, gap: 18 },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 16, gap: 12, ...lift },
-  inputBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 14 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.soft, borderWidth: 1.5, borderColor: colors.soft, borderRadius: radius.md, paddingHorizontal: 14 },
   input: { flex: 1, fontFamily: fonts.medium, fontSize: 16, color: colors.ink, paddingVertical: 13 },
-  chip: { borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
-  seg: { flexDirection: 'row', backgroundColor: colors.soft, borderRadius: radius.md, padding: 4, gap: 4 },
-  segBtn: { flex: 1, borderRadius: 11, paddingVertical: 10 },
-  segOn: { backgroundColor: colors.surface, ...lift },
+  chip: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  seg: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.md, padding: 4, gap: 4, borderWidth: 1, borderColor: colors.line },
+  segBtn: { flex: 1, borderRadius: 9, paddingVertical: 9 },
+  segOn: { backgroundColor: colors.primarySoft },
   backdrop: { flex: 1, backgroundColor: 'rgba(17,21,30,.4)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(17,21,30,.4)', justifyContent: 'flex-end', alignItems: 'center' },
-  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingTop: 10, width: '100%', maxWidth: 560 },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 10, width: '100%', maxWidth: 560 },
   grabber: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.line, alignSelf: 'center', marginBottom: 12 },
   option: { paddingVertical: 13, paddingHorizontal: 12, borderRadius: radius.sm, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  photo: { borderRadius: 14, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
-  upload: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: radius.lg, padding: 12, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.line, borderStyle: 'dashed' },
+  photo: { borderRadius: 12, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
+  upload: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: radius.lg, padding: 12, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: '#C9DDF2', borderStyle: 'dashed' },
   stepNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
   plate: { borderWidth: 2, borderColor: colors.ink, borderRadius: 7, overflow: 'hidden', backgroundColor: '#fff' },
   plateTop: { backgroundColor: colors.plate, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 7 },
-  toast: { position: 'absolute', left: 18, right: 18, alignSelf: 'center', maxWidth: 520, backgroundColor: colors.ink, borderRadius: 16, paddingVertical: 13, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  toast: { position: 'absolute', left: 18, right: 18, alignSelf: 'center', maxWidth: 520, backgroundColor: colors.ink, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
 });
 
 /* ---------------------------------------------------------------- slide to confirm */
@@ -517,7 +527,7 @@ const s = StyleSheet.create({
 export function SlideToConfirm({ label, onConfirm, busy }: { label: string; onConfirm: () => void; busy?: boolean }) {
   const [w, setW] = useState(0);
   const x = useRef(new Animated.Value(0)).current;
-  const knob = 56;
+  const knob = 52;
   const max = Math.max(0, w - knob - 8);
   const done = useRef(false);
   const pan = useRef(PanResponder.create({
@@ -540,11 +550,11 @@ export function SlideToConfirm({ label, onConfirm, busy }: { label: string; onCo
   return (
     <View onLayout={(e) => setW(e.nativeEvent.layout.width)} accessibilityRole="button" accessibilityLabel={label}
       accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={() => onConfirm()}
-      style={{ height: 64, borderRadius: 32, backgroundColor: colors.ink, justifyContent: 'center', overflow: 'hidden' }}>
-      <Animated.View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: fill, backgroundColor: colors.accent, borderRadius: 32 }} />
+      style={{ height: 60, borderRadius: 16, backgroundColor: colors.ink, justifyContent: 'center', overflow: 'hidden' }}>
+      <Animated.View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: fill, backgroundColor: colors.primary, borderRadius: 16 }} />
       <T w="semibold" size={15.5} color="#fff" center style={{ paddingHorizontal: knob + 16 }}>{busy ? 'بنأكد…' : label}</T>
       <Animated.View {...pan.panHandlers}
-        style={{ position: 'absolute', right: 4, width: knob, height: knob, borderRadius: knob / 2, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', transform: [{ translateX: Animated.multiply(x, -1) }], ...(Platform.OS === 'web' ? ({ cursor: 'grab' } as object) : {}) }}>
+        style={{ position: 'absolute', right: 4, width: knob, height: knob, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', transform: [{ translateX: Animated.multiply(x, -1) }], ...(Platform.OS === 'web' ? ({ cursor: 'grab' } as object) : {}) }}>
         {busy ? <ActivityIndicator color={colors.ink} /> : <Icon name="chevron-back" size={26} color={colors.ink} />}
       </Animated.View>
     </View>
@@ -561,14 +571,14 @@ export function TabPills<V extends string>({ items, value, onPick }: {
         const on = it.v === value;
         return (
           <Press key={it.v} onPress={() => onPick(it.v)} role="tab" selected={on}
-            style={[{ flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, paddingHorizontal: 14, height: 42, borderRadius: 21,
-              backgroundColor: on ? colors.ink : colors.surface }, !on && lift]}>
-            <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? '#fff' : colors.ink} numberOfLines={1}>{it.label}</T>
+            style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'center', gap: 6, paddingHorizontal: 14, height: 40, borderRadius: 12, borderWidth: 1,
+              backgroundColor: on ? colors.primarySoft : colors.surface, borderColor: on ? colors.primary : colors.line }}>
+            <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? colors.primary : colors.ink} numberOfLines={1}>{it.label}</T>
             {it.mark && 'count' in it.mark ? (
-              <View style={{ minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
-                <T size={11} w="bold" style={{ lineHeight: 15 }}>{String(it.mark.count)}</T>
+              <View style={{ minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+                <T size={11} w="bold" color="#fff" style={{ lineHeight: 15 }}>{String(it.mark.count)}</T>
               </View>
-            ) : it.mark ? <Icon name={it.mark.icon} size={16} color={on ? colors.accent : it.mark.color} /> : null}
+            ) : it.mark ? <Icon name={it.mark.icon} size={16} color={it.mark.color} /> : null}
           </Press>
         );
       })}

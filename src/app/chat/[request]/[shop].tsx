@@ -68,7 +68,7 @@ export default function Chat() {
         </Press>
         <TextInput value={text} onChangeText={setText} placeholder="اكتب رسالة…" placeholderTextColor={colors.faint}
           onSubmitEditing={() => send()} submitBehavior="submit" returnKeyType="send"
-          style={[{ flex: 1, minHeight: 46, maxHeight: 120, backgroundColor: colors.soft, borderRadius: 23, paddingHorizontal: 16, paddingVertical: 11, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, textAlign: 'right' }, { outlineStyle: 'none' } as any]} />
+          style={[{ flex: 1, minHeight: 46, maxHeight: 120, backgroundColor: colors.soft, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 11, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, textAlign: 'right' }, { outlineStyle: 'none' } as any]} />
         <Press onPress={() => send()} disabled={sending || !text.trim()} label="ابعت"
           style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: text.trim() ? colors.accent : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
           {sending ? <ActivityIndicator color={colors.ink} /> : <Icon name="arrow-up" size={20} color={text.trim() ? colors.ink : colors.faint} />}

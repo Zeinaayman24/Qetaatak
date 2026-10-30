@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { Field, Page, Pill, useData } from '../App';
-import { CATEGORY, CONDITION, ORDER_STATE, ORDER_STATUS, REQUEST_STATUS, SIDE, TICKET_STATUS, URGENCY, WANTED, batchOf, dateTime, memberId, money, must, orderId, photoUrl, supabase, ticketId, useLive, type Message } from '../lib';
+import { CATEGORY, CONDITION, ORDER_STATE, PAY_METHOD, PAY_STATE, ORDER_STATUS, REQUEST_STATUS, SIDE, TICKET_STATUS, URGENCY, WANTED, batchOf, dateTime, memberId, money, must, orderId, photoUrl, supabase, ticketId, useLive, type Message } from '../lib';
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -37,9 +37,10 @@ export default function OrderDetail() {
             <Field label="الاستعجال">{URGENCY[r.urgency]}</Field>
             <Field label="الميزانية">{r.budget ? money(r.budget) : ''}</Field>
             <Field label="ملاحظات">{r.notes}</Field>
-            {(() => { const o = r.order_id ? all.orders.find((x) => x.id === r.order_id) : undefined; return o ? (
+            {(() => { const o = r.order_id ? all.orders.find((x) => x.id === r.order_id) : undefined; return o ? (<>
               <Field label="الأوردر"><span className="mono strong">#{o.order_no}</span> · {ORDER_STATE[o.status]} · {money(Number(o.items_total) + Number(o.delivery_fee))}{o.rating ? ` · ${'★'.repeat(o.rating)}` : ''}</Field>
-            ) : null; })()}
+              <Field label="الدفع">{PAY_METHOD[o.payment_method]} · {PAY_STATE[o.payment_status]?.label ?? o.payment_status}{o.payment_ref ? <> · <span className="mono">{o.payment_ref}</span></> : null}{o.payment_status === 'review' ? <> · <a href="#/payments">راجع الإيصال</a></> : null}</Field>
+            </>) : null; })()}
             <Field label="التوصيل">{r.delivery_mode === 'delivery' ? 'توصيل للبيت' : r.delivery_mode === 'pickup' ? 'استلام من المحل' : ''}</Field>
             <Field label="التقييم">{r.rating ? '★'.repeat(r.rating) : ''}{r.review ? <div className="small">«{r.review}»</div> : null}</Field>
           </div>

@@ -147,7 +147,10 @@ export type Order = {
   status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'received' | 'cancelled';
   items_total: number; delivery_fee: number; rating: number | null; review: string;
   created_at: string; updated_at: string; received_at: string | null;
+  payment_method: PayMethod; payment_status: PayStatus; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null;
 };
+export type PayMethod = 'cash' | 'shop' | 'instapay' | 'card';
+export type PayStatus = 'unpaid' | 'awaiting' | 'review' | 'paid' | 'failed' | 'refund_due' | 'refunded';
 export const orderNo = (n: number) => '#' + ar(n);
 /** What the customer reads for each order status. */
 export const ORDER_LABEL: Record<Order['status'], { title: string; short: string; icon: string }> = {

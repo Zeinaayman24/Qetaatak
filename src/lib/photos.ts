@@ -13,10 +13,10 @@ export async function pickPhoto(): Promise<string | null> {
 }
 
 /** Uploads a picked photo into the person's own folder and returns its storage path. */
-export async function uploadPhoto(uri: string, userId: string): Promise<string> {
+export async function uploadPhoto(uri: string, userId: string, bucket: 'photos' | 'receipts' = 'photos'): Promise<string> {
   const body = await (await fetch(uri)).arrayBuffer();
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
-  const { error } = await supabase.storage.from('photos').upload(path, body, { contentType: 'image/jpeg', upsert: false });
+  const { error } = await supabase.storage.from(bucket).upload(path, body, { contentType: 'image/jpeg', upsert: false });
   if (error) throw error;
   return path;
 }

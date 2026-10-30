@@ -8,6 +8,7 @@ import {
   type Order, type Profile, type Quote, type Request,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
+import { PAY_NAME, PAY_STATUS } from '@/lib/payments';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 
@@ -37,6 +38,7 @@ export default function ShopOrder() {
   const next = o.status === 'preparing' ? (o.delivery_mode === 'delivery' ? 'out_for_delivery' : 'ready') : o.status === 'ready' || o.status === 'out_for_delivery' ? 'delivered' : null;
   const nextLabel = next === 'out_for_delivery' ? 'جهّزت الأوردر · خرج للتوصيل' : next === 'ready' ? 'جهّزت الأوردر · جاهز للاستلام' : next === 'delivered' ? 'سلّمت الأوردر للعميل' : '';
   const total = Number(o.items_total);
+  const waitPay = (o.payment_method === 'instapay' || o.payment_method === 'card') && o.payment_status !== 'paid' && o.status !== 'cancelled';
 
   async function move() {
     if (!next) return;
@@ -46,13 +48,15 @@ export default function ShopOrder() {
     if (error) toast(friendlyError(error)); else toast('اتبعت للعميل');
   }
 
-  const footer = next && o.status !== 'cancelled' ? <Btn kind="accent" icon="arrow-back-circle" title={nextLabel} loading={busy} onPress={move} /> : undefined;
+  const footer = waitPay
+    ? <Row gap={10} style={{ backgroundColor: colors.warnSoft, borderRadius: 14, padding: 14 }}><Icon name="hourglass" size={20} color={colors.warn} /><T size={14} w="semibold" color={colors.warn} style={{ flex: 1 }}>مستنيين العميل يدفع أونلاين. هنبلّغك أول ما الدفع يتأكد.</T></Row>
+    : next && o.status !== 'cancelled' ? <Btn icon="arrow-back-circle" title={nextLabel} loading={busy} onPress={move} /> : undefined;
 
   return (
     <Screen footer={footer}>
       <BackBar title={'أوردر ' + orderNo(o.order_no)} onBack={back} right={<Pill label={ORDER_LABEL[o.status].short} tone={o.status === 'received' ? 'good' : o.status === 'cancelled' ? 'plain' : 'new'} />} />
 
-      <View style={{ backgroundColor: colors.ink, borderRadius: 26, padding: 18, gap: 16 }}>
+      <View style={{ backgroundColor: colors.ink, borderRadius: 20, padding: 18, gap: 16 }}>
         <Row style={{ justifyContent: 'space-between' }}>
           <View>
             <T size={12.5} color="rgba(255,255,255,.65)">صافي ليك بعد عمولة ٥٪</T>
@@ -92,6 +96,10 @@ export default function ShopOrder() {
         })}
         <View style={{ height: 1, backgroundColor: colors.line }} />
         <Lines rows={[['قيمة البيع', money(total) + ' ج.م'], ['عمولة ضغطة ٥٪', money(total * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(total * (1 - COMMISSION)) + ' ج.م']} />
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Muted size={13}>الدفع: {PAY_NAME[o.payment_method]}</Muted>
+          <Pill label={o.payment_method === 'cash' && o.payment_status === 'unpaid' ? 'اتحصّل كاش عند التسليم' : o.payment_method === 'shop' && o.payment_status === 'unpaid' ? 'هيدفع في المحل' : PAY_STATUS[o.payment_status].label} tone={PAY_STATUS[o.payment_status].tone} />
+        </Row>
         <Muted size={12}>اكتب رقم الأوردر {orderNo(o.order_no)} على الكيس.</Muted>
       </Card>
 

@@ -40,7 +40,7 @@ export default function Login() {
   }
 
   const hero = (
-    <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 36, borderBottomRightRadius: 36, paddingBottom: 72, overflow: 'hidden' }}>
+    <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, paddingBottom: 72, overflow: 'hidden' }}>
       <View style={{ position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: colors.accent, opacity: 0.18, top: -80, left: -70 }} />
       <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 22, paddingTop: 22, gap: 22 }}>
         <Logo size={30} on="dark" />
@@ -61,7 +61,7 @@ export default function Login() {
 
   return (
     <Screen top={hero} footer={<Btn kind="accent" title={mode === 'signup' ? 'إنشاء حساب' : 'دخول'} onPress={submit} loading={busy} />}>
-      <View style={[{ marginTop: -52, backgroundColor: colors.surface, borderRadius: 24, padding: 18, gap: 16 }, lift]}>
+      <View style={[{ marginTop: -52, backgroundColor: colors.surface, borderRadius: 18, padding: 18, gap: 16 }, lift]}>
         {sent ? (
           <Notice icon="mail">
             <T w="semibold">بعتنالك إيميل تأكيد على {email.trim()}</T>

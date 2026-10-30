@@ -1,14 +1,16 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, View } from 'react-native';
+import { PaymentPicker, RadioCard } from '@/components/Payment';
 import {
-  BackBar, Btn, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Seg, Sheet, SlideToConfirm, T, TabPills, toast,
+  BackBar, Btn, Card, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Section, SlideToConfirm, T, TabPills, toast,
 } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   CONDITIONS, DELIVERY_FEE, ORDER_LABEL, SIDES, URGENCY, WANTED, addressLine, ago, ar, friendlyError, money, orderNo, reqNo,
-  type Order, type Quote, type Request, type Shop,
+  type Order, type PayMethod, type Quote, type Request, type Shop,
 } from '@/lib/data';
+import { cardAvailable, payByCard } from '@/lib/payments';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
@@ -24,8 +26,11 @@ export default function PriceRequest() {
   const [tab, setTab] = useState<string | null>(null);
   const [sel, setSel] = useState<Record<string, string>>({}); // part id → quote id
   const [modes, setModes] = useState<Record<string, Mode>>({});
-  const [review, setReview] = useState(false);
+  const [review, setReview] = useState(false); // the checkout step
+  const [pay, setPay] = useState<PayMethod>('cash');
+  const [card, setCard] = useState(false);
   const [busy, setBusy] = useState(false);
+  useEffect(() => { cardAvailable().then(setCard); }, []);
 
   const { data, loading } = useLive<Data>(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
@@ -84,14 +89,25 @@ export default function PriceRequest() {
     if (sel[p.id] !== q.id && nextPart) setTimeout(() => setTab(nextPart.id), 350);
   }
 
+  const allPickup = byShop.length > 0 && byShop.every((g) => modeOf(g[0].quote.shop_id) === 'pickup');
+  const method: PayMethod = pay === 'shop' && !allPickup ? 'cash' : pay === 'card' && !card ? 'cash' : pay;
+
   async function accept() {
     setBusy(true);
-    const { data: made, error } = await supabase.rpc('accept_offers', { p_choices: chosen.map((c) => ({ request: c.part.id, quote: c.quote.id, mode: modeOf(c.quote.shop_id) })) });
-    setBusy(false);
-    if (error) return toast(friendlyError(error));
+    const { data: made, error } = await supabase.rpc('place_order', {
+      p_choices: chosen.map((c) => ({ request: c.part.id, quote: c.quote.id, mode: modeOf(c.quote.shop_id) })), p_payment: method,
+    });
+    if (error) { setBusy(false); return toast(friendlyError(error)); }
     const ids = (made ?? []) as string[];
     setReview(false); setSel({});
-    toast(ids.length > 1 ? `اتعمل ${ar(ids.length)} أوردرات` : 'الأوردر اتأكد مع المحل');
+    if (method === 'card' && ids.length === 1) {
+      const err = await payByCard(ids[0]);
+      setBusy(false);
+      if (err) { toast(err); router.push({ pathname: '/order/[id]', params: { id: ids[0] } }); }
+      return;
+    }
+    setBusy(false);
+    toast(method === 'instapay' ? 'الأوردر اتسجّل · فاضل تحوّل وترفع الإيصال' : method === 'card' ? `اتعمل ${ar(ids.length)} أوردرات · ادفع كل واحد من صفحته` : ids.length > 1 ? `اتعمل ${ar(ids.length)} أوردرات` : 'الأوردر اتأكد مع المحل');
     if (ids.length === 1) router.push({ pathname: '/order/[id]', params: { id: ids[0] } });
     else router.push('/customer/requests');
   }
@@ -165,6 +181,79 @@ export default function PriceRequest() {
     );
   };
 
+  /* ---------------------------------------------------------------- checkout */
+  if (review && chosen.length) {
+    const grand = partsTotal + deliveryTotal;
+    return (
+      <Screen footer={
+        <>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Muted size={13}>الإجمالي · {method === 'cash' ? 'كاش عند الاستلام' : method === 'shop' ? 'في المحل' : method === 'card' ? 'بالبطاقة' : 'تحويل'}</Muted>
+            <T w="bold" size={20} color={colors.primary}>{money(grand)} ج.م</T>
+          </Row>
+          <SlideToConfirm label={method === 'card' ? 'اسحب وكمّل للدفع' : 'اسحب لتأكيد الأوردر'} busy={busy} onConfirm={accept} />
+        </>
+      }>
+        <BackBar title="إتمام الطلب" onBack={() => setReview(false)} />
+
+        <Section title="القطع والتوصيل">
+          {byShop.map((g) => {
+            const sid = g[0].quote.shop_id;
+            const shop = d.shops[sid];
+            return (
+              <Card key={sid}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Row gap={8}>
+                    <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={18} color={colors.primary} /></View>
+                    <View><T w="bold" size={14.5}>محل موثّق في {shop?.area ?? '—'}</T><Muted size={12}>{ar(g.length)} {g.length > 1 ? 'قطع' : 'قطعة'}</Muted></View>
+                  </Row>
+                </Row>
+                {g.map((c) => (
+                  <Row key={c.part.id} gap={10}>
+                    <Photo uri={photoUrl(c.quote.photo_path ?? c.part.photo_path)} size={44} />
+                    <View style={{ flex: 1 }}>
+                      <T w="semibold" size={14}>{c.part.part}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
+                      <Muted size={12}>{CONDITIONS[c.quote.condition]} · ضمان {ar(c.quote.warranty_days)} يوم</Muted>
+                    </View>
+                    <T w="semibold" size={14} color={colors.primary}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
+                  </Row>
+                ))}
+                <View style={{ height: 1, backgroundColor: colors.line }} />
+                <T w="semibold" size={13} color={colors.muted}>خيار التسليم</T>
+                <RadioCard title="توصيل للبيت" sub={shop?.offers_delivery ? 'المندوب يوصّلها لعنوانك' : 'المحل ده مش بيوصّل'} icon="bicycle" right={`+${money(DELIVERY_FEE)} ج.م`}
+                  on={modeOf(sid) === 'delivery'} disabled={!shop?.offers_delivery} onPress={() => setModes((m) => ({ ...m, [sid]: 'delivery' }))} />
+                <RadioCard title="استلام من المحل" sub="روح استلمها بنفسك" icon="walk" right="مجاناً"
+                  on={modeOf(sid) === 'pickup'} onPress={() => setModes((m) => ({ ...m, [sid]: 'pickup' }))} />
+              </Card>
+            );
+          })}
+        </Section>
+
+        {!allPickup && profile ? (
+          <Card>
+            <Row gap={10} style={{ alignItems: 'flex-start' }}>
+              <Icon name="location" size={20} color={colors.primary} />
+              <View style={{ flex: 1 }}><T w="semibold" size={14}>التوصيل على</T><Muted size={13}>{addressLine(profile)}</Muted></View>
+              <Btn kind="link" title="تغيير" onPress={() => router.push('/profile')} />
+            </Row>
+          </Card>
+        ) : null}
+
+        <Section title="طريقة الدفع">
+          <PaymentPicker value={method} onPick={setPay} card={card} allPickup={allPickup} />
+        </Section>
+
+        <Section title="ملخص الطلب">
+          <Card>
+            <Lines rows={[['القطع', money(partsTotal) + ' ج.م'], ['التوصيل', deliveryTotal ? money(deliveryTotal) + ' ج.م' : 'مجاناً']]} total={['الإجمالي', money(grand) + ' ج.م']} />
+          </Card>
+          {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في طلب الأسعار مستنية عروض.</Muted> : null}
+          <Muted size={12} center>بتأكيد الأوردر انت موافق على الشروط وسياسة الاسترجاع. كل قطعة عليها ضمان المحل المكتوب.</Muted>
+        </Section>
+      </Screen>
+    );
+  }
+
   /* ---------------------------------------------------------------- page */
   const footer = chosen.length ? (
     <Row gap={12}>
@@ -172,14 +261,14 @@ export default function PriceRequest() {
         <Muted size={12}>اخترت {ar(chosen.length)} من {ar(open.length)}</Muted>
         <T w="bold" size={19}>{money(partsTotal)} ج.م</T>
       </View>
-      <Btn kind="accent" title="راجع وأكّد" icon="arrow-back" onPress={() => setReview(true)} style={{ minWidth: 160 }} />
+      <Btn title="كمّل للدفع" icon="arrow-back" onPress={() => setReview(true)} style={{ minWidth: 160 }} />
     </Row>
   ) : undefined;
 
   return (
     <Screen footer={footer}>
       <BackBar title={'طلب أسعار ' + reqNo(first.num)} onBack={back} />
-      <View style={{ backgroundColor: colors.ink, borderRadius: 24, padding: 16, gap: 14 }}>
+      <View style={{ backgroundColor: colors.ink, borderRadius: 18, padding: 16, gap: 14 }}>
         <Row gap={14}>
           <Plate top={first.car_model || '—'} bottom={ar(first.car_year)} size="sm" />
           <View style={{ flex: 1 }}>
@@ -202,7 +291,7 @@ export default function PriceRequest() {
 
       {bundle && !chosen.length ? (
         <Press onPress={() => setSel(Object.fromEntries(open.map((p, i) => [p.id, bundle.qs[i].id])))}
-          style={{ backgroundColor: colors.accentSoft, borderRadius: 22, padding: 16, gap: 6, borderWidth: 1.5, borderColor: colors.accent }}>
+          style={{ backgroundColor: colors.accentSoft, borderRadius: 18, padding: 16, gap: 6, borderWidth: 1.5, borderColor: colors.accent }}>
           <Row style={{ justifyContent: 'space-between' }}>
             <Row gap={8}><Icon name="bag-check" size={20} color={colors.accentDeep} /><T w="bold" size={15}>كل القطع من محل واحد</T></Row>
             <T w="bold" size={17}>{money(bundle.total)} ج.م</T>
@@ -223,35 +312,6 @@ export default function PriceRequest() {
         </View>
       ) : null}
 
-      <Sheet open={review} onClose={() => setReview(false)} title="راجع وأكّد">
-        <View style={{ gap: 14 }}>
-          {byShop.map((g) => {
-            const sid = g[0].quote.shop_id;
-            const shop = d.shops[sid];
-            return (
-              <View key={sid} style={{ backgroundColor: colors.soft, borderRadius: 18, padding: 14, gap: 10 }}>
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Row gap={8}><Icon name="storefront" size={18} color={colors.accentDeep} /><T w="bold" size={14.5}>أوردر من محل في {shop?.area ?? '—'}</T></Row>
-                  <Muted size={12}>{ar(g.length)} {g.length > 1 ? 'قطع' : 'قطعة'}</Muted>
-                </Row>
-                {g.map((c) => (
-                  <Row key={c.part.id} style={{ justifyContent: 'space-between' }}>
-                    <T size={13.5} style={{ flex: 1 }}>{c.part.part}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''} <T size={12} color={colors.muted}>· ضمان {ar(c.quote.warranty_days)} يوم</T></T>
-                    <T w="semibold" size={13.5}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
-                  </Row>
-                ))}
-                {shop?.offers_delivery
-                  ? <Seg options={[{ v: 'delivery', label: 'توصيل' }, { v: 'pickup', label: 'استلام من المحل' }]} value={modeOf(sid)} onPick={(v) => setModes((m) => ({ ...m, [sid]: v as Mode }))} />
-                  : <Muted size={12.5}>المحل ده مش بيوصّل؛ هتستلم من المحل.</Muted>}
-              </View>
-            );
-          })}
-          {byShop.some((g) => modeOf(g[0].quote.shop_id) === 'delivery') && profile ? <Muted size={12.5}>التوصيل على: {addressLine(profile)}</Muted> : null}
-          <Lines rows={[['القطع', money(partsTotal) + ' ج.م'], ['التوصيل', deliveryTotal ? money(deliveryTotal) + ' ج.م' : 'مجاناً']]} total={['الإجمالي · كاش عند الاستلام', money(partsTotal + deliveryTotal) + ' ج.م']} />
-          {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في طلب الأسعار مستنية عروض.</Muted> : null}
-          <SlideToConfirm label="اسحب لتأكيد الأوردر" busy={busy} onConfirm={accept} />
-        </View>
-      </Sheet>
     </Screen>
   );
 }
@@ -260,7 +320,7 @@ export default function PriceRequest() {
 function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?: Shop; on: boolean; cheapest: boolean; qty: number; onPick: () => void; onChat: () => void }) {
   return (
     <Press onPress={onPick} selected={on}
-      style={[{ backgroundColor: on ? colors.ink : colors.surface, borderRadius: 22, padding: 16, gap: 12 }, lift]}>
+      style={[{ backgroundColor: on ? colors.ink : colors.surface, borderRadius: 18, padding: 16, gap: 12 }, lift]}>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ gap: 2 }}>
           <Row gap={8}>
@@ -277,17 +337,17 @@ function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?
       </Row>
       <Row gap={6} style={{ flexWrap: 'wrap' }}>
         {[[CONDITIONS[q.condition], 'pricetag'], [`ضمان ${ar(q.warranty_days)} يوم`, 'shield-checkmark'], [shop?.offers_delivery ? 'بيوصّل' : 'استلام بس', shop?.offers_delivery ? 'bicycle' : 'walk']].map(([t, icon]) => (
-          <Row key={t} gap={4} style={{ backgroundColor: on ? 'rgba(255,255,255,.1)' : colors.soft, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+          <Row key={t} gap={4} style={{ backgroundColor: on ? 'rgba(255,255,255,.1)' : colors.soft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
             <Icon name={icon} size={13} color={on ? colors.accent : colors.muted} /><T size={12} w="medium" color={on ? '#fff' : colors.ink}>{t}</T>
           </Row>
         ))}
       </Row>
       <Row gap={10}>
-        <View style={{ flex: 1, height: 46, borderRadius: 14, backgroundColor: on ? colors.accent : colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        <View style={{ flex: 1, height: 46, borderRadius: 12, backgroundColor: on ? colors.accent : colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <Icon name={on ? 'checkmark-circle' : 'add-circle-outline'} size={18} color={on ? colors.ink : '#fff'} />
           <T w="semibold" size={14} color={on ? colors.ink : '#fff'}>{on ? 'اخترت العرض ده' : 'اختار العرض'}</T>
         </View>
-        <Press onPress={onChat} label="اسأل المحل" style={{ height: 46, paddingHorizontal: 14, borderRadius: 14, backgroundColor: on ? 'rgba(255,255,255,.1)' : colors.soft, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Press onPress={onChat} label="اسأل المحل" style={{ height: 46, paddingHorizontal: 14, borderRadius: 12, backgroundColor: on ? 'rgba(255,255,255,.1)' : colors.soft, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Icon name="chatbubble-ellipses" size={17} color={on ? '#fff' : colors.ink} /><T size={13} w="medium" color={on ? '#fff' : colors.ink}>اسأل</T>
         </Press>
       </Row>
@@ -303,7 +363,7 @@ function Searching({ shops }: { shops: number }) {
     loop.start(); return () => loop.stop();
   }, [a]);
   return (
-    <View style={[{ backgroundColor: colors.surface, borderRadius: 24, paddingVertical: 26, alignItems: 'center', gap: 10 }, lift]}>
+    <View style={[{ backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 26, alignItems: 'center', gap: 10 }, lift]}>
       <View style={{ width: 90, height: 90, alignItems: 'center', justifyContent: 'center' }}>
         <Animated.View style={{ position: 'absolute', width: 90, height: 90, borderRadius: 45, backgroundColor: colors.accent, opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }), transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.2] }) }] }} />
         <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={24} color={colors.ink} /></View>

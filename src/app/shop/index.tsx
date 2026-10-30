@@ -63,7 +63,7 @@ export default function ShopInbox() {
 
   return (
     <Screen nav={<BottomNav role="shop" />} top={
-      <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingBottom: 56 }}>
+      <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, paddingBottom: 56 }}>
         <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, gap: 14 }}>
           <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1 }}>
@@ -122,7 +122,7 @@ export default function ShopInbox() {
               const live = orderActive(o);
               return (
                 <Press key={o.id} onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: o.id } })}
-                  style={[{ backgroundColor: live ? colors.ink : colors.surface, borderRadius: 22, padding: 16, gap: 10 }, lift]}>
+                  style={[{ backgroundColor: live ? colors.ink : colors.surface, borderRadius: 18, padding: 16, gap: 10 }, lift]}>
                   <Row gap={12}>
                     <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: live ? colors.accent : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
                       <Icon name={ORDER_LABEL[o.status].icon} size={22} color={live ? colors.ink : colors.muted} />
@@ -145,7 +145,7 @@ export default function ShopInbox() {
             const fresh = g.some((x) => x.st === 'open');
             return (
               <Press key={r.batch_id ?? r.id} onPress={() => router.push(`/shop/${(g.find((x) => x.st === 'open') ?? g[0]).r.id}`)}
-                style={[{ backgroundColor: colors.surface, borderRadius: 22, padding: 14, gap: 10, borderWidth: 2, borderColor: fresh ? colors.accent : 'transparent' }, lift]}>
+                style={[lift, { backgroundColor: colors.surface, borderRadius: 18, padding: 14, gap: 10, borderWidth: 2, borderColor: fresh ? colors.accent : colors.line }]}>
                 <Row gap={12}>
                   <Photo uri={photoUrl(g.find((x) => x.r.photo_path)?.r.photo_path)} size={50} />
                   <View style={{ flex: 1, gap: 1 }}>

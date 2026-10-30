@@ -10,6 +10,8 @@
   --accent: #0AABFE;
   --accent-deep: #0071B8;
   --accent-soft: #E2F4FF;
+  --primary: #0077D6;
+  --primary-soft: #E8F3FD;
   --good: #2B7F0E;
   --good-soft: #EAF7DF;
   --bad: #D93F45;
@@ -65,14 +67,14 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 .side { display: flex; flex-direction: column; gap: 18px; }
 
 /* ---------- blocks */
-.panel { background: var(--surface); border: 0; box-shadow: var(--shadow); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow-x: auto; }
+.panel { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow-x: auto; }
 .panel.flush { padding: 0; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; }
 .panel-head a { font-size: 13px; color: var(--accent-deep); font-weight: 500; text-decoration: none; }
 .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .kpis.four { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 900px) { .kpis, .kpis.four { grid-template-columns: repeat(2, 1fr); } }
-.kpi { background: var(--surface); box-shadow: var(--shadow); border-radius: 20px; padding: 16px 18px; display: flex; flex-direction: column; gap: 2px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 2px; }
 .kpi strong { font-size: 28px; font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
 .kpi:first-child { background: var(--ink); color: #fff; }
 .kpi:first-child .muted { color: rgba(255,255,255,.65); }
@@ -102,11 +104,11 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .search, select, .input input, textarea { background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; outline: none; }
 .search { flex: 1; min-width: 240px; }
-.search:focus, select:focus, .input input:focus, textarea:focus { border-color: var(--ink); }
+.search:focus, select:focus, .input input:focus, textarea:focus { border-color: var(--primary); }
 .btn { background: var(--ink); color: #fff; border: 0; border-radius: 12px; padding: 10px 18px; font-weight: 600; cursor: pointer; transition: transform .1s, filter .15s; }
 .btn:hover { filter: brightness(1.12); }
 .btn:active { transform: scale(.97); }
-.btn.accent { background: var(--accent); color: var(--ink); }
+.btn.accent { background: var(--primary); color: #fff; }
 .btn:disabled { opacity: .4; cursor: default; }
 .btn.ghost { background: var(--fill); color: var(--ink); }
 .btn.danger { background: var(--bad-soft); color: var(--bad); }
@@ -185,3 +187,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (max-width: 760px) { .nav.active::before { display: none; } }
 a.pill { text-decoration: none; color: var(--ink); }
 .bubble.flagged { box-shadow: 0 0 0 2px var(--bad); }
+
+/* ---------- payments */
+.receipt { display: grid; grid-template-columns: 180px 1fr; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; }
+.receipt img { width: 180px; height: 220px; object-fit: cover; border-radius: 10px; background: var(--fill); display: block; }
+.receipt-ph { width: 180px; height: 220px; border-radius: 10px; background: var(--fill); display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+.receipt-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.receipt-body p { margin: 0; }
+.row-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.refund { display: grid; grid-template-columns: 1fr 240px auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.refund:last-child { border-bottom: 0; }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .receipt, .refund, .settings-grid { grid-template-columns: 1fr; } .receipt img, .receipt-ph { width: 100%; } }

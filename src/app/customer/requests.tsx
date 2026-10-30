@@ -6,6 +6,7 @@ import { Empty, Icon, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Se
 import { useAuth } from '@/lib/auth';
 import { ORDER_LABEL, ago, ar, groupRequests, money, orderActive, orderNo, orderSteps, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
+import { needsPayment } from '@/lib/payments';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
 
@@ -44,19 +45,19 @@ export default function MyRequests() {
     const live = orderActive(o);
     return (
       <Press key={o.id} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}
-        style={[{ backgroundColor: colors.surface, borderRadius: 22, padding: 14, gap: 12 }, lift]}>
+        style={[lift, { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 12 }]}>
         <Row gap={12}>
-          <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: live ? colors.ink : o.status === 'received' ? colors.goodSoft : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={ORDER_LABEL[o.status].icon} size={22} color={live ? colors.accent : o.status === 'received' ? colors.good : colors.faint} />
+          <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: live ? colors.primarySoft : o.status === 'received' ? colors.goodSoft : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={ORDER_LABEL[o.status].icon} size={22} color={live ? colors.primary : o.status === 'received' ? colors.good : colors.faint} />
           </View>
           <View style={{ flex: 1, gap: 1 }}>
             <T w="bold" size={15} numberOfLines={1}>{ps.length ? partsLabel(ps) : 'أوردر'}</T>
             <Muted size={12}>أوردر {orderNo(o.order_no)} · {money(Number(o.items_total) + Number(o.delivery_fee))} ج.م · {ago(o.created_at)}</Muted>
           </View>
-          {o.status === 'received' && !o.rating ? <Pill label="قيّم" tone="wait" icon="star" /> : <Pill label={ORDER_LABEL[o.status].short} tone={live ? 'new' : o.status === 'received' ? 'good' : 'plain'} />}
+          {needsPayment(o) ? <Pill label="ادفع" tone="wait" icon="card" /> : o.status === 'received' && !o.rating ? <Pill label="قيّم" tone="wait" icon="star" /> : <Pill label={ORDER_LABEL[o.status].short} tone={live ? 'new' : o.status === 'received' ? 'good' : 'plain'} />}
         </Row>
         {live ? (
-          <Row gap={4}>{steps.map((s, i) => <View key={s} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: i <= at ? colors.accent : colors.line }} />)}</Row>
+          <Row gap={4}>{steps.map((s, i) => <View key={s} style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: i <= at ? colors.primary : colors.soft }} />)}</Row>
         ) : null}
       </Press>
     );
@@ -83,7 +84,7 @@ export default function MyRequests() {
               const photo = g.items.find((r) => r.photo_path)?.photo_path;
               return (
                 <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)}
-                  style={[{ backgroundColor: colors.surface, borderRadius: 22, padding: 14, gap: 12, borderWidth: 2, borderColor: n ? colors.accent : 'transparent' }, lift]}>
+                  style={[lift, { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 12, borderWidth: n ? 1.5 : 1, borderColor: n ? colors.primary : colors.line }]}>
                   <Row gap={12}>
                     {photo ? <Photo uri={photoUrl(photo)} size={52} /> : <Plate top="طلب" bottom={reqNo(g.first.num).replace('#', '')} size="sm" />}
                     <View style={{ flex: 1, gap: 1 }}>

@@ -33,7 +33,18 @@ export type Ticket = {
 };
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; internal: boolean; kind: 'user' | 'bot' | 'system'; created_at: string };
 export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; flagged: boolean; created_at: string };
-export type Order = { id: string; order_no: number; customer_id: string; shop_id: string; delivery_mode: string; status: string; items_total: number; delivery_fee: number; rating: number | null; review: string; created_at: string; received_at: string | null };
+export type Order = { id: string; order_no: number; customer_id: string; shop_id: string; delivery_mode: string; status: string; items_total: number; delivery_fee: number; rating: number | null; review: string; created_at: string; received_at: string | null;
+  payment_method: string; payment_status: string; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null; updated_at: string };
+export const PAY_METHOD: Record<string, string> = { cash: 'كاش عند الاستلام', shop: 'في المحل', instapay: 'InstaPay / محفظة', card: 'بطاقة (Paymob)' };
+export const PAY_STATE: Record<string, { label: string; tone: 'plain' | 'good' | 'wait' | 'bad' | 'dark' }> = {
+  unpaid: { label: 'يدفع عند الاستلام', tone: 'plain' }, awaiting: { label: 'مستني الدفع', tone: 'wait' }, review: { label: 'إيصال محتاج مراجعة', tone: 'dark' },
+  paid: { label: 'مدفوع', tone: 'good' }, failed: { label: 'الدفع فشل', tone: 'bad' }, refund_due: { label: 'محتاج استرجاع', tone: 'bad' }, refunded: { label: 'اترجع', tone: 'plain' },
+};
+/** A short-lived link to a private transfer receipt. */
+export async function receiptUrl(path: string) {
+  const { data } = await supabase.storage.from('receipts').createSignedUrl(path, 600);
+  return data?.signedUrl ?? null;
+}
 export const ORDER_STATE: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز للاستلام', out_for_delivery: 'في الطريق', delivered: 'المحل سلّم', received: 'العميل استلم', cancelled: 'اتلغى' };
 
 /* ---------------------------------------------------------------- labels */

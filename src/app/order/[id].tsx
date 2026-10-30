@@ -1,6 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Linking, Platform, View } from 'react-native';
+import { PaymentPanel } from '@/components/Payment';
 import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
@@ -8,6 +9,7 @@ import {
   type Order, type Quote, type Request, type Shop, type ShopPrivate,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
+import { needsPayment } from '@/lib/payments';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
 
@@ -46,6 +48,7 @@ export default function OrderPage() {
   const warrantyDays = Math.max(0, ...quotes.map((q) => q.warranty_days));
   const warrantyEnd = o.received_at ? new Date(new Date(o.received_at).getTime() + warrantyDays * 86400000) : null;
   const firstPart = parts[0];
+  const unpaid = needsPayment(o);
 
   async function rpc(fn: string, args: Record<string, unknown>, ok: string) {
     setBusy(true);
@@ -55,7 +58,7 @@ export default function OrderPage() {
     toast(ok); return true;
   }
 
-  const footer = o.status === 'cancelled' ? undefined
+  const footer = o.status === 'cancelled' || unpaid ? undefined
     : o.status !== 'received'
       ? <Btn kind={o.status === 'delivered' || o.status === 'ready' || o.status === 'out_for_delivery' ? 'accent' : 'secondary'} icon="checkmark-done" loading={busy}
           title="استلمت الأوردر" onPress={() => rpc('receive_order', { p_order: o.id }, 'تمام! قيّم المحل لو سمحت')} />
@@ -68,11 +71,11 @@ export default function OrderPage() {
       <BackBar title={'أوردر ' + orderNo(o.order_no)} onBack={back} />
 
       {/* live status */}
-      <View style={{ backgroundColor: o.status === 'cancelled' ? colors.soft : o.status === 'received' ? colors.goodSoft : colors.ink, borderRadius: 28, padding: 20, gap: 18 }}>
+      <View style={{ backgroundColor: o.status === 'cancelled' ? colors.soft : o.status === 'received' ? colors.goodSoft : colors.ink, borderRadius: 20, padding: 18, gap: 18 }}>
         <Row gap={14}>
-          <StatusIcon name={lbl.icon} live={o.status !== 'received' && o.status !== 'cancelled'} tone={o.status === 'received' ? 'good' : o.status === 'cancelled' ? 'plain' : 'live'} />
+          <StatusIcon name={unpaid ? 'card' : lbl.icon} live={o.status !== 'received' && o.status !== 'cancelled'} tone={o.status === 'received' ? 'good' : o.status === 'cancelled' ? 'plain' : 'live'} />
           <View style={{ flex: 1 }}>
-            <T w="bold" size={20} color={o.status === 'received' || o.status === 'cancelled' ? colors.ink : '#fff'}>{lbl.title}</T>
+            <T w="bold" size={20} color={o.status === 'received' || o.status === 'cancelled' ? colors.ink : '#fff'}>{unpaid ? 'فاضل خطوة الدفع' : lbl.title}</T>
             <T size={13} color={o.status === 'received' || o.status === 'cancelled' ? colors.muted : 'rgba(255,255,255,.7)'}>
               {o.delivery_mode === 'delivery' ? 'توصيل للبيت' : 'استلام من المحل'} · آخر تحديث {ago(o.updated_at)}
             </T>
@@ -94,11 +97,13 @@ export default function OrderPage() {
         ) : null}
       </View>
 
+      <PaymentPanel order={o} />
+
       {/* the shop */}
       {o.status !== 'cancelled' ? (
         <Card>
           <Row gap={12}>
-            <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={24} color={colors.accentDeep} /></View>
+            <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={24} color={colors.primary} /></View>
             <View style={{ flex: 1 }}>
               <T w="bold" size={16}>{priv?.name ?? 'المحل'}</T>
               <Muted size={12.5}>{shop?.area}، {shop?.governorate}</Muted>
@@ -133,11 +138,11 @@ export default function OrderPage() {
           );
         })}
         <View style={{ height: 1, backgroundColor: colors.line }} />
-        <Lines rows={[['القطع', money(o.items_total) + ' ج.م'], ['التوصيل', o.delivery_fee ? money(o.delivery_fee) + ' ج.م' : 'مجاناً']]} total={['الإجمالي · كاش', money(Number(o.items_total) + Number(o.delivery_fee)) + ' ج.م']} />
+        <Lines rows={[['القطع', money(o.items_total) + ' ج.م'], ['التوصيل', o.delivery_fee ? money(o.delivery_fee) + ' ج.م' : 'مجاناً']]} total={['الإجمالي', money(Number(o.items_total) + Number(o.delivery_fee)) + ' ج.م']} />
       </Card>
 
       {warrantyEnd ? (
-        <Row gap={12} style={{ backgroundColor: colors.goodSoft, borderRadius: 20, padding: 16 }}>
+        <Row gap={12} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 16 }}>
           <Icon name="shield-checkmark" size={26} color={colors.good} />
           <View style={{ flex: 1 }}>
             <T w="bold" size={14.5}>الضمان شغال لحد {warrantyEnd.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</T>
