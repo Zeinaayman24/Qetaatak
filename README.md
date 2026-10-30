@@ -1,4 +1,4 @@
-# قطعتك — Qetaatak
+# ضغطة — Daghta
 
 A marketplace for car spare parts in Cairo. Car owners send a part request with a photo; approved shops and scrapyards reply with a price, condition and warranty; the owner picks one and gets it delivered or picks it up.
 
@@ -41,7 +41,7 @@ supabase/migrations database schema and security rules
 
 ## Management system (`manage/`)
 
-A separate desktop web app for the Qetaatak team, served at `/Qetaatak/manage/` and using the same Supabase project.
+A separate desktop web app for the ضغطة team, served at `/Qetaatak/manage/` and using the same Supabase project.
 
 - **Customers** with unique IDs (`C-10001`), full details, cars, orders and complaints; admins can block
 - **Shops** with unique IDs (`S-10002`), full details, sales, ratings; admins approve, suspend or block
@@ -89,7 +89,7 @@ where id = (select id from auth.users where email = 'you@example.com');
 3. Change `SUPABASE_URL` and `SUPABASE_KEY` in `src/lib/supabase.ts`.
 
 ## Chat assistant (`/assistant`)
-Customers make part requests and complaints by chatting with «مساعد قطعتك».
+Customers make part requests and complaints by chatting with «مساعد ضغطة».
 - **Free mode (default):** tap-to-answer buttons plus on-device understanding of simple Arabic (`src/lib/assistant.ts`). It always shows a summary and the customer confirms before a request or ticket is created.
 - **Smart AI mode:** the `assistant` Supabase Edge Function (`supabase/functions/assistant`) is deployed but switched off. To turn it on, add the secret `ANTHROPIC_API_KEY` in Supabase → Edge Functions → Secrets (optional `ASSISTANT_MODEL`, default `claude-haiku-5-5`). The app detects it automatically; no new build needed.
 
@@ -108,3 +108,10 @@ A request can hold several parts (a basket). Each part is its own row in `reques
 - Accepting offers (`accept_offers`) creates one **order** per shop (`orders`, numbered from 5001) holding the parts bought from it; parts still waiting stay in the price request.
 - Orders move `preparing → ready | out_for_delivery → delivered` (shop, `set_order_status`) `→ received` (customer, `receive_order`), then `rate_order`. The customer can `cancel_order` while it's still being prepared; the parts return to choosing offers.
 - **Contact details stay in the app:** before a deal, phone numbers, emails, links and social handles are replaced with ••• in chat messages and request text by database triggers (`private.mask_contacts`), and such messages are marked `flagged` for staff.
+
+## Brand
+
+- Name: **ضغطة (Daghta)**, "one press": ask for any part in one tap.
+- Mark: a gear (parts) around a button being pressed, with speed lines. Vector source in `assets/brand/mark.svg` (on navy) and `mark-light.svg` (on white); in the app it is `Mark` / `Logo` / `AppIcon` in `src/components/Brand.tsx`.
+- Colours: navy `#041D3F` (brand, text, primary buttons), sky `#0AABFE` (call to action), lime `#7CD035` (the "tap" accent). Tokens live in `src/lib/theme.ts` and `manage/src/styles.css`.
+- Type: Alexandria Black for the wordmark, Readex Pro for everything else.

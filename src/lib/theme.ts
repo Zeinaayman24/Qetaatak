@@ -1,27 +1,33 @@
-// Qetaatak design tokens.
-// Asphalt ink on a cool light ground; signal orange is the brand and the call to action.
-// The Egyptian licence plate is the one signature element (cars and order numbers wear it).
+// ضغطة (Daghta) design tokens.
+// Deep navy carries the brand and the text; sky blue is the call to action; lime marks a "tap" / success moment.
+// Taken from the brand mark (gear + pressing finger + speed lines).
+export const brand = {
+  navy: '#041D3F',
+  sky: '#0AABFE',
+  lime: '#7CD035',
+};
+
 export const colors = {
-  ground: '#F2F3F6',     // app background
+  ground: '#F3F6FA',     // app background
   surface: '#FFFFFF',    // cards, sheets, bars
   card: '#FFFFFF',       // filled blocks sit on the ground as white cards
-  soft: '#EEF0F4',       // inputs, chips, inner wells
-  ink: '#1C2230',        // asphalt: text and primary buttons
-  muted: '#5F6676',
-  faint: '#99A0AD',
-  line: '#E5E8EE',
-  brand: '#1C2230',
+  soft: '#EAF0F7',       // inputs, chips, inner wells
+  ink: '#041D3F',        // navy: text and primary buttons
+  muted: '#55627A',
+  faint: '#93A0B5',
+  line: '#E1E8F0',
+  brand: '#041D3F',
   brandInk: '#FFFFFF',
-  accent: '#FF8A1E',     // signal orange
-  accentDeep: '#E56F00',
-  accentInk: '#1C2230',
-  accentSoft: '#FFF0E0',
-  good: '#12925A',
-  goodSoft: '#E3F5EB',
+  accent: '#0AABFE',     // sky blue
+  accentDeep: '#0071B8', // sky that reads on white
+  accentInk: '#041D3F',
+  accentSoft: '#E2F4FF',
+  good: '#2B7F0E',
+  goodSoft: '#EAF7DF',
   bad: '#D93F45',
   badSoft: '#FDECEC',
   plate: '#7DB4EA',      // the light-blue band of an Egyptian private-car plate
-  shadow: '#1C2230',
+  shadow: '#041D3F',
 };
 
 export const fonts = {

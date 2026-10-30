@@ -1,4 +1,4 @@
-// Qetaatak assistant: turns a customer's free-text chat into a draft part request or complaint.
+// Daghta (ضغطة) assistant: turns a customer's free-text chat into a draft part request or complaint.
 // It only drafts; the app shows the draft and the customer confirms before anything is created.
 // Switched off until the ANTHROPIC_API_KEY secret is set in Supabase (Edge Functions > Secrets).
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
@@ -12,7 +12,7 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
-const SYSTEM = `You are "مساعد قطعتك", the assistant inside Qetaatak, an Egyptian app where car owners request spare parts and shops send quotes.
+const SYSTEM = `You are "مساعد ضغطة", the assistant inside Daghta (ضغطة), an Egyptian app where car owners request spare parts and shops send quotes.
 Talk in short, friendly Egyptian Arabic. One question at a time. Never invent prices, shops or stock.
 Your job is to fill ONE draft, either a part request or a complaint, then ask the customer to confirm.
 
@@ -28,7 +28,7 @@ If the customer asks something unrelated, answer briefly and steer back.
 Reply with ONLY a JSON object, no other text:
 {"reply": "...", "quick_replies": ["up to 4 short Arabic button labels"], "draft": {"intent": "request" | "complaint" | null, ...fields}, "ready": true | false}`;
 
-const SUPPORT = `You are "مساعد قطعتك", the support assistant inside Qetaatak (Egyptian car spare-parts marketplace).
+const SUPPORT = `You are "مساعد ضغطة", the support assistant inside Daghta (ضغطة) (Egyptian car spare-parts marketplace).
 A complaint case is open and you are handling it first. Talk in short, warm Egyptian Arabic.
 Use only the facts in the context: order status, warranty days, the complaint. Useful facts about the app:
 customers can chat with the chosen shop from the order page; shops give a warranty and must replace or refund a faulty part within it;
@@ -39,7 +39,7 @@ Hand the case to a human (action "escalate") when: the customer asks for a perso
 Use action "resolved" only when the customer clearly says the problem is solved.
 Reply with ONLY a JSON object: {"reply": "...", "quick_replies": ["up to 3 short Arabic buttons"], "action": null | "escalate" | "resolved"}`;
 
-const BRIEF = `You write hand-over briefs for customer-service agents at Qetaatak (Egyptian car spare-parts marketplace).
+const BRIEF = `You write hand-over briefs for customer-service agents at Daghta (ضغطة) (Egyptian car spare-parts marketplace).
 You get the full chat of a complaint (customer, assistant, events) and facts about the order, shop and customer history.
 Write in clear Egyptian Arabic, 4 to 6 short lines, no greeting: what the problem is, what the assistant already told the customer,
 what the customer wants now, how the customer feels, and the best next step for the agent. Use only the given facts.

@@ -64,7 +64,7 @@ export default function ShopProfile() {
       <Stats items={[
         [p.rating ? ar(p.rating) + ' ★' : '—', p.ratings ? ar(p.ratings) + ' تقييم' : 'لسه مفيش تقييم'],
         [ar(p.sales), 'قطعة اتباعت'],
-        [ago(s.since).replace('من ', ''), 'على قطعتك'],
+        [ago(s.since).replace('من ', ''), 'على ضغطة'],
       ]} />
 
       <Section title="التخصص">

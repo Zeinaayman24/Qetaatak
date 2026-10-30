@@ -13,7 +13,7 @@ export default function Staff() {
     setMsg('');
     const e = email.trim().toLowerCase();
     const p = all.profiles.find((x) => x.email.toLowerCase() === e);
-    if (!p) return setMsg('مفيش حساب بالإيميل ده. الموظف لازم يعمل حساب على قطعتك الأول ويكمّل بياناته.');
+    if (!p) return setMsg('مفيش حساب بالإيميل ده. الموظف لازم يعمل حساب على ضغطة الأول ويكمّل بياناته.');
     if (p.is_admin || p.is_support) return setMsg('الشخص ده في الفريق بالفعل.');
     const { error } = await supabase.from('profiles').update({ is_support: true }).eq('id', p.id);
     if (error) return setMsg('مقدرناش نضيفه.');

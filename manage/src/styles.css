@@ -1,22 +1,22 @@
-/* Qetaatak management: the app's language (asphalt ink, signal orange, lifted white cards), laid out for a desktop. */
+/* ضغطة (Daghta) management: the app's language (navy ink, sky-blue accent, lifted white cards), laid out for a desktop. */
 :root {
-  --bg: #F2F3F6;
+  --bg: #F3F6FA;
   --surface: #FFFFFF;
-  --fill: #EEF0F4;
-  --ink: #1C2230;
-  --muted: #5F6676;
-  --faint: #99A0AD;
-  --line: #E5E8EE;
-  --accent: #FF8A1E;
-  --accent-deep: #E56F00;
-  --accent-soft: #FFF0E0;
-  --good: #12925A;
-  --good-soft: #E3F5EB;
+  --fill: #EAF0F7;
+  --ink: #041D3F;
+  --muted: #55627A;
+  --faint: #93A0B5;
+  --line: #E1E8F0;
+  --accent: #0AABFE;
+  --accent-deep: #0071B8;
+  --accent-soft: #E2F4FF;
+  --good: #2B7F0E;
+  --good-soft: #EAF7DF;
   --bad: #D93F45;
   --bad-soft: #FDECEC;
-  --shadow: 0 6px 18px rgba(28, 34, 48, .06), 0 1px 2px rgba(28, 34, 48, .04);
+  --shadow: 0 6px 18px rgba(4, 29, 63, .07), 0 1px 2px rgba(4, 29, 63, .04);
   --font: 'Readex Pro', 'Segoe UI', Tahoma, system-ui, sans-serif;
-  --display: 'Readex Pro', sans-serif;
+  --display: 'Alexandria', 'Readex Pro', sans-serif;
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -34,8 +34,9 @@ h3 { font-size: 14px; font-weight: 600; }
 /* ids like C-10003 stay on one line and read left to right */
 .mono { white-space: nowrap; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; direction: ltr; unicode-bidi: isolate; font-weight: 600; }
 .error { color: var(--bad); font-weight: 500; }
-.logo { font-family: var(--display); font-size: 26px; font-weight: 700; color: #fff; letter-spacing: -.5px; }
-.logo b { color: var(--accent); }
+.logo { font-family: var(--display); font-size: 26px; font-weight: 900; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; line-height: 1.3; }
+.logo img { width: 1.6em; height: 1.6em; }
+.sidebar .logo { color: #fff; }
 
 /* ---------- layout */
 .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100%; }
@@ -118,7 +119,7 @@ nav { display: flex; flex-direction: column; gap: 2px; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .pill { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 1px 9px; background: var(--fill); color: var(--muted); white-space: nowrap; }
 .pill.good { background: var(--good-soft); color: var(--good); }
-.pill.wait { background: var(--accent-soft); color: #8A5300; }
+.pill.wait { background: var(--accent-soft); color: #00558A; }
 .pill.bad { background: var(--bad-soft); color: var(--bad); }
 .pill.dark { background: var(--ink); color: #fff; }
 
@@ -163,7 +164,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .bubble.bot { align-self: flex-start; background: var(--fill); border: 1px solid var(--line); }
 .chat-event { align-self: center; font-size: 12px; color: var(--muted); background: var(--fill); border-radius: 999px; padding: 3px 12px; }
 .chat-banner { border-radius: 12px; padding: 10px 14px; font-size: 14px; font-weight: 600; background: var(--fill); }
-.chat-banner.wait { background: var(--accent-soft); color: #8A5300; }
+.chat-banner.wait { background: var(--accent-soft); color: #00558A; }
 .chat-banner.dark { background: var(--ink); color: #fff; }
 .chat-banner.good { background: var(--good-soft); color: var(--good); }
 .conversation { height: calc(100vh - 150px); min-height: 480px; overflow: hidden; }

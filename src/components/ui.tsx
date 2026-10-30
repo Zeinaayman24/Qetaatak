@@ -291,7 +291,7 @@ export function Select<V extends string | number>({ label, value, options, onPic
 type Tone = 'new' | 'good' | 'wait' | 'plain' | 'bad' | 'accent';
 export function Pill({ label, tone = 'plain', icon }: { label: string; tone?: Tone; icon?: string }) {
   const bg = { new: colors.ink, good: colors.goodSoft, wait: colors.accentSoft, plain: colors.soft, bad: colors.badSoft, accent: colors.accent }[tone];
-  const fg = { new: colors.brandInk, good: colors.good, wait: '#9A4A00', plain: colors.muted, bad: colors.bad, accent: colors.ink }[tone];
+  const fg = { new: colors.brandInk, good: colors.good, wait: '#00558A', plain: colors.muted, bad: colors.bad, accent: colors.ink }[tone];
   return (
     <View style={{ backgroundColor: bg, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       {icon ? <Icon name={icon} size={12} color={fg} /> : null}

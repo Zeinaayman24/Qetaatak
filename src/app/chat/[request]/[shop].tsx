@@ -93,7 +93,7 @@ export default function Chat() {
       {!deal ? (
         <Row gap={10} style={{ alignItems: 'flex-start', backgroundColor: colors.accentSoft, borderRadius: 16, padding: 12 }}>
           <Icon name="lock-closed" size={18} color={colors.accentDeep} />
-          <T size={12.5} style={{ flex: 1 }}>قبل تأكيد الأوردر، الأرقام والإيميلات واللينكات وحسابات السوشيال بتتشال من الرسائل تلقائياً. اتعاملوا من خلال قطعتك عشان الضمان يكون محفوظ.</T>
+          <T size={12.5} style={{ flex: 1 }}>قبل تأكيد الأوردر، الأرقام والإيميلات واللينكات وحسابات السوشيال بتتشال من الرسائل تلقائياً. اتعاملوا من خلال ضغطة عشان الضمان يكون محفوظ.</T>
         </Row>
       ) : null}
       {data?.msgs.length ? (

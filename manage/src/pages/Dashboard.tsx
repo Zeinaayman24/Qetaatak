@@ -26,7 +26,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <Page title={`أهلاً ${me.full_name?.split(' ')[0] || ''}`} sub="ملخص قطعتك دلوقتي. الأرقام بتتحدث لوحدها.">
+    <Page title={`أهلاً ${me.full_name?.split(' ')[0] || ''}`} sub="ملخص ضغطة دلوقتي. الأرقام بتتحدث لوحدها.">
       <div className="kpis">
         {kpis.map(([label, value, sub]) => (
           <div className="kpi" key={label}><span className="muted small">{label}</span><strong>{value}</strong>{sub ? <span className="muted small">{sub}</span> : null}</div>

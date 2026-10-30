@@ -1,3 +1,4 @@
+import { Logo } from './Logo';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
@@ -44,9 +45,9 @@ function StaffGate({ session }: { session: Session }) {
     return (
       <div className="center-screen">
         <div className="card narrow">
-          <h1 className="logo">قطع<b>تك</b></h1>
+          <Logo as="h1" />
           <h2>الحساب ده مش من فريق العمل</h2>
-          <p className="muted">نظام الإدارة لفريق قطعتك بس. اطلب من الأدمن يضيف إيميلك ({session.user.email}) كموظف خدمة عملاء.</p>
+          <p className="muted">نظام الإدارة لفريق ضغطة بس. اطلب من الأدمن يضيف إيميلك ({session.user.email}) كموظف خدمة عملاء.</p>
           <button className="btn" onClick={() => supabase.auth.signOut()}>خروج</button>
         </div>
       </div>
@@ -66,7 +67,7 @@ function Shell({ me }: { me: Profile }) {
       <HashRouter>
         <div className="layout">
           <aside className="sidebar">
-            <div className="brand"><span className="logo">قطع<b>تك</b></span><span className="tag">الإدارة</span></div>
+            <div className="brand"><Logo dark /><span className="tag">الإدارة</span></div>
             <nav>
               <Nav to="/" icon="grid" label="لوحة التحكم" end />
               <Nav to="/tickets" icon="chat" label="خدمة العملاء" badge={openTickets} />

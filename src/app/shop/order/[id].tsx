@@ -91,7 +91,7 @@ export default function ShopOrder() {
           );
         })}
         <View style={{ height: 1, backgroundColor: colors.line }} />
-        <Lines rows={[['قيمة البيع', money(total) + ' ج.م'], ['عمولة قطعتك ٥٪', money(total * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(total * (1 - COMMISSION)) + ' ج.م']} />
+        <Lines rows={[['قيمة البيع', money(total) + ' ج.م'], ['عمولة ضغطة ٥٪', money(total * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(total * (1 - COMMISSION)) + ' ج.م']} />
         <Muted size={12}>اكتب رقم الأوردر {orderNo(o.order_no)} على الكيس.</Muted>
       </Card>
 

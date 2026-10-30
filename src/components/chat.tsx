@@ -34,7 +34,7 @@ export function ChatFrame({ subtitle, live, onBack, right, messages, typing, chi
             <Icon name={avatar === 'agent' ? 'headset' : 'sparkles'} size={19} color={avatar === 'agent' ? colors.ink : colors.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <T w="bold" size={16}>{avatar === 'agent' ? 'خدمة العملاء' : 'مساعد قطعتك'}</T>
+            <T w="bold" size={16}>{avatar === 'agent' ? 'خدمة العملاء' : 'مساعد ضغطة'}</T>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: live === false ? colors.faint : colors.good }} />
               <Muted size={12} numberOfLines={1}>{typing ? 'بيكتب…' : subtitle}</Muted>

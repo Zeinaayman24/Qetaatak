@@ -77,7 +77,7 @@ export default function Account() {
       <Group>
         <Item icon="log-out-outline" title="تسجيل خروج" onPress={signOut} danger />
       </Group>
-      <Muted center size={12}>قطعتك · نسخة تجريبية</Muted>
+      <Muted center size={12}>ضغطة · نسخة تجريبية</Muted>
     </Screen>
   );
 }

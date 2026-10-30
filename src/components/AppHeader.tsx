@@ -22,21 +22,13 @@ export function AppHeader(_: { role?: Role }) {
   );
 }
 
-/** The wordmark. On the orange hero the tail turns white; on dark grounds the head does. */
-export function Logo({ size = 24, on = 'light' }: { size?: number; on?: 'light' | 'orange' | 'dark' }) {
-  const head = on === 'dark' ? '#fff' : colors.ink;
-  const tail = on === 'orange' ? '#fff' : colors.accent;
-  return (
-    <T w="display" size={size} color={head} style={{ lineHeight: size * 1.35, letterSpacing: -0.5 }}>
-      قطع<T w="display" size={size} color={tail}>تك</T>
-    </T>
-  );
-}
+import { Logo } from './Brand';
+export { Logo };
 
 type Item = { href: string; label: string; icon: string; match: (p: string) => boolean };
 
 /**
- * The floating tab bar. Customers get a raised orange button in the middle for a new request;
+ * The floating tab bar. Customers get a raised blue button in the middle for a new request;
  * customers and shops each see only their own tabs.
  */
 export function BottomNav({ role }: { role: 'customer' | 'shop' }) {

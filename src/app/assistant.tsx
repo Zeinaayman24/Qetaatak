@@ -100,7 +100,7 @@ export default function Assistant() {
     const first = (profile.full_name || '').split(' ')[0];
     const mode = str(params.mode);
     if (mode === 'complaint') {
-      say({ text: `أهلاً يا ${first} 👋 أنا مساعد قطعتك. خليني أسجّل مشكلتك وأوصّلها لخدمة العملاء.` });
+      say({ text: `أهلاً يا ${first} 👋 أنا مساعد ضغطة. خليني أسجّل مشكلتك وأوصّلها لخدمة العملاء.` });
       const rid = str(params.request);
       return advanceC({ ...emptyC(), category: rid ? 'order' : null, requestId: rid || null, requestAsked: !!rid });
     }
@@ -122,8 +122,8 @@ export default function Assistant() {
         if (live) say({ text: `عندك محادثة مفتوحة مع خدمة العملاء (T-${live.ticket_no}).`, links: [{ label: 'كمّل المحادثة', href: `/assistant?ticket=${live.id}` }] });
       });
     say({ text: isShop
-      ? `أهلاً يا ${first} 👋 أنا مساعد قطعتك. لو عندك مشكلة أو شكوى اكتبهالي وأنا أوصّلها لخدمة العملاء.`
-      : `أهلاً يا ${first} 👋 أنا مساعد قطعتك.\nأقدر أدوّرلك على أي قطعة عند المحلات، أو أسجّل شكوى، أو أتابعلك طلب.\nاكتبلي محتاج إيه، مثلاً «عايز فانوس يمين مستعمل».` });
+      ? `أهلاً يا ${first} 👋 أنا مساعد ضغطة. لو عندك مشكلة أو شكوى اكتبهالي وأنا أوصّلها لخدمة العملاء.`
+      : `أهلاً يا ${first} 👋 أنا مساعد ضغطة.\nأقدر أدوّرلك على أي قطعة عند المحلات، أو أسجّل شكوى، أو أتابعلك طلب.\nاكتبلي محتاج إيه، مثلاً «عايز فانوس يمين مستعمل».` });
     setStep('menu');
   }
 

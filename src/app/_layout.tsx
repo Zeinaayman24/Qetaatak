@@ -2,6 +2,7 @@ import { ReadexPro_400Regular } from '@expo-google-fonts/readex-pro/400Regular';
 import { ReadexPro_500Medium } from '@expo-google-fonts/readex-pro/500Medium';
 import { ReadexPro_600SemiBold } from '@expo-google-fonts/readex-pro/600SemiBold';
 import { ReadexPro_700Bold } from '@expo-google-fonts/readex-pro/700Bold';
+import { Alexandria_900Black } from '@expo-google-fonts/alexandria/900Black';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,14 +20,14 @@ if (Platform.OS !== 'web' && !I18nManager.isRTL) {
 
 export default function RootLayout() {
   const [loaded] = useFonts({
-    ReadexPro_400Regular, ReadexPro_500Medium, ReadexPro_600SemiBold, ReadexPro_700Bold,
+    ReadexPro_400Regular, ReadexPro_500Medium, ReadexPro_600SemiBold, ReadexPro_700Bold, Alexandria_900Black,
   });
 
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       document.documentElement.dir = 'rtl';
       document.documentElement.lang = 'ar';
-      document.title = 'قطعتك';
+      document.title = 'ضغطة';
       document.body.style.backgroundColor = colors.ground;
     }
   }, []);

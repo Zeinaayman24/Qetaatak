@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "قطعتك",
+    "name": "ضغطة",
     "slug": "qetaatak",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1D3550",
+        "backgroundColor": "#041D3F",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -23,7 +23,7 @@
     "web": {
       "favicon": "./assets/favicon.png",
       "output": "single",
-      "name": "قطعتك",
+      "name": "ضغطة",
       "lang": "ar"
     },
     "plugins": [

@@ -43,22 +43,22 @@ export default function CustomerHome() {
   const orders = data?.orders ?? [];
 
   const hero = (
-    <View style={{ backgroundColor: colors.accent, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingBottom: 64 }}>
+    <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, paddingBottom: 64 }}>
       <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 12, gap: 18 }}>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Logo size={26} on="orange" />
+          <Logo size={24} on="dark" />
           <Bell light />
         </Row>
         <View style={{ gap: 2 }}>
-          <T size={15} w="medium" color="rgba(28,34,48,.75)">أهلاً يا {first} 👋</T>
-          <T w="bold" size={28} style={{ lineHeight: 40, letterSpacing: -0.4 }}>محتاج قطعة إيه النهارده؟</T>
+          <T size={15} w="medium" color="rgba(255,255,255,.72)">أهلاً يا {first} 👋</T>
+          <T w="bold" size={28} color="#fff" style={{ lineHeight: 40, letterSpacing: -0.4 }}>محتاج قطعة إيه النهارده؟</T>
         </View>
         <Press onPress={() => newReq()} label="اكتب اسم القطعة"
           style={[{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: 18, paddingStart: 16, paddingEnd: 6, height: 58 }, lift]}>
           <Icon name="search" size={21} color={colors.faint} />
           <T size={15} color={colors.faint} style={{ flex: 1 }} numberOfLines={1}>فانوس، رديتر، مراية…</T>
-          <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="camera" size={21} color="#fff" />
+          <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="camera" size={21} color={colors.ink} />
           </View>
         </Press>
       </View>
@@ -140,7 +140,7 @@ export default function CustomerHome() {
       ) : null}
 
       <Press onPress={() => router.push('/assistant')} style={{ backgroundColor: colors.ink, borderRadius: 24, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <View style={{ width: 50, height: 50, borderRadius: 16, backgroundColor: 'rgba(255,138,30,.16)', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 50, height: 50, borderRadius: 16, backgroundColor: 'rgba(10,171,254,.16)', alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="sparkles" size={24} color={colors.accent} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>

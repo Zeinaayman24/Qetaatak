@@ -112,7 +112,7 @@ export default function ShopRequest() {
         {st === 'declined' ? <Notice>قلت إنها مش متوفرة. لو لقيتها، تقدر تبعت عرض.</Notice> : null}
         {!approved ? <Notice>محلك لسه تحت المراجعة، فمش هتقدر تبعت عروض دلوقتي.</Notice> : null}
         <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0"
-          hint={p ? `عمولة قطعتك ٥٪ = ${money(p * COMMISSION)} ج.م · يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة ٥٪ بس لو العميل اشترى منك.'} />
+          hint={p ? `عمولة ضغطة ٥٪ = ${money(p * COMMISSION)} ج.م · يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة ٥٪ بس لو العميل اشترى منك.'} />
         <Labeled label="حالة القطعة">
           <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
         </Labeled>
