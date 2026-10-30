@@ -1,3 +1,4 @@
+import { isFeatured } from '@/components/AdBanner';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, View } from 'react-native';
@@ -7,7 +8,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  CONDITIONS, DELIVERY_FEE, MATCH_HOURS, warrantyLabel, ORDER_LABEL, SIDES, URGENCY, WANTED, addressLine, ago, ar, friendlyError, money, orderNo, reqNo,
+  CONDITIONS, MATCH_HOURS, warrantyLabel, ORDER_LABEL, SIDES, URGENCY, WANTED, addressLine, ago, ar, friendlyError, money, orderNo, reqNo,
   type Order, type PayMethod, type Quote, type Request, type Shop,
 } from '@/lib/data';
 import { cardAvailable, payByCard } from '@/lib/payments';
@@ -17,7 +18,7 @@ import { colors, lift } from '@/lib/theme';
 
 type Mode = 'delivery' | 'pickup';
 type Declines = Record<string, { n: number; reasons: string[] }>;
-type Data = { req: Request | null; parts: Request[]; quotes: Quote[]; shops: Record<string, Shop>; orders: Record<string, Order>; declines: Declines; shopCount: number; transfer: Record<string, boolean> };
+type Data = { req: Request | null; parts: Request[]; quotes: Quote[]; shops: Record<string, Shop>; orders: Record<string, Order>; declines: Declines; shopCount: number; transfer: Record<string, boolean>; fees: Record<string, number | null> };
 
 /** A price request: offers per part, side by side. Accepted parts move into orders. */
 export default function PriceRequest() {
@@ -34,7 +35,7 @@ export default function PriceRequest() {
 
   const { data, loading } = useLive<Data>(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
-    if (!req) return { req: null, parts: [], quotes: [], shops: {}, orders: {}, declines: {}, shopCount: 0, transfer: {} };
+    if (!req) return { req: null, parts: [], quotes: [], shops: {}, orders: {}, declines: {}, shopCount: 0, transfer: {}, fees: {} };
     const parts = req.batch_id ? (must(await supabase.from('requests').select('*').eq('batch_id', req.batch_id).order('num')) as Request[]) : [req];
     const ids = parts.map((p) => p.id);
     const orderIds = [...new Set(parts.map((p) => p.order_id).filter(Boolean))] as string[];
@@ -50,8 +51,12 @@ export default function PriceRequest() {
     const quoteShops = [...new Set((must(quotes) as Quote[]).map((q) => q.shop_id))];
     const pay = quoteShops.length ? await supabase.rpc('shop_pay_options', { p_shops: quoteShops }) : { data: [] };
     const transfer = Object.fromEntries(((pay.data ?? []) as { shop_id: string; instapay: boolean }[]).map((x) => [x.shop_id, x.instapay]));
+    // delivery price of every offer to this customer's address (null = pickup only)
+    const qids = (must(quotes) as Quote[]).map((q) => q.id);
+    const opt = qids.length ? await supabase.rpc('delivery_options', { p_quotes: qids }) : { data: [] };
+    const fees = Object.fromEntries(((opt.data ?? []) as { quote_id: string; fee: number | null }[]).map((x) => [x.quote_id, x.fee == null ? null : Number(x.fee)]));
     return {
-      transfer,
+      transfer, fees,
       req, parts, quotes: must(quotes) as Quote[],
       shops: Object.fromEntries(shops.map((s) => [s.id, s])),
       orders: Object.fromEntries((must(orderRows as any) as Order[]).map((o) => [o.id, o])),
@@ -69,16 +74,22 @@ export default function PriceRequest() {
   if (d.parts.length === 1 && r.order_id) return <Redirect href={{ pathname: '/order/[id]', params: { id: r.order_id } }} />;
 
   const first = d.parts[0];
-  const quotesOf = (p: Request) => d.quotes.filter((q) => q.request_id === p.id);
+  // featured shops (paid visibility) are listed first; the rest keep the cheapest-first order
+  const quotesOf = (p: Request) => d.quotes.filter((q) => q.request_id === p.id)
+    .sort((a, b) => Number(isFeatured(d.shops[b.shop_id])) - Number(isFeatured(d.shops[a.shop_id])));
   const open = d.parts.filter((p) => p.status === 'open');
   const current = d.parts.find((p) => p.id === tab) ?? open.find((p) => quotesOf(p).length) ?? open[0] ?? d.parts[0];
   const chosen = Object.entries(sel)
     .map(([pid, qid]) => ({ part: d.parts.find((p) => p.id === pid)!, quote: d.quotes.find((q) => q.id === qid)! }))
     .filter((x) => x.part && x.quote && x.part.status === 'open');
   const byShop = Object.values(chosen.reduce<Record<string, typeof chosen>>((acc, c) => ({ ...acc, [c.quote.shop_id]: [...(acc[c.quote.shop_id] ?? []), c] }), {}));
-  const modeOf = (sid: string): Mode => modes[sid] ?? (d.shops[sid]?.offers_delivery ? 'delivery' : 'pickup');
+  // one delivery per shop: possible only if every chosen part from that shop can be delivered; its fee is the highest of them
+  const groupOf = (sid: string) => chosen.filter((c) => c.quote.shop_id === sid);
+  const canDeliver = (sid: string) => groupOf(sid).length > 0 && groupOf(sid).every((c) => d.fees[c.quote.id] != null);
+  const feeOf = (sid: string) => Math.max(0, ...groupOf(sid).map((c) => d.fees[c.quote.id] ?? 0));
+  const modeOf = (sid: string): Mode => (!canDeliver(sid) ? 'pickup' : modes[sid] ?? 'delivery');
   const partsTotal = chosen.reduce((s, c) => s + c.quote.price * (c.part.qty || 1), 0);
-  const deliveryTotal = byShop.filter((g) => modeOf(g[0].quote.shop_id) === 'delivery').length * DELIVERY_FEE;
+  const deliveryTotal = byShop.filter((g) => modeOf(g[0].quote.shop_id) === 'delivery').reduce((s, g) => s + feeOf(g[0].quote.shop_id), 0);
   const bundle = open.length > 1
     ? [...new Set(d.quotes.map((q) => q.shop_id))]
         .filter((sid) => open.every((p) => quotesOf(p).some((q) => q.shop_id === sid)))
@@ -166,7 +177,7 @@ export default function PriceRequest() {
           <Empty icon="close-circle-outline" text="القطعة دي اتلغت من الطلب." />
         ) : qs.length ? (
           <>
-            {qs.map((q, i) => <Offer key={q.id} q={q} shop={d.shops[q.shop_id]} on={sel[p.id] === q.id} cheapest={i === 0 && qs.length > 1} qty={p.qty || 1}
+            {qs.map((q, i) => <Offer key={q.id} q={q} shop={d.shops[q.shop_id]} fee={d.fees[q.id]} on={sel[p.id] === q.id} cheapest={qs.length > 1 && qs.findIndex((x) => x.price === Math.min(...qs.map((y) => y.price))) === i} qty={p.qty || 1}
               onPick={() => pick(p, q)} onChat={() => router.push(`/chat/${p.id}/${q.shop_id}`)} />)}
             {dec?.n ? <Muted size={12.5}>{ar(dec.n)} {dec.n > 1 ? 'محلات قالوا' : 'محل قال'} إنها مش متوفرة عندهم.</Muted> : null}
           </>
@@ -229,8 +240,9 @@ export default function PriceRequest() {
                 ))}
                 <View style={{ height: 1, backgroundColor: colors.line }} />
                 <T w="semibold" size={13} color={colors.muted}>خيار التسليم</T>
-                <RadioCard title="توصيل للبيت" sub={shop?.offers_delivery ? 'المندوب يوصّلها لعنوانك' : 'المحل ده مش بيوصّل'} icon="bicycle" right={`+${money(DELIVERY_FEE)} ج.م`}
-                  on={modeOf(sid) === 'delivery'} disabled={!shop?.offers_delivery} onPress={() => setModes((m) => ({ ...m, [sid]: 'delivery' }))} />
+                <RadioCard title="توصيل للبيت" icon="bicycle" right={canDeliver(sid) ? `+${money(feeOf(sid))} ج.م` : undefined}
+                  sub={canDeliver(sid) ? 'سعر التوصيل من المحل حسب منطقتك' : !shop?.offers_delivery ? 'المحل ده مش بيوصّل' : g.length > 1 ? 'قطعة من دول استلام من المحل بس' : 'القطعة دي استلام من المحل بس (أو المحل مش بيوصّل لمنطقتك)'}
+                  on={modeOf(sid) === 'delivery'} disabled={!canDeliver(sid)} onPress={() => setModes((m) => ({ ...m, [sid]: 'delivery' }))} />
                 <RadioCard title="استلام من المحل" sub="روح استلمها بنفسك" icon="walk" right="مجاناً"
                   on={modeOf(sid) === 'pickup'} onPress={() => setModes((m) => ({ ...m, [sid]: 'pickup' }))} />
               </Card>
@@ -326,7 +338,7 @@ export default function PriceRequest() {
 }
 
 /** One offer: big price, what you get, and a clear pick state. */
-function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?: Shop; on: boolean; cheapest: boolean; qty: number; onPick: () => void; onChat: () => void }) {
+function Offer({ q, shop, fee, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?: Shop; fee?: number | null; on: boolean; cheapest: boolean; qty: number; onPick: () => void; onChat: () => void }) {
   return (
     <Press onPress={onPick} selected={on}
       style={[{ backgroundColor: on ? colors.ink : colors.surface, borderRadius: 18, padding: 16, gap: 12 }, lift]}>
@@ -337,6 +349,7 @@ function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?
             <T w="bold" size={26} color={on ? '#fff' : colors.ink} style={{ lineHeight: 34 }}>{money(q.price)}</T>
             <T size={13} color={on ? 'rgba(255,255,255,.6)' : colors.muted}>ج.م{qty > 1 ? ' للقطعة' : ''}</T>
             {cheapest ? <Pill label="الأرخص" tone="accent" /> : null}
+            {isFeatured(shop) ? <Pill label="محل مميز" icon="star" tone="wait" /> : null}
           </Row>
           <Pressable onPress={() => router.push(`/shop-profile/${q.shop_id}`)} hitSlop={4}>
             <Row gap={4}><Icon name="storefront-outline" size={14} color={on ? 'rgba(255,255,255,.7)' : colors.muted} />
@@ -347,7 +360,7 @@ function Offer({ q, shop, on, cheapest, qty, onPick, onChat }: { q: Quote; shop?
       </Row>
       {q.note ? <T size={13} color={on ? 'rgba(255,255,255,.85)' : colors.muted}>«{q.note}»</T> : null}
       <Row gap={6} style={{ flexWrap: 'wrap' }}>
-        {[[CONDITIONS[q.condition], 'pricetag'], [warrantyLabel(q.warranty_days), q.warranty_days ? 'shield-checkmark' : 'information-circle'], [shop?.offers_delivery ? 'بيوصّل' : 'استلام بس', shop?.offers_delivery ? 'bicycle' : 'walk']].map(([t, icon]) => (
+        {[[CONDITIONS[q.condition], 'pricetag'], [warrantyLabel(q.warranty_days), q.warranty_days ? 'shield-checkmark' : 'information-circle'], [fee != null ? `توصيل ${money(fee)} ج.م` : 'استلام من المحل بس', fee != null ? 'bicycle' : 'walk']].map(([t, icon]) => (
           <Row key={t} gap={4} style={{ backgroundColor: on ? 'rgba(255,255,255,.1)' : colors.soft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
             <Icon name={icon} size={13} color={on ? colors.accent : colors.muted} /><T size={12} w="medium" color={on ? '#fff' : colors.ink}>{t}</T>
           </Row>

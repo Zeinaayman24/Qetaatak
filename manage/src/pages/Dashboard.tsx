@@ -21,7 +21,7 @@ export default function Dashboard() {
     ['المحلات الشغالة', shops.filter((s) => s.status === 'approved').length, pending.length ? `${pending.length} مستنية موافقة` : undefined],
     ['طلبات النهارده', reqToday, `${all.requests.length} إجمالي`],
     ['محادثات مع خدمة العملاء', openTickets.length, openTickets.filter((t) => t.priority === 'high').length ? `${openTickets.filter((t) => t.priority === 'high').length} عاجلة` : undefined],
-    ['قيمة المبيعات', money(gmv), `عمولة ${money(gmv * 0.05)}`],
+    ['قيمة المبيعات', money(gmv), 'من غير رسوم على المحلات'],
     ['طلبات لقت عرض', pct(found, all.requests.length), `إغلاق ${pct(sold.length, found)}`],
   ];
 

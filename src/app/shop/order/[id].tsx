@@ -1,10 +1,10 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
-import { BackBar, Btn, Card, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Row, Screen, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  COMMISSION, CONDITIONS, ORDER_LABEL, warrantyLabel, ORDER_STEP_NAME, orderStep, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
+  CONDITIONS, ORDER_LABEL, warrantyLabel, ORDER_STEP_NAME, orderStep, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
   type Order, type Profile, type Quote, type Request,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -18,6 +18,7 @@ export default function ShopOrder() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { ready, session } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState('');
   const { data, loading } = useLive(async () => {
     const order = must(await supabase.from('orders').select('*').eq('id', id).maybeSingle()) as Order | null;
     if (!order) return { order: null, parts: [] as Request[], quotes: [] as Quote[], customer: null as Profile | null };
@@ -41,6 +42,17 @@ export default function ShopOrder() {
   const total = Number(o.items_total);
   const waitPay = (o.payment_method === 'instapay' || o.payment_method === 'card') && o.payment_status !== 'paid' && o.status !== 'cancelled';
 
+  async function closeWithCode() {
+    if (!code.trim()) return toast('اكتب الكود اللي العميل ادهولك');
+    setBusy(true);
+    const { data: res, error } = await supabase.rpc('confirm_receipt', { p_order: o!.id, p_code: code });
+    setBusy(false);
+    if (error) return toast(friendlyError(error));
+    if (res === 'ok') { setCode(''); toast('تمام! الأوردر اتقفل إنه اتسلّم'); }
+    else if (res === 'locked') toast('محاولات غلط كتير. استنى ربع ساعة وجرّب تاني.');
+    else toast('الكود غلط. اتأكد من العميل وجرّب تاني.');
+  }
+
   async function move() {
     if (!next) return;
     setBusy(true);
@@ -61,8 +73,8 @@ export default function ShopOrder() {
       <View style={{ backgroundColor: colors.ink, borderRadius: 20, padding: 18, gap: 16 }}>
         <Row style={{ justifyContent: 'space-between' }}>
           <View>
-            <T size={12.5} color="rgba(255,255,255,.65)">صافي ليك بعد عمولة ٥٪</T>
-            <T w="bold" size={30} color="#fff">{money(total * (1 - COMMISSION))} <T size={14} color="rgba(255,255,255,.6)">ج.م</T></T>
+            <T size={12.5} color="rgba(255,255,255,.65)">قيمة الأوردر ليك</T>
+            <T w="bold" size={30} color="#fff">{money(total + Number(o.delivery_fee))} <T size={14} color="rgba(255,255,255,.6)">ج.م</T></T>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <T size={12.5} color="rgba(255,255,255,.65)">{o.delivery_mode === 'delivery' ? 'توصيل للعميل' : 'العميل جاي يستلم'}</T>
@@ -83,6 +95,17 @@ export default function ShopOrder() {
 
       <ShopPaymentReview order={o} />
 
+      {!waitPay && o.status !== 'received' && o.status !== 'cancelled' ? (
+        <Card>
+          <Row gap={8}><Icon name="lock-closed" size={18} color={colors.primary} /><T w="bold" size={15}>سلّمت الأوردر؟ اكتب كود الاستلام</T></Row>
+          <Muted size={12.5}>العميل معاه كود من ٤ أرقام في صفحة الأوردر. خده منه بعد ما يستلم القطع ويتأكد منها، واكتبه هنا عشان الأوردر يتقفل.</Muted>
+          <Row gap={10} style={{ alignItems: 'flex-end' }}>
+            <View style={{ flex: 1 }}><Field value={code} onChangeText={setCode} keyboardType="number-pad" ltr big placeholder="٠٠٠٠" /></View>
+            <Btn icon="checkmark-done" title="اتسلّم" loading={busy} onPress={closeWithCode} style={{ minWidth: 110 }} />
+          </Row>
+        </Card>
+      ) : null}
+
       <Card>
         <T w="bold" size={16}>جهّز القطع دي ({ar(parts.length)})</T>
         {parts.map((p) => {
@@ -99,7 +122,7 @@ export default function ShopOrder() {
           );
         })}
         <View style={{ height: 1, backgroundColor: colors.line }} />
-        <Lines rows={[['قيمة البيع', money(total) + ' ج.م'], ['عمولة ضغطة ٥٪', money(total * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(total * (1 - COMMISSION)) + ' ج.م']} />
+        <Lines rows={[['القطع', money(total) + ' ج.م'], ['التوصيل', Number(o.delivery_fee) ? money(Number(o.delivery_fee)) + ' ج.م' : 'استلام من المحل']]} total={['الإجمالي من العميل', money(total + Number(o.delivery_fee)) + ' ج.م']} />
         <Row style={{ justifyContent: 'space-between' }}>
           <Muted size={13}>الدفع: {PAY_NAME[o.payment_method]}</Muted>
           <Pill label={o.payment_method === 'cash' && o.payment_status === 'unpaid' ? 'اتحصّل كاش عند التسليم' : o.payment_method === 'shop' && o.payment_status === 'unpaid' ? 'هيدفع في المحل' : o.payment_status === 'review' ? 'محتاج تأكيدك' : PAY_STATUS[o.payment_status].label} tone={PAY_STATUS[o.payment_status].tone} />

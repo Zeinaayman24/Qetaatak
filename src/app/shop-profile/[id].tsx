@@ -1,3 +1,4 @@
+import { isFeatured } from '@/components/AdBanner';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { BackBar, Chips, Empty, Icon, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
@@ -21,7 +22,8 @@ export default function ShopProfile() {
   const { data, loading, reload } = useLive(async () => {
     const p = must(await supabase.rpc('shop_profile', { p_shop: id })) as Profile;
     const fav = uid ? ((must(await supabase.from('favorites').select('shop_id').eq('customer_id', uid).eq('shop_id', id)) as unknown[]).length > 0) : false;
-    return { p, fav };
+    const featured = (await supabase.from('shops').select('featured_until').eq('id', id).maybeSingle()).data?.featured_until ?? null;
+    return { p, fav, featured };
   }, ['requests'], [id, uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
@@ -47,6 +49,7 @@ export default function ShopProfile() {
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <T w="bold" size={20}>محل في {s.area}</T>
+          {isFeatured({ featured_until: data?.featured }) ? <Pill label="محل مميز" icon="star" tone="wait" /> : null}
           <Muted>{s.governorate}، {SHOP_TYPES[s.shop_type]}</Muted>
           <Row gap={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>
             <Pill label={s.offers_delivery ? 'بيوصّل' : 'استلام من المحل'} />

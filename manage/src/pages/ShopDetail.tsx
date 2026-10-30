@@ -19,23 +19,33 @@ export default function ShopDetail() {
     const { error } = await supabase.from('shops').update({ status }).eq('id', s.id);
     if (error) alert('الأدمن بس يقدر يغيّر حالة المحل.'); else reload();
   }
+  const featured = !!s.featured_until && new Date(s.featured_until) > new Date();
+  async function feature() {
+    const days = prompt(featured ? 'كام يوم من النهارده؟ (اكتب ٠ عشان تشيل التمييز)' : 'المحل يفضل مميز كام يوم؟', '30');
+    if (days === null) return;
+    const n = Number(days.replace(/[٠-٩]/g, (c) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))));
+    if (!Number.isFinite(n) || n < 0) { alert('اكتب عدد أيام.'); return; }
+    const { error } = await supabase.rpc('set_featured', { p_shop: s.id, p_days: Math.round(n) });
+    if (error) alert('مش مسموح.'); else reload();
+  }
   async function toggleBlock() {
     const { error } = await supabase.from('profiles').update({ is_blocked: !pr?.is_blocked }).eq('id', s.id);
     if (error) alert('مش مسموح.'); else reload();
   }
 
   return (
-    <Page title={<>{p?.name} <span className="mono muted">{memberId(pr)}</span></>} sub={<><Pill tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'bad'}>{SHOP_STATUS[s.status]}</Pill> · مسجّل من {date(s.created_at)}</>}
+    <Page title={<>{p?.name} <span className="mono muted">{memberId(pr)}</span></>} sub={<><Pill tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'bad'}>{SHOP_STATUS[s.status]}</Pill>{featured ? <> <Pill tone="dark">★ مميز لحد {date(s.featured_until!)}</Pill></> : null} · مسجّل من {date(s.created_at)}</>}
       actions={me.is_admin ? (
         <>
           {s.status !== 'approved' ? <button className="btn" onClick={() => setStatus('approved')}>وافق على المحل</button> : <button className="btn ghost" onClick={() => setStatus('suspended')}>إيقاف المحل</button>}
+          {s.status === 'approved' ? <button className="btn ghost" onClick={feature}>{featured ? '★ عدّل التمييز' : '★ خلّيه مميز'}</button> : null}
           <button className={'btn ' + (pr?.is_blocked ? 'ghost' : 'danger')} onClick={toggleBlock}>{pr?.is_blocked ? 'إلغاء الحظر' : 'حظر'}</button>
         </>
       ) : null}>
       <div className="kpis four">
         <div className="kpi"><span className="muted small">عروض بعتها</span><strong>{quotes.length}</strong></div>
         <div className="kpi"><span className="muted small">مبيعات</span><strong>{sales.length}</strong></div>
-        <div className="kpi"><span className="muted small">قيمة المبيعات</span><strong>{money(revenue)}</strong><span className="muted small">عمولة {money(revenue * 0.05)}</span></div>
+        <div className="kpi"><span className="muted small">قيمة المبيعات</span><strong>{money(revenue)}</strong></div>
         <div className="kpi"><span className="muted small">التقييم</span><strong>{rated.length ? (rated.reduce((a, r) => a + r.rating!, 0) / rated.length).toFixed(1) + ' ★' : '—'}</strong><span className="muted small">{rated.length} تقييم</span></div>
       </div>
       <div className="grid-2">

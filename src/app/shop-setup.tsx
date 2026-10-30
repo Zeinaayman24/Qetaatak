@@ -11,7 +11,7 @@ export default function ShopSetup() {
   const { ready, session, profile, shop, shopPrivate, refresh } = useAuth();
   const [f, setF] = useState({
     name: '', owner: '', phone: '', phone2: '', governorate: 'القاهرة', area: '', street: '', building: '', landmark: '', postal: '',
-    register: '', instapay: '', wallet: '', type: 'used' as 'used' | 'new' | 'both', specialties: [] as string[], brands: [] as string[], delivery: false,
+    register: '', instapay: '', wallet: '', type: 'used' as 'used' | 'new' | 'both', specialties: [] as string[], brands: [] as string[], delivery: false, feeArea: '', feeCity: '', feeFar: '',
   });
   const set = (k: keyof typeof f) => (v: any) => setF((x) => ({ ...x, [k]: v }));
   const toggle = (k: 'brands' | 'specialties') => (v: string) => setF((x) => ({ ...x, [k]: x[k].includes(v) ? x[k].filter((y) => y !== v) : [...x[k], v] }));
@@ -31,6 +31,7 @@ export default function ShopSetup() {
       ...(shop ? {
         governorate: shop.governorate || 'القاهرة', area: shop.area, type: shop.shop_type || 'used', specialties: shop.specialties || [],
         brands: shop.brands, delivery: !!shop.offers_delivery,
+        feeArea: shop.fee_area != null ? String(Number(shop.fee_area)) : '', feeCity: shop.fee_city != null ? String(Number(shop.fee_city)) : '', feeFar: shop.fee_far != null ? String(Number(shop.fee_far)) : '',
       } : {}),
     }));
   }, [shop?.id, shopPrivate?.id, profile?.id]);
@@ -48,10 +49,13 @@ export default function ShopSetup() {
     if (!validPostal(f.postal)) return setErr('الرقم البريدي لازم يكون ٥ أرقام.');
     if (!f.specialties.length) return setErr('اختار تخصص واحد على الأقل.');
     if (!f.brands.length) return setErr('اختار ماركة واحدة على الأقل.');
+    if (f.delivery && (!f.feeArea.trim() || !f.feeCity.trim())) return setErr('اكتب سعر التوصيل لنفس المنطقة ولنفس المحافظة.');
     setBusy(true);
     try {
       const uid = profile!.id;
-      const pub = { area: f.area.trim(), governorate: f.governorate, shop_type: f.type, specialties: f.specialties, brands: f.brands, offers_delivery: f.delivery };
+      const fee = (t: string) => { const n = parseFloat(toLatin(t).trim()); return t.trim() && !isNaN(n) ? n : null; };
+      const pub = { area: f.area.trim(), governorate: f.governorate, shop_type: f.type, specialties: f.specialties, brands: f.brands, offers_delivery: f.delivery,
+        fee_area: f.delivery ? fee(f.feeArea) : null, fee_city: f.delivery ? fee(f.feeCity) : null, fee_far: f.delivery ? fee(f.feeFar) : null };
       const priv = {
         name: f.name.trim(), owner_name: f.owner.trim(), phone: toLatin(f.phone).replace(/\s/g, ''), phone2: toLatin(f.phone2).replace(/\s/g, ''),
         street: f.street.trim(), building: f.building.trim(), landmark: f.landmark.trim(), postal_code: toLatin(f.postal.trim()), commercial_register: f.register.trim(),
@@ -125,6 +129,16 @@ export default function ShopSetup() {
           </Labeled>
           <Labeled label="التوصيل">
             <Seg options={[{ v: 'yes', label: 'بنوصّل' }, { v: 'no', label: 'استلام من المحل بس' }]} value={f.delivery ? 'yes' : 'no'} onPick={(v) => set('delivery')(v === 'yes')} />
+            {f.delivery ? (
+              <View style={{ gap: 10, marginTop: 6 }}>
+                <Muted size={12.5}>سعر التوصيل حسب المسافة. العميل بيشوف السعر المناسب لعنوانه تلقائي، وتقدر تغيّره لأي قطعة تقيلة وانت بتبعت العرض.</Muted>
+                <Row style={{ alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}><Field label="نفس المنطقة (ج.م)" value={f.feeArea} onChangeText={set('feeArea')} keyboardType="number-pad" ltr placeholder="40" /></View>
+                  <View style={{ flex: 1 }}><Field label="نفس المحافظة (ج.م)" value={f.feeCity} onChangeText={set('feeCity')} keyboardType="number-pad" ltr placeholder="70" /></View>
+                </Row>
+                <Field label="محافظات تانية (ج.م، سيبه فاضي لو مش بتوصّل بره المحافظة)" value={f.feeFar} onChangeText={set('feeFar')} keyboardType="number-pad" ltr placeholder="مثلاً 150" />
+              </View>
+            ) : null}
           </Labeled>
         </View>
       </Section>

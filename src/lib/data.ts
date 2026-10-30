@@ -29,7 +29,6 @@ export const warrantyLabel = (d: number) => (d > 0 ? `ضمان ${ar(d)} يوم` 
 /** What every order gets, warranty or not: the part must match what was described. */
 export const MATCH_HOURS = 48;
 export const DELIVERY_FEE = 60;
-export const COMMISSION = 0.05;
 
 const AD = '٠١٢٣٤٥٦٧٨٩';
 export const ar = (v: string | number) => String(v).replace(/\d/g, (d) => AD[Number(d)]);
@@ -59,6 +58,10 @@ export type Profile = {
 export type Shop = {
   id: string; area: string; brands: string[]; status: 'pending' | 'approved' | 'suspended'; created_at: string;
   governorate: string; shop_type: 'used' | 'new' | 'both'; specialties: string[]; offers_delivery: boolean;
+  /** delivery fees by distance: same area, same governorate, other governorates (null = doesn't deliver there) */
+  fee_area: number | null; fee_city: number | null; fee_far: number | null;
+  /** paid visibility: listed first with a badge until this date */
+  featured_until?: string | null;
 };
 export type ShopPrivate = {
   id: string; name: string; owner_name: string; phone: string; phone2: string;
@@ -97,6 +100,8 @@ export const REPORT_CATEGORIES: Record<string, string> = { order: 'مشكلة ف
 export type Quote = {
   id: string; request_id: string; shop_id: string; price: number; condition: string; warranty_days: number;
   photo_path: string | null; created_at: string; brand: string; note: string;
+  /** can THIS part be delivered, and an optional fee for it (heavy parts) instead of the shop's distance fees */
+  can_deliver: boolean; delivery_fee: number | null;
 };
 /** A shop can send up to this many offers for one part (different brands / prices). */
 export const MAX_OFFERS = 5;

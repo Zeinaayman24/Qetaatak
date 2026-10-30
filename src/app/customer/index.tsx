@@ -5,6 +5,7 @@ import { BottomNav, Logo, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { Icon, Loading, Muted, Plate, Press, Row, Screen, Section, T } from '@/components/ui';
 import { InstallCard } from '@/components/InstallCard';
+import { AdBanner } from '@/components/AdBanner';
 import { useAuth } from '@/lib/auth';
 import { ORDER_LABEL, ar, groupRequests, orderNo, orderStep, orderSteps, orderTitle, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -91,6 +92,8 @@ export default function CustomerHome() {
           ))}
         </View>
       </View>
+
+      <AdBanner />
 
       {orders.length ? (
         <Section title="أوردراتك" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>

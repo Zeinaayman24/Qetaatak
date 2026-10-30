@@ -13,7 +13,7 @@ import { needsPayment } from '@/lib/payments';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
 
-type Data = { order: Order | null; parts: Request[]; quotes: Quote[]; shop: Shop | null; priv: ShopPrivate | null };
+type Data = { order: Order | null; parts: Request[]; quotes: Quote[]; shop: Shop | null; priv: ShopPrivate | null; code: string | null };
 
 /** One order with one shop: live status, the shop, the parts, the receipt and the warranty. */
 export default function OrderPage() {
@@ -24,15 +24,16 @@ export default function OrderPage() {
   const [review, setReview] = useState('');
   const { data, loading } = useLive<Data>(async () => {
     const order = must(await supabase.from('orders').select('*').eq('id', id).maybeSingle()) as Order | null;
-    if (!order) return { order: null, parts: [], quotes: [], shop: null, priv: null };
+    if (!order) return { order: null, parts: [], quotes: [], shop: null, priv: null, code: null };
     const parts = must(await supabase.from('requests').select('*').eq('order_id', id).order('num')) as Request[];
     const qids = parts.map((p) => p.chosen_quote_id).filter(Boolean) as string[];
-    const [quotes, shop, priv] = await Promise.all([
+    const [quotes, shop, priv, code] = await Promise.all([
       qids.length ? supabase.from('quotes').select('*').in('id', qids) : Promise.resolve({ data: [], error: null }),
       supabase.from('shops').select('*').eq('id', order.shop_id).maybeSingle(),
       supabase.from('shop_private').select('*').eq('id', order.shop_id).maybeSingle(),
+      supabase.from('order_codes').select('code').eq('order_id', order.id).maybeSingle(),
     ]);
-    return { order, parts, quotes: must(quotes as any) as Quote[], shop: shop.data as Shop | null, priv: priv.data as ShopPrivate | null };
+    return { order, parts, quotes: must(quotes as any) as Quote[], shop: shop.data as Shop | null, priv: priv.data as ShopPrivate | null, code: (code.data as { code: string } | null)?.code ?? null };
   }, ['orders', 'requests'], [id]);
 
   if (ready && !session) return <Redirect href="/login" />;
@@ -96,6 +97,14 @@ export default function OrderPage() {
           </Row>
         ) : null}
       </View>
+
+      {data!.code && o.status !== 'received' && o.status !== 'cancelled' ? (
+        <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.primary, padding: 16, gap: 8, alignItems: 'center' }}>
+          <Row gap={6}><Icon name="lock-closed" size={16} color={colors.primary} /><T w="semibold" size={13.5} color={colors.primary}>كود الاستلام</T></Row>
+          <T w="bold" size={40} style={{ letterSpacing: 10, lineHeight: 52, writingDirection: 'ltr' }} selectable>{ar(data!.code)}</T>
+          <Muted size={12.5} center>اديه للمحل أو المندوب بعد ما تستلم القطع وتتأكد إنها زي الوصف. الكود ده بيقفل الأوردر، فماتديهوش قبل كده.</Muted>
+        </View>
+      ) : null}
 
       <PaymentPanel order={o} shop={priv} />
 

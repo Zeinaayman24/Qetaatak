@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, URGENCY, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel } from '@/lib/data';
+import { CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, URGENCY, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -21,6 +21,8 @@ export default function ShopRequest() {
   const [brand, setBrand] = useState('');
   const [note, setNote] = useState('');
   const [adding, setAdding] = useState(false);
+  const [deliverable, setDeliverable] = useState(true);
+  const [partFee, setPartFee] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -58,6 +60,8 @@ export default function ShopRequest() {
   const latin = (t: string) => t.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
   const p = parseInt(latin(price), 10) || 0;
   const wd = parseInt(latin(days), 10) || 0;
+  const shopDelivers = !!shop?.offers_delivery;
+  const pf = partFee.trim() ? parseFloat(latin(partFee)) : null;
   const offers = data!.offers;
   const approved = shop?.status === 'approved';
   const extras = [
@@ -78,9 +82,10 @@ export default function ShopRequest() {
       const photo_path = photo ? await uploadPhoto(photo, uid!) : null;
       const { error } = await supabase.from('quotes').insert({
         request_id: r!.id, shop_id: uid, price: p, condition: cond, warranty_days: hasWarranty ? wd : 0, photo_path, brand: brand.trim(), note: note.trim(),
+        can_deliver: shopDelivers && deliverable, delivery_fee: shopDelivers && deliverable && pf != null && !isNaN(pf) ? pf : null,
       });
       if (error) throw error;
-      setPrice(''); setPhoto(null); setBrand(''); setNote(''); setAdding(false);
+      setPrice(''); setPhoto(null); setBrand(''); setNote(''); setPartFee(''); setAdding(false);
       const next = !offers.length ? data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open') : undefined;
       if (next) { toast('العرض اتبعت، كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
       else { toast('العرض اتبعت للعميل'); reload(); }
@@ -111,6 +116,7 @@ export default function ShopRequest() {
       </Row>
       <Row gap={6} style={{ flexWrap: 'wrap' }}>
         <Pill label={CONDITIONS[q.condition]} /><Pill label={warrantyLabel(q.warranty_days)} tone={q.warranty_days ? 'good' : 'plain'} />
+        <Pill label={!q.can_deliver ? 'استلام من المحل بس' : q.delivery_fee != null ? `توصيل ${money(q.delivery_fee)} ج.م` : 'توصيل حسب المنطقة'} icon={q.can_deliver ? 'bicycle' : 'walk'} />
         {r.chosen_quote_id === q.id ? <Pill label="العميل اختاره" tone="good" icon="checkmark" /> : null}
       </Row>
       {q.note ? <Muted size={12.5}>{q.note}</Muted> : null}
@@ -139,8 +145,7 @@ export default function ShopRequest() {
         <T w="bold" size={17}>{offers.length ? 'عرض جديد بماركة أو سعر تاني' : 'ابعت عرضك'}</T>
         <Field label="الماركة / النوع" value={brand} onChangeText={setBrand} placeholder="مثلاً: أصلي هيونداي، Bosch، Valeo، صيني" icon="pricetag"
           hint="لو عندك أكتر من ماركة، ابعت كل واحدة كعرض لوحدها بسعرها." />
-        <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0"
-          hint={p ? `عمولة ضغطة ٥٪ = ${money(p * COMMISSION)} ج.م، يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة ٥٪ بس لو العميل اشترى منك.'} />
+        <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0" hint="ده السعر اللي العميل هيدفعه ليك كامل. ضغطة مجاناً للمحلات." />
         <Labeled label="حالة القطعة">
           <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
         </Labeled>
@@ -149,6 +154,17 @@ export default function ShopRequest() {
           {hasWarranty
             ? <Field label="مدة الضمان بالأيام (مطلوب)" value={days} onChangeText={setDays} keyboardType="number-pad" ltr placeholder="مثلاً 30" icon="shield-checkmark" />
             : <Muted size={12}>مش لازم تدي ضمان. العروض اللي عليها ضمان بتظهر بعلامة «بضمان» والعملاء بيختاروها أكتر.</Muted>}
+        </Labeled>
+        <Labeled label="التوصيل للقطعة دي">
+          {shopDelivers ? (
+            <>
+              <Seg options={[{ v: 'yes', label: 'ينفع تتوصّل' }, { v: 'no', label: 'استلام من المحل بس' }]} value={deliverable ? 'yes' : 'no'} onPick={(v) => setDeliverable(v === 'yes')} />
+              {deliverable ? (
+                <Field value={partFee} onChangeText={setPartFee} keyboardType="number-pad" ltr icon="bicycle" placeholder="سعر توصيل خاص للقطعة دي (اختياري)"
+                  hint={`لو سيبته فاضي: ${shop?.fee_area != null ? money(Number(shop.fee_area)) : '—'} ج.م لنفس المنطقة، ${shop?.fee_city != null ? money(Number(shop.fee_city)) : '—'} ج.م لنفس المحافظة${shop?.fee_far != null ? `، ${money(Number(shop.fee_far))} ج.م لبرّه` : ''}. اكتب سعر لو القطعة تقيلة أو كبيرة.`} />
+              ) : <Muted size={12}>العميل هيشوف إن القطعة دي استلام من المحل بس.</Muted>}
+            </>
+          ) : <Muted size={12.5}>محلك مش بيوصّل، فالعميل هيستلم من المحل. تقدر تفعّل التوصيل وأسعاره من بيانات المحل.</Muted>}
         </Labeled>
         <Field label="ملاحظة للعميل (اختياري)" value={note} onChangeText={setNote} placeholder="مثلاً: فرز أول، متجربة على العربية" multiline />
         <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر" />

@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { customerPill } from '@/components/status';
 import { BackBar, Btn, Card, Empty, Field, Lines, ListRow, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COMMISSION, SHOP_TYPES, addressLine, ago, ar, friendlyError, money, reqNo, REPORT_CATEGORIES, type Profile, type Quote, type Report, type Request, type Shop, type ShopPrivate } from '@/lib/data';
+import { SHOP_TYPES, addressLine, ago, ar, friendlyError, money, reqNo, REPORT_CATEGORIES, type Profile, type Quote, type Report, type Request, type Shop, type ShopPrivate } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 
@@ -49,7 +49,7 @@ export default function Admin() {
   return (
     <Screen>
       <BackBar title="لوحة الإدارة" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
-      <Stats items={[[ar(d.reqs.length), 'طلبات'], [ar(sold.length), 'مبيعات'], [money(gmv * COMMISSION), 'عمولتك (ج.م)']]} />
+      <Stats items={[[ar(d.reqs.length), 'طلبات'], [ar(sold.length), 'مبيعات'], [ar(d.shops.filter((x) => x.status === 'approved').length), 'محلات شغالة']]} />
       <Stats items={[[pct(found, d.reqs.length), 'لقت عرض'], [pct(sold.length, found), 'نسبة الإغلاق'], [money(gmv), 'المبيعات (ج.م)']]} />
 
       <Section title={'المحلات (' + ar(d.shops.length) + ')'}>
