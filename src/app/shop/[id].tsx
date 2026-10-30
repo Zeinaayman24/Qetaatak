@@ -75,7 +75,7 @@ export default function ShopRequest() {
       if (error) throw error;
       setPrice(''); setPhoto(null);
       const next = data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open');
-      if (next) { toast('العرض اتبعت · كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
+      if (next) { toast('العرض اتبعت، كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
       else { toast('العرض اتبعت للعميل'); reload(); }
     } catch (x) { setErr(friendlyError(x)); }
     finally { setBusy(false); }
@@ -86,7 +86,7 @@ export default function ShopRequest() {
     setAsk(false);
     if (error) return toast(friendlyError(error));
     const next = data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open');
-    if (next) { toast('اتسجّل · كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
+    if (next) { toast('اتسجّل، كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
     else { toast('تمام، العميل هيعرف إنها مش متوفرة عندك'); reload(); }
   }
 
@@ -100,7 +100,7 @@ export default function ShopRequest() {
   const footer = canQuote ? (
     <>
       <ErrorText text={err} />
-      <Btn kind="accent" icon="paper-plane" title={p ? 'ابعت العرض · ' + money(p) + ' ج.م' : 'ابعت العرض'} onPress={send} loading={busy} disabled={!approved} />
+      <Btn kind="accent" icon="paper-plane" title={p ? 'ابعت العرض، ' + money(p) + ' ج.م' : 'ابعت العرض'} onPress={send} loading={busy} disabled={!approved} />
       {st === 'open' ? <Btn kind="link" title="مش متوفرة عندي" onPress={() => setAsk(true)} style={{ alignSelf: 'center' }} /> : null}
     </>
   ) : undefined;
@@ -112,7 +112,7 @@ export default function ShopRequest() {
         {st === 'declined' ? <Notice>قلت إنها مش متوفرة. لو لقيتها، تقدر تبعت عرض.</Notice> : null}
         {!approved ? <Notice>محلك لسه تحت المراجعة، فمش هتقدر تبعت عروض دلوقتي.</Notice> : null}
         <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0"
-          hint={p ? `عمولة ضغطة ٥٪ = ${money(p * COMMISSION)} ج.م · يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة ٥٪ بس لو العميل اشترى منك.'} />
+          hint={p ? `عمولة ضغطة ٥٪ = ${money(p * COMMISSION)} ج.م، يفضلك ${money(p * (1 - COMMISSION))} ج.م` : 'عمولة ٥٪ بس لو العميل اشترى منك.'} />
         <Labeled label="حالة القطعة">
           <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
         </Labeled>
@@ -153,7 +153,7 @@ export default function ShopRequest() {
                 <Press key={x.r.id} onPress={() => router.replace(`/shop/${x.r.id}`)} selected={on}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: on ? colors.ink : colors.surface, borderWidth: 1.5, borderColor: on ? colors.ink : colors.line }}>
                   <Icon name={x.quoted ? 'checkmark-circle' : x.declined ? 'remove-circle' : 'ellipse-outline'} size={16} color={on ? colors.accent : x.quoted ? colors.good : colors.faint} />
-                  <T size={13} w="medium" color={on ? '#fff' : colors.ink}>{ar(i + 1)}. {x.r.part}</T>
+                  <T size={13} w="medium" color={on ? '#fff' : colors.ink}>{x.r.part}</T>
                 </Press>
               );
             })}
@@ -165,7 +165,7 @@ export default function ShopRequest() {
         <View style={{ flex: 1 }}>
           <T w="bold" size={18}>{r.part}{r.qty > 1 ? ` × ${ar(r.qty)}` : ''}</T>
           <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
-          <Muted>عايزها {WANTED[r.wanted_condition]} · {r.area} · {ago(r.created_at)}</Muted>
+          <Muted>عايزها {WANTED[r.wanted_condition]}، {r.area}، {ago(r.created_at)}</Muted>
         </View>
       </Row>
       {extras.length ? <Row gap={6} style={{ flexWrap: 'wrap' }}>{extras.map((e) => <Pill key={e} label={e} tone={e === URGENCY.urgent ? 'wait' : 'plain'} />)}</Row> : null}

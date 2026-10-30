@@ -13,7 +13,7 @@ export default function Notifications() {
   const uid = session?.user.id;
   const { data, loading } = useLive(async () => {
     if (!uid) return [] as Notification[];
-    return must(await supabase.from('notifications').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(60)) as Notification[];
+    return must(await supabase.from('notifications').select('*').eq('user_id', uid).not('link', 'like', '/chat/%').order('created_at', { ascending: false }).limit(60)) as Notification[];
   }, ['notifications'], [uid]);
 
   // opening the list marks everything as read (a moment later, so the new ones still show highlighted)

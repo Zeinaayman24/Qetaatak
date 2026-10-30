@@ -169,7 +169,7 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
     chips = [{ label: 'محادثة جديدة', main: true, icon: 'add', fn: () => router.replace('/assistant') }, { label: 'شكاويّا', fn: () => router.push('/support') }];
   }
 
-  const sub = `T-${t.ticket_no} · ` + (status === 'bot' ? 'المساعد بيحاول يحلّها' : status === 'open' ? 'بنوصّلك بموظف…' : status === 'in_progress' ? 'موظف معاك دلوقتي' : 'المحادثة انتهت');
+  const sub = `T-${t.ticket_no}، ` + (status === 'bot' ? 'المساعد بيحاول يحلّها' : status === 'open' ? 'بنوصّلك بموظف…' : status === 'in_progress' ? 'موظف معاك دلوقتي' : 'المحادثة انتهت');
   const footer = status === 'open' ? (
     <View style={{ backgroundColor: colors.accentSoft, borderRadius: 14, padding: 12 }}>
       <T size={13.5} w="medium">حوّلناك لخدمة العملاء</T>

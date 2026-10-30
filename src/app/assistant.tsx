@@ -154,7 +154,7 @@ export default function Assistant() {
     setStep('confirm');
     const car = carOf(d)!;
     const all = [...b, d];
-    const itemLine = (x: Draft): string => [x.part, x.side ? SIDES[x.side] : '', WANTED[x.cond ?? d.cond ?? 'any']].filter(Boolean).join(' · ');
+    const itemLine = (x: Draft): string => [x.part, x.side ? SIDES[x.side] : '', WANTED[x.cond ?? d.cond ?? 'any']].filter(Boolean).join('، ');
     say({
       text: all.length > 1 ? `تمام، ده طلبك (${ar(all.length)} قطع). أبعته للمحلات؟ كل محل هيسعّر اللي عنده.` : 'تمام، ده طلبك. أبعته للمحلات؟',
       photo: d.photo ?? undefined,
@@ -219,7 +219,7 @@ export default function Assistant() {
       text: 'ده ملخص شكوتك. أبعتها؟',
       lines: [
         ['النوع', REPORT_CATEGORIES[c.category]],
-        ...(r ? [['الطلب', `${reqNo(r.num)} · ${r.part}`] as [string, string]] : []),
+        ...(r ? [['الطلب', `${reqNo(r.num)}، ${r.part}`] as [string, string]] : []),
         ['التفاصيل', c.body.trim()],
       ],
     });
@@ -250,7 +250,7 @@ export default function Assistant() {
     const { data } = await supabase.from('requests').select('*').eq('customer_id', uid!).in('status', ['open', 'chosen']).order('created_at', { ascending: false }).limit(5);
     const rs = (data ?? []) as Request[];
     if (!rs.length) return say({ text: 'مفيش طلبات شغالة دلوقتي. تحب أدوّرلك على قطعة؟' });
-    say({ text: rs.length === 1 ? 'عندك طلب شغال:' : `عندك ${ar(rs.length)} طلبات شغالة:`, links: rs.map((r) => ({ label: `${reqNo(r.num)} · ${r.part} — ${STATUS[r.status]}`, href: `/customer/${r.id}` })) });
+    say({ text: rs.length === 1 ? 'عندك طلب شغال:' : `عندك ${ar(rs.length)} طلبات شغالة:`, links: rs.map((r) => ({ label: `${reqNo(r.num)}، ${r.part} — ${STATUS[r.status]}`, href: `/customer/${r.id}` })) });
   }
 
   /* ---------- understanding typed text */
@@ -426,7 +426,7 @@ export default function Assistant() {
       tap('الميزانية', () => advance({ ...draft, budget: null, budgetAsked: false })),
     ]; break;
     case 'c_cat': chips = complaintCats.map(([k, v]) => tap(v, () => advanceC({ ...cdraft, category: k }))); break;
-    case 'c_order': chips = [...recent.map((r) => tap(`${reqNo(r.num)} · ${r.part}`, () => advanceC({ ...cdraft, requestId: r.id, requestAsked: true }))), tap('مش عن طلب معين', () => advanceC({ ...cdraft, requestAsked: true }))]; break;
+    case 'c_order': chips = [...recent.map((r) => tap(`${reqNo(r.num)}، ${r.part}`, () => advanceC({ ...cdraft, requestId: r.id, requestAsked: true }))), tap('مش عن طلب معين', () => advanceC({ ...cdraft, requestAsked: true }))]; break;
     case 'c_body': chips = []; break;
     case 'c_confirm': chips = [
       { label: busy ? 'بتتبعت…' : 'ابعت الشكوى', fn: sendComplaint },
@@ -446,7 +446,7 @@ export default function Assistant() {
 
   return (
     <ChatFrame
-      subtitle={aiOn ? 'متصل · ذكاء اصطناعي' : 'متصل دايماً'}
+      subtitle={aiOn ? 'متصل، ذكاء اصطناعي' : 'متصل دايماً'}
       onBack={back}
       right={!isShop ? (
         <Pressable onPress={() => router.push('/customer/new')} hitSlop={8} accessibilityRole="button">

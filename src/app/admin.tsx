@@ -61,7 +61,7 @@ export default function Admin() {
             <View key={s.id}>
               <ListRow last={i === shops.length - 1 && !open} onPress={() => setOpenId(open ? null : s.id)}
                 title={<Row gap={8}><T w="semibold">{p?.name ?? '—'}</T><Pill label={s.status === 'approved' ? 'شغال' : s.status === 'pending' ? 'مستني موافقة' : 'موقوف'} tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'plain'} /></Row>}
-                subtitle={`${s.area}، ${s.governorate} · ${SHOP_TYPES[s.shop_type] ?? ''}`}
+                subtitle={`${s.area}، ${s.governorate}، ${SHOP_TYPES[s.shop_type] ?? ''}`}
                 meta={open ? 'اضغط للإخفاء' : 'اضغط لعرض كل البيانات'} />
               {open ? (
                 <Card style={{ marginBottom: 12 }}>
@@ -96,7 +96,7 @@ export default function Admin() {
               <Pill label={rp.status === 'resolved' ? 'اتحلّت' : 'مفتوحة'} tone={rp.status === 'resolved' ? 'good' : 'wait'} />
             </Row>
             <T size={14}>{rp.body}</T>
-            <Muted size={12}>{d.people[rp.reporter_id]?.full_name || d.priv[rp.reporter_id]?.name || ''} · {d.people[rp.reporter_id]?.email ?? ''} · {ago(rp.created_at)}</Muted>
+            <Muted size={12}>{d.people[rp.reporter_id]?.full_name || d.priv[rp.reporter_id]?.name || ''}، {d.people[rp.reporter_id]?.email ?? ''}، {ago(rp.created_at)}</Muted>
             {rp.admin_reply ? <Muted size={13}>ردّك: {rp.admin_reply}</Muted> : null}
             {rp.status === 'open' ? (
               <>
@@ -117,8 +117,8 @@ export default function Admin() {
           return (
             <ListRow key={r.id} last={i === d.reqs.length - 1}
               title={r.part}
-              subtitle={`${r.car_make} ${r.car_model} · ${d.people[r.customer_id]?.full_name ?? ''} · ${r.area}`}
-              meta={qs.length ? qs.map((q) => `${d.priv[q.shop_id]?.name ?? 'محل'} ${money(q.price)}${q.id === r.chosen_quote_id ? ' ✓' : ''}`).join(' · ') : `${reqNo(r.num)} · ${ago(r.created_at)}`}
+              subtitle={`${r.car_make} ${r.car_model}، ${d.people[r.customer_id]?.full_name ?? ''}، ${r.area}`}
+              meta={qs.length ? qs.map((q) => `${d.priv[q.shop_id]?.name ?? 'محل'} ${money(q.price)}${q.id === r.chosen_quote_id ? ' ✓' : ''}`).join('، ') : `${reqNo(r.num)}، ${ago(r.created_at)}`}
               trailing={customerPill(r, qs.length)} />
           );
         }) : <Empty text="لسه مفيش طلبات." />}

@@ -230,7 +230,7 @@ export default function NewRequest() {
                   <Plate top={car.model || '—'} bottom={ar(car.year)} size="sm" />
                   <View style={{ flex: 1 }}>
                     <T w="semibold" color="#fff">{car.make} {car.model}</T>
-                    <T size={12.5} color="rgba(255,255,255,.7)">{URGENCY[urgency]} · {profile.area}</T>
+                    <T size={12.5} color="rgba(255,255,255,.7)">{URGENCY[urgency]}، {profile.area}</T>
                   </View>
                 </View>
                 {items.map((it, i) => (
@@ -240,7 +240,7 @@ export default function NewRequest() {
                     )}
                     <View style={{ flex: 1 }}>
                       <T w="semibold" size={14.5}>{it.part}{it.qty > 1 ? ` × ${ar(it.qty)}` : ''}</T>
-                      <Muted size={12}>{[WANTED[it.cond], partIsSided(it.part) && it.side ? SIDES[it.side] : '', it.budget ? `لحد ${it.budget} ج` : '', it.notes].filter(Boolean).join(' · ')}</Muted>
+                      <Muted size={12}>{[WANTED[it.cond], partIsSided(it.part) && it.side ? SIDES[it.side] : '', it.budget ? `لحد ${it.budget} ج` : '', it.notes].filter(Boolean).join('، ')}</Muted>
                     </View>
                   </View>
                 ))}
@@ -258,7 +258,7 @@ export default function NewRequest() {
       <View style={[{ backgroundColor: colors.surface, paddingTop: 12, paddingBottom: insets.bottom + 12, borderTopLeftRadius: 24, borderTopRightRadius: 24 }, lift]}>
         <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18 }}>
           <Btn kind={step === 3 ? 'accent' : 'primary'} icon={step === 3 ? 'paper-plane' : 'arrow-back'} loading={busy} disabled={!canNext}
-            title={step === 0 ? (items.length ? `التالي · ${ar(items.length)} ${items.length > 1 ? 'قطع' : 'قطعة'}` : 'ضيف قطعة الأول') : step === 3 ? 'ابعت للمحلات' : 'التالي'}
+            title={step === 0 ? (items.length ? `التالي، ${ar(items.length)} ${items.length > 1 ? 'قطع' : 'قطعة'}` : 'ضيف قطعة الأول') : step === 3 ? 'ابعت للمحلات' : 'التالي'}
             onPress={next} />
         </View>
       </View>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { ar, friendlyError, money, type Order, type PayMethod } from '@/lib/data';
-import { PAY_METHODS, PAY_NAME, PAY_STATUS, payByCard, paySettings, type PaySettings } from '@/lib/payments';
+import { PAY_METHODS, PAY_NAME, PAY_STATUS, payByCard } from '@/lib/payments';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
 import { colors, radius } from '@/lib/theme';
@@ -36,15 +36,28 @@ export function RadioCard({ title, sub, icon, on, onPress, disabled, badge, righ
   );
 }
 
-/** The payment choice in the checkout. Card shows "soon" until Paymob is switched on; pay-at-shop needs pickup. */
-export function PaymentPicker({ value, onPick, card, allPickup }: { value: PayMethod; onPick: (v: PayMethod) => void; card: boolean; allPickup: boolean }) {
+/** Which payment methods fit how the parts arrive: delivery, pickup, or a mix of both. */
+export type Handover = 'delivery' | 'pickup' | 'mixed';
+export function payOptions(handover: Handover): PayMethod[] {
+  return handover === 'pickup' ? ['shop', 'instapay', 'card'] : ['cash', 'instapay', 'card'];
+}
+
+/** The payment choice in the checkout: only the methods that fit the delivery choice are shown. */
+export function PaymentPicker({ value, onPick, card, instapay, handover }: {
+  value: PayMethod; onPick: (v: PayMethod) => void; card: boolean; instapay: boolean; handover: Handover;
+}) {
   return (
     <View style={{ gap: 10 }}>
-      {PAY_METHODS.map((m) => {
-        const off = (m.v === 'card' && !card) || (m.v === 'shop' && !allPickup);
+      {payOptions(handover).map((v) => {
+        const m = PAY_METHODS.find((x) => x.v === v)!;
+        const off = (v === 'card' && !card) || (v === 'instapay' && !instapay);
+        const title = v === 'cash' && handover === 'mixed' ? 'كاش عند الاستلام' : v === 'shop' ? 'كاش في المحل' : m.title;
+        const sub = v === 'cash' ? (handover === 'mixed' ? 'للمندوب أو في المحل وانت بتستلم' : 'ادفع للمندوب لما الأوردر يوصلك')
+          : v === 'shop' ? 'ادفع وانت بتستلم القطع من المحل'
+          : v === 'instapay' && !instapay ? 'المحل ده لسه مش مفعّل الدفع بالتحويل' : m.sub;
         return (
-          <RadioCard key={m.v} title={m.title} icon={m.icon} on={value === m.v} disabled={off} onPress={() => onPick(m.v)}
-            sub={m.v === 'shop' && !allPickup ? 'متاح لما تختار الاستلام من المحل' : m.sub} badge={m.v === 'card' && !card ? 'قريباً' : undefined} />
+          <RadioCard key={v} title={title} icon={m.icon} on={value === v} disabled={off} onPress={() => onPick(v)}
+            sub={sub} badge={v === 'card' && !card ? 'قريباً' : undefined} />
         );
       })}
     </View>
@@ -52,9 +65,8 @@ export function PaymentPicker({ value, onPick, card, allPickup }: { value: PayMe
 }
 
 /** The payment block on an order page: what was chosen, its state, and the next step (pay by card, upload a transfer receipt). */
-export function PaymentPanel({ order: o }: { order: Order }) {
+export function PaymentPanel({ order: o, shop }: { order: Order; shop?: { name?: string; instapay_address?: string; wallet_number?: string } | null }) {
   const { session } = useAuth();
-  const [s, setS] = useState<PaySettings | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [ref, setRef] = useState('');
   const [busy, setBusy] = useState(false);
@@ -62,7 +74,6 @@ export function PaymentPanel({ order: o }: { order: Order }) {
   const st = PAY_STATUS[o.payment_status];
   const transferOpen = o.payment_method === 'instapay' && ['awaiting', 'failed'].includes(o.payment_status) && o.status !== 'cancelled';
   const cardOpen = o.payment_method === 'card' && ['awaiting', 'failed'].includes(o.payment_status) && o.status !== 'cancelled';
-  useEffect(() => { if (transferOpen) paySettings().then(setS); }, [transferOpen]);
 
   async function sendReceipt() {
     if (!photo || !session) return;
@@ -106,21 +117,20 @@ export function PaymentPanel({ order: o }: { order: Order }) {
         <>
           <Muted size={13}>المحل هيبدأ يجهّز القطع أول ما الدفع يتأكد.</Muted>
           <Btn icon="card" title={`ادفع ${money(total)} ج.م بالبطاقة`} loading={busy} onPress={card} />
-          <Row gap={6} style={{ justifyContent: 'center' }}><Icon name="lock-closed" size={13} color={colors.muted} /><Muted size={12}>دفع آمن عن طريق Paymob · بيانات بطاقتك مش بتعدّي علينا</Muted></Row>
+          <Row gap={6} style={{ justifyContent: 'center' }}><Icon name="lock-closed" size={13} color={colors.muted} /><Muted size={12}>دفع آمن عن طريق Paymob، بيانات بطاقتك مش بتعدّي علينا</Muted></Row>
         </>
       ) : null}
 
       {transferOpen ? (
         <>
-          <T size={13.5}>حوّل <T w="bold" size={13.5}>{money(total)} ج.م</T> على الحساب ده، وبعدين ارفع صورة الإيصال:</T>
-          {s && (s.instapay_address || s.wallet_number) ? (
+          <T size={13.5}>حوّل <T w="bold" size={13.5}>{money(total)} ج.م</T> للمحل مباشرة، وبعدين ارفع صورة الإيصال والمحل يأكّد:</T>
+          {shop && (shop.instapay_address || shop.wallet_number) ? (
             <View style={{ gap: 8 }}>
-              {s.instapay_address ? <View style={{ gap: 4 }}><Muted size={12}>عنوان InstaPay</Muted><CopyBox text={s.instapay_address} /></View> : null}
-              {s.wallet_number ? <View style={{ gap: 4 }}><Muted size={12}>رقم المحفظة (فودافون كاش وغيرها)</Muted><CopyBox text={s.wallet_number} /></View> : null}
-              {s.account_name ? <Muted size={12.5}>باسم: {s.account_name}</Muted> : null}
-              {s.payment_note ? <Muted size={12.5}>{s.payment_note}</Muted> : null}
+              {shop.instapay_address ? <View style={{ gap: 4 }}><Muted size={12}>عنوان InstaPay</Muted><CopyBox text={shop.instapay_address} /></View> : null}
+              {shop.wallet_number ? <View style={{ gap: 4 }}><Muted size={12}>رقم المحفظة (فودافون كاش وغيرها)</Muted><CopyBox text={shop.wallet_number} /></View> : null}
+              {shop.name ? <Muted size={12.5}>باسم المحل: {shop.name}، اكتب رقم الأوردر في ملاحظة التحويل</Muted> : null}
             </View>
-          ) : <Muted size={13}>{s ? 'بيانات التحويل هتظهر هنا قريب. لو مستعجل كلّم خدمة العملاء.' : 'بنحمّل بيانات التحويل…'}</Muted>}
+          ) : <Muted size={13}>بنحمّل بيانات تحويل المحل…</Muted>}
           <Press onPress={async () => { try { const u = await pickPhoto(); if (u) setPhoto(u); } catch { toast('الصورة دي مش مدعومة.'); } }}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: radius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#C9DDF2', backgroundColor: colors.surface }}>
             {photo ? <Image source={{ uri: photo }} style={{ width: 52, height: 52, borderRadius: 10 }} /> : (
@@ -139,7 +149,7 @@ export function PaymentPanel({ order: o }: { order: Order }) {
       {o.payment_method === 'instapay' && o.payment_status === 'review' ? (
         <Row gap={8} style={{ backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: 12 }}>
           <Icon name="hourglass" size={18} color={colors.primary} />
-          <T size={13.5} style={{ flex: 1 }}>وصلنا الإيصال{o.payment_ref ? ` (عملية ${o.payment_ref})` : ''}. بنأكد التحويل وهيوصلك إشعار، والمحل بيبدأ بعدها.</T>
+          <T size={13.5} style={{ flex: 1 }}>الإيصال وصل للمحل{o.payment_ref ? ` (عملية ${o.payment_ref})` : ''}. أول ما يأكد إن الفلوس وصلته هيوصلك إشعار ويبدأ يجهّز.</T>
         </Row>
       ) : null}
 
@@ -151,6 +161,76 @@ export function PaymentPanel({ order: o }: { order: Order }) {
       ) : null}
       {o.payment_status === 'refund_due' ? <Muted size={13}>الأوردر اتلغى بعد الدفع. فريقنا هيرجّعلك {money(total)} ج.م خلال {ar(3)} أيام عمل.</Muted> : null}
       {o.payment_status === 'refunded' ? <Muted size={13}>رجّعنالك {money(total)} ج.م.{o.payment_note ? ` ${o.payment_note}` : ''}</Muted> : null}
+    </View>
+  );
+}
+
+/**
+ * The shop's side of a transfer: InstaPay / wallet money goes straight to the shop,
+ * so the shop opens the customer's receipt and confirms the money arrived (or rejects it with a reason).
+ */
+export function ShopPaymentReview({ order: o }: { order: Order }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const total = Number(o.items_total) + Number(o.delivery_fee);
+  useEffect(() => {
+    if (!o.payment_proof) return;
+    supabase.storage.from('receipts').createSignedUrl(o.payment_proof, 600).then(({ data }) => setUrl(data?.signedUrl ?? null));
+  }, [o.payment_proof]);
+
+  async function decide(ok: boolean) {
+    if (!ok && !note.trim()) return toast('اكتب للعميل سبب الرفض');
+    setBusy(true);
+    const { error } = await supabase.rpc('review_payment', { p_order: o.id, p_ok: ok, p_note: note.trim() });
+    setBusy(false);
+    if (error) toast(friendlyError(error)); else toast(ok ? 'تمام، ابدأ جهّز الأوردر' : 'بلّغنا العميل');
+  }
+  async function refunded() {
+    setBusy(true);
+    const { error } = await supabase.rpc('mark_refunded', { p_order: o.id, p_note: note.trim() });
+    setBusy(false);
+    if (error) toast(friendlyError(error)); else toast('اتسجّل إنك رجّعت الفلوس');
+  }
+
+  if (o.payment_method !== 'instapay') return null;
+  if (o.payment_status === 'refund_due') {
+    return (
+      <View style={{ backgroundColor: colors.warnSoft, borderRadius: radius.lg, padding: 16, gap: 10 }}>
+        <T w="bold" size={15} color={colors.warn}>العميل لغى بعد ما حوّل، رجّعله {money(total)} ج.م</T>
+        <Field value={note} onChangeText={setNote} placeholder="رقم عملية الاسترجاع (اختياري)" ltr />
+        <Btn kind="dark" icon="checkmark-done" title="رجّعت المبلغ للعميل" loading={busy} onPress={refunded} />
+      </View>
+    );
+  }
+  if (o.payment_status === 'awaiting' || o.payment_status === 'failed') {
+    return (
+      <Row gap={10} style={{ backgroundColor: colors.warnSoft, borderRadius: radius.lg, padding: 14 }}>
+        <Icon name="hourglass" size={20} color={colors.warn} />
+        <T size={13.5} color={colors.warn} style={{ flex: 1 }}>العميل هيحوّل {money(total)} ج.م على InstaPay / محفظتك ويرفع الإيصال هنا.{o.payment_status === 'failed' ? ' رفضت الإيصال اللي فات، مستنيين واحد جديد.' : ''}</T>
+      </Row>
+    );
+  }
+  if (o.payment_status !== 'review') return null;
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.primary, padding: 16, gap: 12 }}>
+      <Row gap={8}><Icon name="receipt" size={20} color={colors.primary} /><T w="bold" size={16}>العميل حوّل، راجع الإيصال</T></Row>
+      <Row gap={12} style={{ alignItems: 'flex-start' }}>
+        {url ? <Image source={{ uri: url }} style={{ width: 110, height: 150, borderRadius: 10, backgroundColor: colors.soft }} resizeMode="cover" accessibilityLabel="صورة إيصال التحويل" />
+          : <View style={{ width: 110, height: 150, borderRadius: 10, backgroundColor: colors.soft }} />}
+        <View style={{ flex: 1, gap: 4 }}>
+          <Muted size={12}>المبلغ المطلوب</Muted>
+          <T w="bold" size={20}>{money(total)} ج.م</T>
+          <Muted size={12}>رقم العملية</Muted>
+          <T w="semibold" size={14} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{o.payment_ref || 'مش مكتوب'}</T>
+        </View>
+      </Row>
+      <Muted size={12.5}>افتح InstaPay أو المحفظة واتأكد إن المبلغ وصلك فعلاً قبل ما تأكّد.</Muted>
+      <Field value={note} onChangeText={setNote} placeholder="سبب الرفض (لو هترفض)" />
+      <Row gap={10}>
+        <Btn icon="checkmark-circle" title="الفلوس وصلت" loading={busy} onPress={() => decide(true)} style={{ flex: 1 }} />
+        <Btn kind="danger" title="ارفض" loading={busy} onPress={() => decide(false)} style={{ minWidth: 96 }} />
+      </Row>
     </View>
   );
 }

@@ -59,6 +59,7 @@ export type Shop = {
 export type ShopPrivate = {
   id: string; name: string; owner_name: string; phone: string; phone2: string;
   street: string; building: string; landmark: string; postal_code: string; commercial_register: string;
+  instapay_address: string; wallet_number: string;
 };
 
 /** One readable line for an address. */
@@ -155,16 +156,24 @@ export const orderNo = (n: number) => '#' + ar(n);
 /** What the customer reads for each order status. */
 export const ORDER_LABEL: Record<Order['status'], { title: string; short: string; icon: string }> = {
   preparing: { title: 'المحل بيجهّز أوردرك', short: 'بيتجهّز', icon: 'construct' },
-  ready: { title: 'أوردرك جاهز للاستلام', short: 'جاهز للاستلام', icon: 'bag-check' },
-  out_for_delivery: { title: 'أوردرك في الطريق ليك', short: 'في الطريق', icon: 'bicycle' },
-  delivered: { title: 'المحل سلّم الأوردر', short: 'اتسلّم من المحل', icon: 'checkmark-done' },
+  ready: { title: 'أوردرك جاهز', short: 'جاهز', icon: 'bag-check' },
+  // older orders may still carry these two; they read as "ready"
+  out_for_delivery: { title: 'أوردرك جاهز', short: 'جاهز', icon: 'bag-check' },
+  delivered: { title: 'أوردرك جاهز', short: 'جاهز', icon: 'bag-check' },
   received: { title: 'استلمت الأوردر', short: 'اتسلّم', icon: 'checkmark-circle' },
   cancelled: { title: 'الأوردر اتلغى', short: 'اتلغى', icon: 'close-circle' },
 };
-/** The steps an order goes through, depending on delivery or pickup. */
-export const orderSteps = (mode: Order['delivery_mode']): Order['status'][] =>
-  mode === 'delivery' ? ['preparing', 'out_for_delivery', 'delivered', 'received'] : ['preparing', 'ready', 'delivered', 'received'];
+/** The order's headline, worded for delivery or pickup. */
+export const orderTitle = (o: Pick<Order, 'status' | 'delivery_mode'>) =>
+  ['ready', 'out_for_delivery', 'delivered'].includes(o.status)
+    ? (o.delivery_mode === 'delivery' ? 'أوردرك جاهز وخارج ليك' : 'أوردرك جاهز للاستلام من المحل')
+    : ORDER_LABEL[o.status].title;
+/** Every order goes through the same three steps: the shop prepares it, it is ready, the customer receives it. */
+export const orderSteps = (_mode?: Order['delivery_mode']): Order['status'][] => ['preparing', 'ready', 'received'];
+/** Where an order sits on those steps (older statuses count as ready). */
+export const orderStep = (o: Pick<Order, 'status'>) =>
+  o.status === 'cancelled' ? -1 : o.status === 'received' ? 2 : o.status === 'preparing' ? 0 : 1;
 export const ORDER_STEP_NAME: Record<string, string> = {
-  preparing: 'بيتجهّز', ready: 'جاهز', out_for_delivery: 'في الطريق', delivered: 'اتسلّم', received: 'تمام',
+  preparing: 'بيتجهّز', ready: 'جاهز', out_for_delivery: 'جاهز', delivered: 'جاهز', received: 'استلمت',
 };
 export const orderActive = (o: Pick<Order, 'status'>) => o.status !== 'received' && o.status !== 'cancelled';

@@ -35,9 +35,9 @@ export type TicketMessage = { id: string; report_id: string; sender_id: string; 
 export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; flagged: boolean; created_at: string };
 export type Order = { id: string; order_no: number; customer_id: string; shop_id: string; delivery_mode: string; status: string; items_total: number; delivery_fee: number; rating: number | null; review: string; created_at: string; received_at: string | null;
   payment_method: string; payment_status: string; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null; updated_at: string };
-export const PAY_METHOD: Record<string, string> = { cash: 'كاش عند الاستلام', shop: 'في المحل', instapay: 'InstaPay / محفظة', card: 'بطاقة (Paymob)' };
+export const PAY_METHOD: Record<string, string> = { cash: 'كاش عند الاستلام', shop: 'في المحل', instapay: 'InstaPay / محفظة (للمحل)', card: 'بطاقة (Paymob)' };
 export const PAY_STATE: Record<string, { label: string; tone: 'plain' | 'good' | 'wait' | 'bad' | 'dark' }> = {
-  unpaid: { label: 'يدفع عند الاستلام', tone: 'plain' }, awaiting: { label: 'مستني الدفع', tone: 'wait' }, review: { label: 'إيصال محتاج مراجعة', tone: 'dark' },
+  unpaid: { label: 'يدفع عند الاستلام', tone: 'plain' }, awaiting: { label: 'مستني الدفع', tone: 'wait' }, review: { label: 'المحل بيراجع الإيصال', tone: 'dark' },
   paid: { label: 'مدفوع', tone: 'good' }, failed: { label: 'الدفع فشل', tone: 'bad' }, refund_due: { label: 'محتاج استرجاع', tone: 'bad' }, refunded: { label: 'اترجع', tone: 'plain' },
 };
 /** A short-lived link to a private transfer receipt. */
@@ -45,7 +45,7 @@ export async function receiptUrl(path: string) {
   const { data } = await supabase.storage.from('receipts').createSignedUrl(path, 600);
   return data?.signedUrl ?? null;
 }
-export const ORDER_STATE: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز للاستلام', out_for_delivery: 'في الطريق', delivered: 'المحل سلّم', received: 'العميل استلم', cancelled: 'اتلغى' };
+export const ORDER_STATE: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز', out_for_delivery: 'جاهز', delivered: 'جاهز', received: 'العميل استلم', cancelled: 'اتلغى' };
 
 /* ---------------------------------------------------------------- labels */
 export const memberId = (p: Pick<Profile, 'member_no' | 'is_customer' | 'is_shop'> | undefined | null) =>
@@ -54,7 +54,7 @@ export const ticketId = (n: number) => 'T-' + n;
 export const orderId = (n: number) => '#' + n;
 
 export const REQUEST_STATUS: Record<string, string> = { open: 'مستني عروض', chosen: 'اتأكد', done: 'اتسلّم', cancelled: 'اتلغى' };
-export const ORDER_STATUS: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز للاستلام', out_for_delivery: 'خرج للتوصيل', delivered: 'اتسلّم' };
+export const ORDER_STATUS: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز', out_for_delivery: 'جاهز', delivered: 'جاهز' };
 export const SHOP_STATUS: Record<string, string> = { pending: 'مستني موافقة', approved: 'شغال', suspended: 'موقوف' };
 export const TICKET_STATUS: Record<string, string> = { bot: 'مع المساعد الآلي', open: 'مستنية موظف', in_progress: 'مع موظف', resolved: 'انتهت' };
 export const RESOLVED_BY: Record<string, string> = { bot: 'المساعد حلّها', agent: 'موظف قفلها', customer: 'العميل قفلها' };

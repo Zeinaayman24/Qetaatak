@@ -5,8 +5,9 @@ import { BottomNav, Logo, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { Icon, Loading, Muted, Plate, Press, Row, Screen, Section, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { ORDER_LABEL, ar, groupRequests, orderNo, orderSteps, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
+import { ORDER_LABEL, ar, groupRequests, orderNo, orderStep, orderSteps, orderTitle, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
+import { needsPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
 
@@ -94,7 +95,7 @@ export default function CustomerHome() {
         <Section title="أوردراتك" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>
           {orders.slice(0, 3).map((o) => {
             const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
-            const steps = orderSteps(o.delivery_mode); const at = steps.indexOf(o.status);
+            const steps = orderSteps(o.delivery_mode); const at = orderStep(o);
             return (
               <Press key={o.id} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}
                 style={[lift, { backgroundColor: colors.surface, borderRadius: 16, padding: 14, gap: 12 }]}>
@@ -103,8 +104,8 @@ export default function CustomerHome() {
                     <Icon name={ORDER_LABEL[o.status].icon} size={22} color={colors.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <T w="bold" size={15}>{ORDER_LABEL[o.status].title}</T>
-                    <T size={12.5} color={colors.muted} numberOfLines={1}>{orderNo(o.order_no)} · {ps.length ? partsLabel(ps) : ''}</T>
+                    <T w="bold" size={15}>{needsPayment(o) ? 'فاضل تدفع' : orderTitle(o)}</T>
+                    <T size={12.5} color={colors.muted} numberOfLines={1}>{orderNo(o.order_no)}، {ps.length ? partsLabel(ps) : ''}</T>
                   </View>
                   <Icon name="chevron-back" size={18} color={colors.faint} />
                 </Row>

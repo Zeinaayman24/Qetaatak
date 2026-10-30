@@ -1,7 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, View } from 'react-native';
-import { PaymentPicker, RadioCard } from '@/components/Payment';
+import { PaymentPicker, RadioCard, payOptions, type Handover } from '@/components/Payment';
 import {
   BackBar, Btn, Card, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Section, SlideToConfirm, T, TabPills, toast,
 } from '@/components/ui';
@@ -17,7 +17,7 @@ import { colors, lift } from '@/lib/theme';
 
 type Mode = 'delivery' | 'pickup';
 type Declines = Record<string, { n: number; reasons: string[] }>;
-type Data = { req: Request | null; parts: Request[]; quotes: Quote[]; shops: Record<string, Shop>; orders: Record<string, Order>; declines: Declines; shopCount: number };
+type Data = { req: Request | null; parts: Request[]; quotes: Quote[]; shops: Record<string, Shop>; orders: Record<string, Order>; declines: Declines; shopCount: number; transfer: Record<string, boolean> };
 
 /** A price request: offers per part, side by side. Accepted parts move into orders. */
 export default function PriceRequest() {
@@ -34,7 +34,7 @@ export default function PriceRequest() {
 
   const { data, loading } = useLive<Data>(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
-    if (!req) return { req: null, parts: [], quotes: [], shops: {}, orders: {}, declines: {}, shopCount: 0 };
+    if (!req) return { req: null, parts: [], quotes: [], shops: {}, orders: {}, declines: {}, shopCount: 0, transfer: {} };
     const parts = req.batch_id ? (must(await supabase.from('requests').select('*').eq('batch_id', req.batch_id).order('num')) as Request[]) : [req];
     const ids = parts.map((p) => p.id);
     const orderIds = [...new Set(parts.map((p) => p.order_id).filter(Boolean))] as string[];
@@ -47,7 +47,11 @@ export default function PriceRequest() {
     const declines: Declines = {};
     for (const d of (dec.data ?? []) as { request_id: string; n: number; reasons: string[] | null }[]) declines[d.request_id] = { n: Number(d.n), reasons: d.reasons ?? [] };
     const shops = must(shopRows) as Shop[];
+    const quoteShops = [...new Set((must(quotes) as Quote[]).map((q) => q.shop_id))];
+    const pay = quoteShops.length ? await supabase.rpc('shop_pay_options', { p_shops: quoteShops }) : { data: [] };
+    const transfer = Object.fromEntries(((pay.data ?? []) as { shop_id: string; instapay: boolean }[]).map((x) => [x.shop_id, x.instapay]));
     return {
+      transfer,
       req, parts, quotes: must(quotes) as Quote[],
       shops: Object.fromEntries(shops.map((s) => [s.id, s])),
       orders: Object.fromEntries((must(orderRows as any) as Order[]).map((o) => [o.id, o])),
@@ -90,7 +94,12 @@ export default function PriceRequest() {
   }
 
   const allPickup = byShop.length > 0 && byShop.every((g) => modeOf(g[0].quote.shop_id) === 'pickup');
-  const method: PayMethod = pay === 'shop' && !allPickup ? 'cash' : pay === 'card' && !card ? 'cash' : pay;
+  const allDelivery = byShop.length > 0 && byShop.every((g) => modeOf(g[0].quote.shop_id) === 'delivery');
+  const handover: Handover = allPickup ? 'pickup' : allDelivery ? 'delivery' : 'mixed';
+  const transferOk = byShop.length > 0 && byShop.every((g) => d.transfer[g[0].quote.shop_id]);
+  const allowed = payOptions(handover).filter((v) => (v !== 'card' || card) && (v !== 'instapay' || transferOk));
+  // keep the person's choice when it still fits; otherwise fall back to cash (on delivery or at the shop)
+  const method: PayMethod = allowed.includes(pay) ? pay : pay === 'cash' && allowed.includes('shop') ? 'shop' : pay === 'shop' && allowed.includes('cash') ? 'cash' : allowed[0];
 
   async function accept() {
     setBusy(true);
@@ -107,7 +116,7 @@ export default function PriceRequest() {
       return;
     }
     setBusy(false);
-    toast(method === 'instapay' ? 'الأوردر اتسجّل · فاضل تحوّل وترفع الإيصال' : method === 'card' ? `اتعمل ${ar(ids.length)} أوردرات · ادفع كل واحد من صفحته` : ids.length > 1 ? `اتعمل ${ar(ids.length)} أوردرات` : 'الأوردر اتأكد مع المحل');
+    toast(method === 'instapay' ? 'الأوردر اتسجّل، فاضل تحوّل وترفع الإيصال' : method === 'card' ? `اتعمل ${ar(ids.length)} أوردرات، ادفع كل واحد من صفحته` : ids.length > 1 ? `اتعمل ${ar(ids.length)} أوردرات` : 'الأوردر اتأكد مع المحل');
     if (ids.length === 1) router.push({ pathname: '/order/[id]', params: { id: ids[0] } });
     else router.push('/customer/requests');
   }
@@ -139,7 +148,7 @@ export default function PriceRequest() {
           <Photo uri={photoUrl(p.photo_path)} size={52} />
           <View style={{ flex: 1 }}>
             <T w="bold" size={18}>{p.part}</T>
-            <Muted size={12.5}>{extras.join(' · ')}{p.notes ? ` · «${p.notes}»` : ''}</Muted>
+            <Muted size={12.5}>{extras.join('، ')}{p.notes ? `، «${p.notes}»` : ''}</Muted>
           </View>
         </Row>
 
@@ -149,7 +158,7 @@ export default function PriceRequest() {
             <Icon name={ORDER_LABEL[order.status].icon} size={26} color={colors.good} />
             <View style={{ flex: 1 }}>
               <T w="bold" size={15}>القطعة دي في أوردر {orderNo(order.order_no)}</T>
-              <Muted size={12.5}>{ORDER_LABEL[order.status].short} · اضغط تتابع الأوردر</Muted>
+              <Muted size={12.5}>{ORDER_LABEL[order.status].short}، اضغط تتابع الأوردر</Muted>
             </View>
             <Icon name="chevron-back" size={18} color={colors.good} />
           </Press>
@@ -188,7 +197,7 @@ export default function PriceRequest() {
       <Screen footer={
         <>
           <Row style={{ justifyContent: 'space-between' }}>
-            <Muted size={13}>الإجمالي · {method === 'cash' ? 'كاش عند الاستلام' : method === 'shop' ? 'في المحل' : method === 'card' ? 'بالبطاقة' : 'تحويل'}</Muted>
+            <Muted size={13}>الإجمالي، {method === 'cash' ? 'كاش عند الاستلام' : method === 'shop' ? 'في المحل' : method === 'card' ? 'بالبطاقة' : 'تحويل'}</Muted>
             <T w="bold" size={20} color={colors.primary}>{money(grand)} ج.م</T>
           </Row>
           <SlideToConfirm label={method === 'card' ? 'اسحب وكمّل للدفع' : 'اسحب لتأكيد الأوردر'} busy={busy} onConfirm={accept} />
@@ -213,7 +222,7 @@ export default function PriceRequest() {
                     <Photo uri={photoUrl(c.quote.photo_path ?? c.part.photo_path)} size={44} />
                     <View style={{ flex: 1 }}>
                       <T w="semibold" size={14}>{c.part.part}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
-                      <Muted size={12}>{CONDITIONS[c.quote.condition]} · ضمان {ar(c.quote.warranty_days)} يوم</Muted>
+                      <Muted size={12}>{CONDITIONS[c.quote.condition]}، ضمان {ar(c.quote.warranty_days)} يوم</Muted>
                     </View>
                     <T w="semibold" size={14} color={colors.primary}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
                   </Row>
@@ -240,7 +249,7 @@ export default function PriceRequest() {
         ) : null}
 
         <Section title="طريقة الدفع">
-          <PaymentPicker value={method} onPick={setPay} card={card} allPickup={allPickup} />
+          <PaymentPicker value={method} onPick={setPay} card={card} instapay={transferOk} handover={handover} />
         </Section>
 
         <Section title="ملخص الطلب">
@@ -273,7 +282,7 @@ export default function PriceRequest() {
           <Plate top={first.car_model || '—'} bottom={ar(first.car_year)} size="sm" />
           <View style={{ flex: 1 }}>
             <T w="bold" size={16} color="#fff">{d.parts.length > 1 ? `${ar(d.parts.length)} قطع` : first.part}</T>
-            <T size={12.5} color="rgba(255,255,255,.7)">{first.car_make} {first.car_model} · {URGENCY[first.urgency]} · {ago(first.created_at)}</T>
+            <T size={12.5} color="rgba(255,255,255,.7)">{first.car_make} {first.car_model}، {URGENCY[first.urgency]}، {ago(first.created_at)}</T>
           </View>
         </Row>
         <Row gap={8}>
@@ -301,7 +310,7 @@ export default function PriceRequest() {
       ) : null}
 
       {d.parts.length > 1 ? (
-        <TabPills items={d.parts.map((p, i) => ({ v: p.id, label: `${ar(i + 1)}. ${p.part}`, mark: partMark(p) }))} value={current.id} onPick={setTab} />
+        <TabPills items={d.parts.map((p, i) => ({ v: p.id, label: p.part, mark: partMark(p) }))} value={current.id} onPick={setTab} />
       ) : null}
       {panel(current)}
 

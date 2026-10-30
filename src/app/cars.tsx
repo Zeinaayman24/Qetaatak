@@ -46,7 +46,7 @@ export default function Cars() {
         <Icon name="car-sport" size={22} />
       </View>
       <View style={{ flex: 1 }}>
-        <Row gap={6}><T w="semibold">{title}</T>{main ? <T size={11} w="semibold" color={colors.muted}>· الأساسية</T> : null}</Row>
+        <Row gap={6}><T w="semibold">{title}</T>{main ? <T size={11} w="semibold" color={colors.muted}>(الأساسية)</T> : null}</Row>
         <Muted size={12.5}>{sub}</Muted>
       </View>
       {action}

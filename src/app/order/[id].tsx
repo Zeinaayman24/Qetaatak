@@ -5,7 +5,7 @@ import { PaymentPanel } from '@/components/Payment';
 import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
+  CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
   type Order, type Quote, type Request, type Shop, type ShopPrivate,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -42,7 +42,7 @@ export default function OrderPage() {
   if (!o) return <Screen><BackBar title="الأوردر" onBack={back} /><Empty text="الأوردر ده مش موجود." /></Screen>;
   const { parts, quotes, shop, priv } = data!;
   const steps = orderSteps(o.delivery_mode);
-  const at = o.status === 'cancelled' ? -1 : steps.indexOf(o.status);
+  const at = orderStep(o);
   const lbl = ORDER_LABEL[o.status];
   const quoteOf = (p: Request) => quotes.find((q) => q.id === p.chosen_quote_id);
   const warrantyDays = Math.max(0, ...quotes.map((q) => q.warranty_days));
@@ -60,7 +60,7 @@ export default function OrderPage() {
 
   const footer = o.status === 'cancelled' || unpaid ? undefined
     : o.status !== 'received'
-      ? <Btn kind={o.status === 'delivered' || o.status === 'ready' || o.status === 'out_for_delivery' ? 'accent' : 'secondary'} icon="checkmark-done" loading={busy}
+      ? <Btn kind={o.status === 'preparing' ? 'secondary' : 'primary'} icon="checkmark-done" loading={busy}
           title="استلمت الأوردر" onPress={() => rpc('receive_order', { p_order: o.id }, 'تمام! قيّم المحل لو سمحت')} />
       : !o.rating
         ? <Btn title="ابعت التقييم" icon="star" disabled={!stars} loading={busy} onPress={() => rpc('rate_order', { p_order: o.id, p_rating: stars, p_review: review.trim() }, 'شكراً على تقييمك')} />
@@ -75,9 +75,9 @@ export default function OrderPage() {
         <Row gap={14}>
           <StatusIcon name={unpaid ? 'card' : lbl.icon} live={o.status !== 'received' && o.status !== 'cancelled'} tone={o.status === 'received' ? 'good' : o.status === 'cancelled' ? 'plain' : 'live'} />
           <View style={{ flex: 1 }}>
-            <T w="bold" size={20} color={o.status === 'received' || o.status === 'cancelled' ? colors.ink : '#fff'}>{unpaid ? 'فاضل خطوة الدفع' : lbl.title}</T>
+            <T w="bold" size={20} color={o.status === 'received' || o.status === 'cancelled' ? colors.ink : '#fff'}>{unpaid ? 'فاضل خطوة الدفع' : orderTitle(o)}</T>
             <T size={13} color={o.status === 'received' || o.status === 'cancelled' ? colors.muted : 'rgba(255,255,255,.7)'}>
-              {o.delivery_mode === 'delivery' ? 'توصيل للبيت' : 'استلام من المحل'} · آخر تحديث {ago(o.updated_at)}
+              {o.delivery_mode === 'delivery' ? 'توصيل للبيت' : 'استلام من المحل'}، آخر تحديث {ago(o.updated_at)}
             </T>
           </View>
         </Row>
@@ -89,7 +89,7 @@ export default function OrderPage() {
               return (
                 <View key={s} style={{ flex: 1, gap: 6 }}>
                   <View style={{ height: 6, borderRadius: 3, backgroundColor: done ? colors.accent : dark ? 'rgba(255,255,255,.15)' : colors.line }} />
-                  <T size={11.5} w={i === at ? 'bold' : 'regular'} color={dark ? (done ? '#fff' : 'rgba(255,255,255,.5)') : colors.ink}>{s === 'ready' ? 'جاهز' : ORDER_STEP_NAME[s]}</T>
+                  <T size={11.5} w={i === at ? 'bold' : 'regular'} color={dark ? (done ? '#fff' : 'rgba(255,255,255,.5)') : colors.ink}>{ORDER_STEP_NAME[s]}</T>
                 </View>
               );
             })}
@@ -97,7 +97,7 @@ export default function OrderPage() {
         ) : null}
       </View>
 
-      <PaymentPanel order={o} />
+      <PaymentPanel order={o} shop={priv} />
 
       {/* the shop */}
       {o.status !== 'cancelled' ? (
@@ -116,7 +116,7 @@ export default function OrderPage() {
           </Row>
           {o.delivery_mode === 'pickup' && priv ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
-              <Muted size={13} style={{ flex: 1 }}>{addressLine({ street: priv.street, building: priv.building, area: shop?.area, governorate: shop?.governorate })}{priv.landmark ? ` (${priv.landmark})` : ''} · قول للمحل رقم الأوردر {orderNo(o.order_no)}</Muted></Row>
+              <Muted size={13} style={{ flex: 1 }}>{addressLine({ street: priv.street, building: priv.building, area: shop?.area, governorate: shop?.governorate })}{priv.landmark ? ` (${priv.landmark})` : ''}، قول للمحل رقم الأوردر {orderNo(o.order_no)}</Muted></Row>
           ) : null}
         </Card>
       ) : null}
@@ -131,7 +131,7 @@ export default function OrderPage() {
               <Photo uri={photoUrl(q?.photo_path ?? p.photo_path)} size={48} />
               <View style={{ flex: 1 }}>
                 <T w="semibold" size={14.5}>{p.part}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
-                <Muted size={12}>{q ? `${CONDITIONS[q.condition]} · ضمان ${ar(q.warranty_days)} يوم` : ''}</Muted>
+                <Muted size={12}>{q ? `${CONDITIONS[q.condition]}، ضمان ${ar(q.warranty_days)} يوم` : ''}</Muted>
               </View>
               {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))} ج.م</T> : null}
             </Row>

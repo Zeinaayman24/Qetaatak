@@ -4,11 +4,12 @@ import { Linking, View } from 'react-native';
 import { BackBar, Btn, Card, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  COMMISSION, CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
+  COMMISSION, CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, orderStep, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
   type Order, type Profile, type Quote, type Request,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { PAY_NAME, PAY_STATUS } from '@/lib/payments';
+import { ShopPaymentReview } from '@/components/Payment';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 
@@ -34,9 +35,9 @@ export default function ShopOrder() {
   if (!o) return <Screen><BackBar title="الأوردر" onBack={back} /><Empty text="الأوردر ده مش موجود." /></Screen>;
   const { parts, quotes, customer: c } = data!;
   const steps = orderSteps(o.delivery_mode);
-  const at = steps.indexOf(o.status);
-  const next = o.status === 'preparing' ? (o.delivery_mode === 'delivery' ? 'out_for_delivery' : 'ready') : o.status === 'ready' || o.status === 'out_for_delivery' ? 'delivered' : null;
-  const nextLabel = next === 'out_for_delivery' ? 'جهّزت الأوردر · خرج للتوصيل' : next === 'ready' ? 'جهّزت الأوردر · جاهز للاستلام' : next === 'delivered' ? 'سلّمت الأوردر للعميل' : '';
+  const at = orderStep(o);
+  const next = o.status === 'preparing' ? 'ready' : null;
+  const nextLabel = o.delivery_mode === 'delivery' ? 'الأوردر جاهز، خارج للعميل' : 'الأوردر جاهز، العميل ييجي يستلم';
   const total = Number(o.items_total);
   const waitPay = (o.payment_method === 'instapay' || o.payment_method === 'card') && o.payment_status !== 'paid' && o.status !== 'cancelled';
 
@@ -45,11 +46,12 @@ export default function ShopOrder() {
     setBusy(true);
     const { error } = await supabase.rpc('set_order_status', { p_order: o!.id, p_status: next });
     setBusy(false);
-    if (error) toast(friendlyError(error)); else toast('اتبعت للعميل');
+    if (error) toast(friendlyError(error)); else toast('بلّغنا العميل إن الأوردر جاهز');
   }
 
-  const footer = waitPay
+  const footer = waitPay && o.payment_method === 'card'
     ? <Row gap={10} style={{ backgroundColor: colors.warnSoft, borderRadius: 14, padding: 14 }}><Icon name="hourglass" size={20} color={colors.warn} /><T size={14} w="semibold" color={colors.warn} style={{ flex: 1 }}>مستنيين العميل يدفع أونلاين. هنبلّغك أول ما الدفع يتأكد.</T></Row>
+    : waitPay ? undefined
     : next && o.status !== 'cancelled' ? <Btn icon="arrow-back-circle" title={nextLabel} loading={busy} onPress={move} /> : undefined;
 
   return (
@@ -72,12 +74,14 @@ export default function ShopOrder() {
             {steps.map((s, i) => (
               <View key={s} style={{ flex: 1, gap: 6 }}>
                 <View style={{ height: 6, borderRadius: 3, backgroundColor: i <= at ? colors.accent : 'rgba(255,255,255,.15)' }} />
-                <T size={11.5} w={i === at ? 'bold' : 'regular'} color={i <= at ? '#fff' : 'rgba(255,255,255,.5)'}>{s === 'ready' ? 'جاهز' : ORDER_STEP_NAME[s]}</T>
+                <T size={11.5} w={i === at ? 'bold' : 'regular'} color={i <= at ? '#fff' : 'rgba(255,255,255,.5)'}>{ORDER_STEP_NAME[s]}</T>
               </View>
             ))}
           </Row>
         ) : <T color="#fff">العميل لغى الأوردر ده.</T>}
       </View>
+
+      <ShopPaymentReview order={o} />
 
       <Card>
         <T w="bold" size={16}>جهّز القطع دي ({ar(parts.length)})</T>
@@ -88,7 +92,7 @@ export default function ShopOrder() {
               <Photo uri={photoUrl(q?.photo_path ?? p.photo_path)} size={48} />
               <View style={{ flex: 1 }}>
                 <T w="semibold" size={14.5}>{p.part}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
-                <Muted size={12}>{p.car_make} {p.car_model} {ar(p.car_year)}{q ? ` · ${CONDITIONS[q.condition]} · ضمان ${ar(q.warranty_days)} يوم` : ''}</Muted>
+                <Muted size={12}>{p.car_make} {p.car_model} {ar(p.car_year)}{q ? `، ${CONDITIONS[q.condition]}، ضمان ${ar(q.warranty_days)} يوم` : ''}</Muted>
               </View>
               {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))}</T> : null}
             </Row>
@@ -98,7 +102,7 @@ export default function ShopOrder() {
         <Lines rows={[['قيمة البيع', money(total) + ' ج.م'], ['عمولة ضغطة ٥٪', money(total * COMMISSION) + ' ج.م']]} total={['صافي ليك', money(total * (1 - COMMISSION)) + ' ج.م']} />
         <Row style={{ justifyContent: 'space-between' }}>
           <Muted size={13}>الدفع: {PAY_NAME[o.payment_method]}</Muted>
-          <Pill label={o.payment_method === 'cash' && o.payment_status === 'unpaid' ? 'اتحصّل كاش عند التسليم' : o.payment_method === 'shop' && o.payment_status === 'unpaid' ? 'هيدفع في المحل' : PAY_STATUS[o.payment_status].label} tone={PAY_STATUS[o.payment_status].tone} />
+          <Pill label={o.payment_method === 'cash' && o.payment_status === 'unpaid' ? 'اتحصّل كاش عند التسليم' : o.payment_method === 'shop' && o.payment_status === 'unpaid' ? 'هيدفع في المحل' : o.payment_status === 'review' ? 'محتاج تأكيدك' : PAY_STATUS[o.payment_status].label} tone={PAY_STATUS[o.payment_status].tone} />
         </Row>
         <Muted size={12}>اكتب رقم الأوردر {orderNo(o.order_no)} على الكيس.</Muted>
       </Card>
@@ -126,7 +130,7 @@ export default function ShopOrder() {
           {o.rating ? <Row gap={3}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={18} color={o.rating! >= n ? colors.accent : colors.line} />)}</Row> : null}
           {o.review ? <T size={14}>«{o.review}»</T> : null}
         </Card>
-      ) : o.status === 'delivered' ? <Muted center>مستنيين العميل يأكد إنه استلم.</Muted> : null}
+      ) : o.status !== 'preparing' && o.status !== 'cancelled' ? <Muted center>مستنيين العميل يأكد إنه استلم الأوردر.</Muted> : null}
     </Screen>
   );
 }

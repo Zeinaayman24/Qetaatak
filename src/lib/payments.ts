@@ -5,8 +5,8 @@ import { supabase } from './supabase';
 /** The four ways to pay, in the order the checkout lists them. */
 export const PAY_METHODS: { v: PayMethod; title: string; sub: string; icon: string }[] = [
   { v: 'cash', title: 'كاش عند الاستلام', sub: 'ادفع للمندوب أو المحل لما القطعة توصلك', icon: 'cash' },
-  { v: 'instapay', title: 'InstaPay أو محفظة', sub: 'حوّل المبلغ وارفع صورة الإيصال، وإحنا نأكد', icon: 'phone' },
-  { v: 'card', title: 'بطاقة بنكية', sub: 'فيزا · ماستركارد · ميزة، دفع آمن عن طريق Paymob', icon: 'card' },
+  { v: 'instapay', title: 'InstaPay أو محفظة', sub: 'حوّل للمحل مباشرة وارفع صورة الإيصال، والمحل يأكد', icon: 'phone' },
+  { v: 'card', title: 'بطاقة بنكية', sub: 'فيزا، ماستركارد، ميزة، دفع آمن عن طريق Paymob', icon: 'card' },
   { v: 'shop', title: 'الدفع في المحل', sub: 'للاستلام من المحل بس: ادفع وانت بتستلم', icon: 'storefront' },
 ];
 export const PAY_NAME: Record<PayMethod, string> = { cash: 'كاش عند الاستلام', instapay: 'InstaPay / محفظة', card: 'بطاقة بنكية', shop: 'الدفع في المحل' };
@@ -15,7 +15,7 @@ export const PAY_NAME: Record<PayMethod, string> = { cash: 'كاش عند الا
 export const PAY_STATUS: Record<PayStatus, { label: string; tone: 'good' | 'wait' | 'bad' | 'plain' | 'new' }> = {
   unpaid: { label: 'الدفع عند الاستلام', tone: 'plain' },
   awaiting: { label: 'مستني الدفع', tone: 'wait' },
-  review: { label: 'بنراجع الإيصال', tone: 'new' },
+  review: { label: 'المحل بيراجع الإيصال', tone: 'new' },
   paid: { label: 'مدفوع', tone: 'good' },
   failed: { label: 'الدفع ماتمّش', tone: 'bad' },
   refund_due: { label: 'هيترجعلك المبلغ', tone: 'wait' },

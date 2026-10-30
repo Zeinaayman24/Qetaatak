@@ -1,18 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Page, Pill, useData } from '../App';
-import { PAY_METHOD, PAY_STATE, dateTime, memberId, money, must, receiptUrl, supabase, useLive, type Order } from '../lib';
+import { PAY_METHOD, PAY_STATE, dateTime, memberId, money, receiptUrl, supabase, type Order } from '../lib';
 
-const SETTINGS: [string, string, string][] = [
-  ['instapay_address', 'عنوان InstaPay', 'مثلاً daghta@instapay'],
-  ['wallet_number', 'رقم المحفظة', 'رقم فودافون كاش / محفظة'],
-  ['account_name', 'اسم صاحب الحساب', 'الاسم اللي العميل هيشوفه وهو بيحوّل'],
-  ['payment_note', 'ملاحظة للعميل', 'مثلاً: اكتب رقم الأوردر في ملاحظة التحويل'],
-];
-
-/** Payments: transfer receipts to check, refunds to send, every online payment, and the company's InstaPay details. */
+/** Payments: transfers waiting for the shop, refunds due, and every online payment. */
 export default function Payments() {
-  const { all, me } = useData();
+  const { all } = useData();
   const review = all.orders.filter((o) => o.payment_method === 'instapay' && o.payment_status === 'review');
   const refunds = all.orders.filter((o) => o.payment_status === 'refund_due');
   const online = all.orders.filter((o) => o.payment_method === 'instapay' || o.payment_method === 'card');
@@ -23,7 +16,7 @@ export default function Payments() {
     <Page title="المدفوعات" sub={`${review.length} إيصال محتاج مراجعة · ${refunds.length} استرجاع · ${money(paidOnline)} اتدفعوا أونلاين`}>
       <div className="kpis four">
         {[
-          ['إيصالات للمراجعة', String(review.length)],
+          ['تحويلات مستنية المحل', String(review.length)],
           ['استرجاع مطلوب', String(refunds.length)],
           ['أوردرات كاش', String(all.orders.filter((o) => o.payment_method === 'cash' || o.payment_method === 'shop').length)],
           ['مدفوع أونلاين', money(paidOnline)],
@@ -31,13 +24,15 @@ export default function Payments() {
       </div>
 
       <section className="panel">
-        <div className="panel-head"><h2>إيصالات تحويل محتاجة مراجعة</h2></div>
-        {review.length ? review.map((o) => <ReceiptCard key={o.id} o={o} total={total(o)} />) : <p className="empty">مفيش إيصالات مستنية. 👌</p>}
+        <div className="panel-head"><h2>تحويلات مستنية تأكيد المحل</h2></div>
+        <p className="muted small">التحويلات بتروح للمحل مباشرة والمحل هو اللي بيأكد. لو المحل اتأخر أو فيه خلاف، تقدر تتدخل وتأكد أو ترفض من هنا.</p>
+        {review.length ? review.map((o) => <ReceiptCard key={o.id} o={o} total={total(o)} />) : <p className="empty">مفيش تحويلات مستنية. 👌</p>}
       </section>
 
       {refunds.length ? (
         <section className="panel">
-          <div className="panel-head"><h2>أوردرات مدفوعة اتلغت · رجّع المبلغ</h2></div>
+          <div className="panel-head"><h2>أوردرات مدفوعة اتلغت · المبلغ لازم يرجع</h2></div>
+          <p className="muted small">البطاقة: إحنا اللي بنرجّع من Paymob. التحويل: المحل بيرجّع ويسجّل، وتقدر تسجّل نيابة عنه.</p>
           {refunds.map((o) => <RefundRow key={o.id} o={o} total={total(o)} />)}
         </section>
       ) : null}
@@ -68,7 +63,6 @@ export default function Payments() {
         {!online.length ? <p className="empty">لسه مفيش مدفوعات أونلاين.</p> : null}
       </section>
 
-      {me.is_admin ? <Settings /> : null}
     </Page>
   );
 }
@@ -123,38 +117,5 @@ function RefundRow({ o, total }: { o: Order; total: number }) {
       <input className="search" placeholder="رقم عملية الاسترجاع (اختياري)" value={note} onChange={(e) => setNote(e.target.value)} />
       <button className="btn" disabled={busy} onClick={done}>رجّعت المبلغ</button>
     </div>
-  );
-}
-
-function Settings() {
-  const { data, reload } = useLive(async () => {
-    const rows = must(await supabase.from('app_settings').select('key, value')) as { key: string; value: string }[];
-    return Object.fromEntries(rows.map((r) => [r.key, r.value])) as Record<string, string>;
-  }, []);
-  const [form, setForm] = useState<Record<string, string> | null>(null);
-  const [msg, setMsg] = useState('');
-  useEffect(() => { if (data && !form) setForm(data); }, [data, form]);
-  if (!form) return null;
-  async function save() {
-    setMsg('');
-    for (const [k] of SETTINGS) {
-      const { error } = await supabase.rpc('set_setting', { p_key: k, p_value: (form![k] ?? '').trim() });
-      if (error) return setMsg(error.message);
-    }
-    setMsg('اتحفظ ✓'); reload();
-  }
-  return (
-    <section className="panel">
-      <div className="panel-head"><h2>بيانات التحويل اللي بتظهر للعميل</h2></div>
-      <p className="muted small">العميل اللي يختار InstaPay أو محفظة بيشوف البيانات دي في صفحة الأوردر. الدفع بالبطاقة بيشتغل لما مفاتيح Paymob تتحط في Supabase.</p>
-      <div className="settings-grid">
-        {SETTINGS.map(([k, label, ph]) => (
-          <label key={k} className="input"><span>{label}</span>
-            <input dir={k === 'instapay_address' || k === 'wallet_number' ? 'ltr' : 'rtl'} placeholder={ph} value={form[k] ?? ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} />
-          </label>
-        ))}
-      </div>
-      <div className="row-actions"><button className="btn" onClick={save}>احفظ</button>{msg ? <span className="muted small">{msg}</span> : null}</div>
-    </section>
   );
 }

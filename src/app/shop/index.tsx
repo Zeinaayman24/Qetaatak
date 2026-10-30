@@ -67,7 +67,7 @@ export default function ShopInbox() {
         <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, gap: 14 }}>
           <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1 }}>
-              <T size={13} color="rgba(255,255,255,.65)">{shop.area}، {shop.governorate} · {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</T>
+              <T size={13} color="rgba(255,255,255,.65)">{shop.area}، {shop.governorate}، {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</T>
               <T w="bold" size={26} color="#fff" style={{ lineHeight: 36 }}>{shopPrivate?.name}</T>
             </View>
             <Bell light />
@@ -128,8 +128,8 @@ export default function ShopInbox() {
                       <Icon name={ORDER_LABEL[o.status].icon} size={22} color={live ? colors.ink : colors.muted} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <T w="bold" size={15} color={live ? '#fff' : colors.ink}>أوردر {orderNo(o.order_no)} · {ORDER_LABEL[o.status].short}</T>
-                      <T size={12.5} color={live ? 'rgba(255,255,255,.7)' : colors.muted} numberOfLines={1}>{ps.length ? partsLabel(ps) : ''} · {o.delivery_mode === 'delivery' ? 'توصيل' : 'استلام'}</T>
+                      <T w="bold" size={15} color={live ? '#fff' : colors.ink}>أوردر {orderNo(o.order_no)}، {ORDER_LABEL[o.status].short}</T>
+                      <T size={12.5} color={live ? 'rgba(255,255,255,.7)' : colors.muted} numberOfLines={1}>{ps.length ? partsLabel(ps) : ''}، {o.delivery_mode === 'delivery' ? 'توصيل' : 'استلام'}</T>
                     </View>
                     <T w="bold" size={15} color={live ? colors.accent : colors.ink}>{money(Number(o.items_total))}</T>
                   </Row>
@@ -153,7 +153,7 @@ export default function ShopInbox() {
                       <T w="bold" size={15} numberOfLines={1} style={{ flexShrink: 1 }}>{g.length > 1 ? `${ar(g.length)} قطع` : r.part}</T>
                       {shop.brands.includes(r.car_make) ? <Pill label="تخصصك" tone="good" /> : null}
                     </Row>
-                    <Muted size={12.5} numberOfLines={1}>{r.car_make} {r.car_model} {ar(r.car_year)} · {r.area}</Muted>
+                    <Muted size={12.5} numberOfLines={1}>{r.car_make} {r.car_model} {ar(r.car_year)}، {r.area}</Muted>
                   </View>
                   {g.length === 1 ? shopPill(g[0].st) : null}
                 </Row>
@@ -161,7 +161,7 @@ export default function ShopInbox() {
                   <View style={{ gap: 6, backgroundColor: colors.soft, borderRadius: 14, padding: 10 }}>
                     {g.map((x) => (
                       <Row key={x.r.id} style={{ justifyContent: 'space-between' }}>
-                        <T size={13.5} w="medium" numberOfLines={1} style={{ flex: 1 }}>{x.r.part}{x.r.qty > 1 ? ` × ${ar(x.r.qty)}` : ''} <T size={12} color={colors.muted}>· {WANTED[x.r.wanted_condition]}</T></T>
+                        <T size={13.5} w="medium" numberOfLines={1} style={{ flex: 1 }}>{x.r.part}{x.r.qty > 1 ? ` × ${ar(x.r.qty)}` : ''} <T size={12} color={colors.muted}>، {WANTED[x.r.wanted_condition]}</T></T>
                         {shopPill(x.st)}
                       </Row>
                     ))}
@@ -169,7 +169,7 @@ export default function ShopInbox() {
                 ) : null}
                 <Row gap={6}>
                   <Icon name="time-outline" size={14} color={colors.faint} />
-                  <Muted size={12}>{reqNo(r.num)} · {ago(r.created_at)}{r.urgency !== 'normal' ? ' · ' + URGENCY[r.urgency] : ''}{r.budget && g.length === 1 ? ' · ميزانية ' + money(r.budget) : ''}</Muted>
+                  <Muted size={12}>{reqNo(r.num)}، {ago(r.created_at)}{r.urgency !== 'normal' ? '، ' + URGENCY[r.urgency] : ''}{r.budget && g.length === 1 ? '، ميزانية ' + money(r.budget) : ''}</Muted>
                 </Row>
               </Press>
             );

@@ -1,5 +1,5 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, TextInput, View } from 'react-native';
 import { BackBar, Empty, Icon, Loading, Muted, Photo, Pill, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -25,12 +25,16 @@ export default function Chat() {
     return { req, sh, msgs, quote: mine, deal: !!(req && mine && req.chosen_quote_id === mine.id) };
   }, ['messages'], [request, shop]);
 
+  // opening the chat (and every new message while it is open) marks it as read for the messages tab
+  const count = data?.msgs.length ?? 0;
+  useEffect(() => { if (uid && request && shop) supabase.rpc('mark_chat_read', { p_request: request, p_shop: shop }).then(() => {}); }, [uid, request, shop, count]);
+
   if (ready && !session) return <Redirect href="/login" />;
   if (loading && !data) return <Screen><Loading /></Screen>;
   const r = data?.req;
   const iAmShop = uid === shop;
   const title = iAmShop ? 'العميل' : 'محل في ' + (data?.sh?.area ?? '');
-  const back = () => (router.canGoBack() ? router.back() : router.replace(iAmShop ? `/shop/${request}` : `/customer/${request}`));
+  const back = () => (router.canGoBack() ? router.back() : router.replace('/messages'));
 
   async function send(photo?: string, preset?: string) {
     const body = (preset ?? text).trim();
@@ -85,7 +89,7 @@ export default function Chat() {
           <Photo uri={photoUrl(r.photo_path)} size={44} />
           <View style={{ flex: 1 }}>
             <T w="semibold" size={14}>{r.part}</T>
-            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}{data?.quote ? ` · عرض المحل ${money(data.quote.price)} ج.م` : ''}</Muted>
+            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}{data?.quote ? `، عرض المحل ${money(data.quote.price)} ج.م` : ''}</Muted>
           </View>
           <Icon name="chevron-back" size={16} color={colors.faint} />
         </Press>

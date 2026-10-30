@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { BottomNav } from '@/components/AppHeader';
 import { Empty, Icon, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Seg, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { ORDER_LABEL, ago, ar, groupRequests, money, orderActive, orderNo, orderSteps, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
+import { ORDER_LABEL, ago, ar, groupRequests, money, orderActive, orderNo, orderStep, orderSteps, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -41,7 +41,7 @@ export default function MyRequests() {
   const orderCard = (o: Order) => {
     const ps = partsOf(o);
     const steps = orderSteps(o.delivery_mode);
-    const at = steps.indexOf(o.status);
+    const at = orderStep(o);
     const live = orderActive(o);
     return (
       <Press key={o.id} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}
@@ -52,7 +52,7 @@ export default function MyRequests() {
           </View>
           <View style={{ flex: 1, gap: 1 }}>
             <T w="bold" size={15} numberOfLines={1}>{ps.length ? partsLabel(ps) : 'أوردر'}</T>
-            <Muted size={12}>أوردر {orderNo(o.order_no)} · {money(Number(o.items_total) + Number(o.delivery_fee))} ج.م · {ago(o.created_at)}</Muted>
+            <Muted size={12}>أوردر {orderNo(o.order_no)}، {money(Number(o.items_total) + Number(o.delivery_fee))} ج.م، {ago(o.created_at)}</Muted>
           </View>
           {needsPayment(o) ? <Pill label="ادفع" tone="wait" icon="card" /> : o.status === 'received' && !o.rating ? <Pill label="قيّم" tone="wait" icon="star" /> : <Pill label={ORDER_LABEL[o.status].short} tone={live ? 'new' : o.status === 'received' ? 'good' : 'plain'} />}
         </Row>
@@ -67,8 +67,8 @@ export default function MyRequests() {
     <Screen nav={<BottomNav role="customer" />}>
       <T w="bold" size={28} style={{ lineHeight: 40 }}>طلباتي</T>
       <Seg options={[
-        { v: 'orders', label: `أوردرات${activeOrders.length ? ' · ' + ar(activeOrders.length) : ''}` },
-        { v: 'quotes', label: `عروض أسعار${openGroups.length ? ' · ' + ar(openGroups.length) : ''}` },
+        { v: 'orders', label: `أوردرات${activeOrders.length ? '، ' + ar(activeOrders.length) : ''}` },
+        { v: 'quotes', label: `عروض أسعار${openGroups.length ? '، ' + ar(openGroups.length) : ''}` },
         { v: 'past', label: 'خلصت' },
       ] as { v: Tab; label: string }[]} value={tab} onPick={setTab} />
 
@@ -89,7 +89,7 @@ export default function MyRequests() {
                     {photo ? <Photo uri={photoUrl(photo)} size={52} /> : <Plate top="طلب" bottom={reqNo(g.first.num).replace('#', '')} size="sm" />}
                     <View style={{ flex: 1, gap: 1 }}>
                       <T w="bold" size={15} numberOfLines={1}>{partsLabel(open)}</T>
-                      <Muted size={12}>{g.first.car_make} {g.first.car_model} · {reqNo(g.first.num)} · {ago(g.first.created_at)}</Muted>
+                      <Muted size={12}>{g.first.car_make} {g.first.car_model}، {reqNo(g.first.num)}، {ago(g.first.created_at)}</Muted>
                     </View>
                   </Row>
                   <Row gap={8}>

@@ -13,7 +13,7 @@ export function Bell({ light }: { light?: boolean } = {}) {
   const uid = session?.user.id;
   const { data } = useLive(async () => {
     if (!uid) return 0;
-    const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', uid).is('read_at', null);
+    const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', uid).is('read_at', null).not('link', 'like', '/chat/%');
     return count ?? 0;
   }, ['notifications'], [uid]);
   const n = data ?? 0;

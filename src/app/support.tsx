@@ -27,11 +27,11 @@ export default function Support() {
             {data.map((r) => (
               <Card key={r.id} onPress={() => router.push({ pathname: "/assistant", params: { ticket: r.id } })}>
                 <Row style={{ justifyContent: 'space-between' }}>
-                  <T w="semibold" size={14}>T-{r.ticket_no} · {REPORT_CATEGORIES[r.category]}</T>
+                  <T w="semibold" size={14}>T-{r.ticket_no}، {REPORT_CATEGORIES[r.category]}</T>
                   <Pill label={TICKET_STATUS[r.status]} tone={r.status === 'resolved' ? 'good' : r.status === 'in_progress' ? 'new' : 'wait'} />
                 </Row>
                 <T size={14} numberOfLines={2}>{r.body}</T>
-                <Muted size={11.5}>آخر تحديث {ago(r.updated_at)} · اضغط وكمّل المحادثة</Muted>
+                <Muted size={11.5}>آخر تحديث {ago(r.updated_at)}، اضغط وكمّل المحادثة</Muted>
               </Card>
             ))}
           </View>

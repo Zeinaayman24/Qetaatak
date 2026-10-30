@@ -11,7 +11,7 @@ export default function ShopSetup() {
   const { ready, session, profile, shop, shopPrivate, refresh } = useAuth();
   const [f, setF] = useState({
     name: '', owner: '', phone: '', phone2: '', governorate: 'القاهرة', area: '', street: '', building: '', landmark: '', postal: '',
-    register: '', type: 'used' as 'used' | 'new' | 'both', specialties: [] as string[], brands: [] as string[], delivery: false,
+    register: '', instapay: '', wallet: '', type: 'used' as 'used' | 'new' | 'both', specialties: [] as string[], brands: [] as string[], delivery: false,
   });
   const set = (k: keyof typeof f) => (v: any) => setF((x) => ({ ...x, [k]: v }));
   const toggle = (k: 'brands' | 'specialties') => (v: string) => setF((x) => ({ ...x, [k]: x[k].includes(v) ? x[k].filter((y) => y !== v) : [...x[k], v] }));
@@ -26,6 +26,7 @@ export default function ShopSetup() {
         name: shopPrivate.name, owner: shopPrivate.owner_name, phone: shopPrivate.phone, phone2: shopPrivate.phone2 || '',
         street: shopPrivate.street || '', building: shopPrivate.building || '', landmark: shopPrivate.landmark || '',
         postal: shopPrivate.postal_code || '', register: shopPrivate.commercial_register || '',
+        instapay: shopPrivate.instapay_address || '', wallet: shopPrivate.wallet_number || '',
       } : {}),
       ...(shop ? {
         governorate: shop.governorate || 'القاهرة', area: shop.area, type: shop.shop_type || 'used', specialties: shop.specialties || [],
@@ -54,6 +55,7 @@ export default function ShopSetup() {
       const priv = {
         name: f.name.trim(), owner_name: f.owner.trim(), phone: toLatin(f.phone).replace(/\s/g, ''), phone2: toLatin(f.phone2).replace(/\s/g, ''),
         street: f.street.trim(), building: f.building.trim(), landmark: f.landmark.trim(), postal_code: toLatin(f.postal.trim()), commercial_register: f.register.trim(),
+        instapay_address: f.instapay.trim(), wallet_number: toLatin(f.wallet).replace(/\s/g, ''),
       };
       const c = await supabase.from('profiles').update({
         is_shop: true, email: session?.user.email ?? '', full_name: profile!.full_name || priv.owner_name, phone: profile!.phone || priv.phone,
@@ -99,6 +101,14 @@ export default function ShopSetup() {
             <View style={{ flex: 1 }}><Field label="الرقم البريدي" value={f.postal} onChangeText={set('postal')} keyboardType="number-pad" ltr placeholder="11511" /></View>
           </Row>
           <Field label="علامة مميزة (اختياري)" value={f.landmark} onChangeText={set('landmark')} placeholder="مثلاً: قصاد بنزينة …" />
+        </View>
+      </Section>
+
+      <Section title="استلام الفلوس بالتحويل">
+        <View style={{ gap: 14, marginTop: 8 }}>
+          <Muted size={13}>لو حطيت بياناتك، العميل يقدر يحوّلك تمن الأوردر على InstaPay أو المحفظة ويرفع الإيصال، وانت تأكّد إن الفلوس وصلت. البيانات دي بتظهر للعميل بعد ما يأكد الأوردر بس.</Muted>
+          <Field label="عنوان InstaPay (اختياري)" value={f.instapay} onChangeText={set('instapay')} ltr placeholder="name@instapay" icon="phone" />
+          <Field label="رقم المحفظة (فودافون كاش وغيرها، اختياري)" value={f.wallet} onChangeText={set('wallet')} keyboardType="phone-pad" ltr placeholder="01xxxxxxxxx" icon="wallet" />
         </View>
       </Section>
 

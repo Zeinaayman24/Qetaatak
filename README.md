@@ -124,11 +124,13 @@ The customer picks how to pay on the checkout screen, before the order is confir
 | --- | --- |
 | Cash on delivery | `unpaid` → `paid` automatically when the customer taps "استلمت الأوردر" |
 | Pay at the shop | only for pickup orders; same as cash |
-| InstaPay / wallet | `awaiting` → customer uploads the receipt (private `receipts` bucket) → `review` → staff confirm in **Management › المدفوعات** → `paid` (or `failed` with a reason, and the customer re-uploads) |
+| InstaPay / wallet | the money goes **to the shop**: the shop adds its InstaPay / wallet in its profile; the customer transfers, uploads the receipt (private `receipts` bucket) → `review` → the **shop** confirms on its order page → `paid` (or `failed` with a reason, and the customer re-uploads). Staff can step in from Management › المدفوعات |
 | Card (Paymob) | `awaiting` → Paymob unified checkout → webhook → `paid` / `failed` |
 
-Shops can't move an InstaPay/card order past "preparing" until it is paid. A paid online order that is cancelled becomes `refund_due`, and staff record the refund.
+Orders go **preparing → ready → received** (the customer confirms receipt). Shops can't mark an InstaPay/card order ready until it is paid. A paid order that is cancelled becomes `refund_due`: the shop returns transfers, we return card payments. At checkout, pickup orders offer pay-at-shop / InstaPay / card, delivery orders offer cash-on-delivery / InstaPay / card.
 
-Database: `orders.payment_*` columns, `place_order`, `submit_payment_proof`, `review_payment`, `mark_refunded`, `set_setting` (migration `20261030000011_payments.sql`). The company's InstaPay / wallet details live in `app_settings` and are edited by admins on the Payments page.
+**Messages tab:** chats live in their own tab with unread counts (`my_inbox`, `mark_chat_read`, `chat_reads`); they no longer create notifications.
+
+Database: `orders.payment_*` columns, `place_order`, `submit_payment_proof`, `review_payment`, `mark_refunded`, `set_setting` (migration `20261030000011_payments.sql`). Each shop's InstaPay / wallet details live in `shop_private` and are only visible to the customer after the order is confirmed.
 
 **Switching on card payments:** create a Paymob merchant account (Egypt), then in Supabase › Edge Functions › Secrets set `PAYMOB_SECRET_KEY`, `PAYMOB_PUBLIC_KEY`, `PAYMOB_HMAC` and `PAYMOB_INTEGRATION_IDS` (your card / wallet integration ids, comma separated). In the Paymob dashboard set the transaction processed callback to `https://ztnbyvfupadzhddnbdje.supabase.co/functions/v1/paymob`. The card option appears in the app on its own once the secrets are set.

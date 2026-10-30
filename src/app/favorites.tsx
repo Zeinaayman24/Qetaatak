@@ -29,7 +29,7 @@ export default function Favorites() {
             <ListRow key={s.id} last={i === list.length - 1} onPress={() => router.push(`/shop-profile/${s.id}`)}
               leading={<View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront-outline" size={22} /></View>}
               title={'محل في ' + s.area}
-              subtitle={`${s.governorate} · ${SHOP_TYPES[s.shop_type]}`}
+              subtitle={`${s.governorate}، ${SHOP_TYPES[s.shop_type]}`}
               meta={s.brands.join('، ')} />
           ))}
         </View>

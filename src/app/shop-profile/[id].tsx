@@ -47,7 +47,7 @@ export default function ShopProfile() {
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <T w="bold" size={20}>محل في {s.area}</T>
-          <Muted>{s.governorate} · {SHOP_TYPES[s.shop_type]}</Muted>
+          <Muted>{s.governorate}، {SHOP_TYPES[s.shop_type]}</Muted>
           <Row gap={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>
             <Pill label={s.offers_delivery ? 'بيوصّل' : 'استلام من المحل'} />
             <Pill label="محل متراجع ✓" tone="good" />
@@ -82,7 +82,7 @@ export default function ShopProfile() {
               <Row gap={2}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={13} color={rv.rating >= n ? colors.accent : colors.line} />)}</Row>
             </Row>
             {rv.review ? <T size={14}>{rv.review}</T> : null}
-            <Muted size={12}>{rv.part}{rv.at ? ' · ' + ago(rv.at) : ''}</Muted>
+            <Muted size={12}>{rv.part}{rv.at ? '، ' + ago(rv.at) : ''}</Muted>
           </View>
         )) : <Empty text="لسه مفيش آراء." />}
       </Section>

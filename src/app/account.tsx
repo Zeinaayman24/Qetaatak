@@ -46,7 +46,7 @@ export default function Account() {
 
       {isShop ? (
         <Group>
-          <Item icon="storefront-outline" title="بيانات المحل" sub={shop ? `${shop.area}، ${shop.governorate} · ${SHOP_TYPES[shop.shop_type]}` : ''} onPress={() => router.push('/shop-setup')} />
+          <Item icon="storefront-outline" title="بيانات المحل" sub={shop ? `${shop.area}، ${shop.governorate}، ${SHOP_TYPES[shop.shop_type]}` : ''} onPress={() => router.push('/shop-setup')} />
           {shop ? (
             <Row style={{ paddingBottom: 14 }} gap={8}>
               <Pill label={shop.status === 'approved' ? 'المحل شغال' : shop.status === 'pending' ? 'تحت المراجعة' : 'موقوف'} tone={shop.status === 'approved' ? 'good' : shop.status === 'pending' ? 'wait' : 'plain'} />
@@ -77,7 +77,7 @@ export default function Account() {
       <Group>
         <Item icon="log-out-outline" title="تسجيل خروج" onPress={signOut} danger />
       </Group>
-      <Muted center size={12}>ضغطة · نسخة تجريبية</Muted>
+      <Muted center size={12}>ضغطة، نسخة تجريبية</Muted>
     </Screen>
   );
 }
