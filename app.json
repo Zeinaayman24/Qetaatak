@@ -28,7 +28,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ضغطة بتستخدم مكانك عشان تحدّد مكان محلك على الخريطة."
+        }
+      ]
     ],
     "scheme": "qetaatak",
     "experiments": {
