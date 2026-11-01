@@ -35,7 +35,7 @@ export default function ShopInbox() {
     const dec = must(await supabase.from('declines').select('request_id').eq('shop_id', uid)) as { request_id: string }[];
     const orders = must(await supabase.from('orders').select('*').eq('shop_id', uid).order('created_at', { ascending: false }).limit(100)) as Order[];
     return { reqs, mine, declined: new Set(dec.map((d) => d.request_id)), orders };
-  }, ['requests', 'quotes', 'orders'], [uid, shop?.status]);
+  }, ['requests', 'quotes', 'orders'], [uid, shop?.status], { pollMs: 20000 });
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && (!shop || !shop.governorate)) return <Redirect href="/shop-setup" />;

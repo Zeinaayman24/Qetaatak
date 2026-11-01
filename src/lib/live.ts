@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus, Platform } from 'react-native';
 import { supabase } from './supabase';
 
 let channelSeq = 0;
@@ -6,8 +7,12 @@ let channelSeq = 0;
 /**
  * Runs `fetcher`, then re-runs it whenever any of `tables` changes (Supabase Realtime).
  * Row level security still applies, so each person only receives what they may see.
+ *
+ * Phones drop the live connection when the screen sleeps or the app goes to the background,
+ * so the data is also refreshed when the screen comes back, when the connection is restored,
+ * and (when `pollMs` is given) every few seconds while the screen is visible.
  */
-export function useLive<T>(fetcher: () => Promise<T>, tables: string[], deps: unknown[] = []) {
+export function useLive<T>(fetcher: () => Promise<T>, tables: string[], deps: unknown[] = [], opts: { pollMs?: number } = {}) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
@@ -24,15 +29,30 @@ export function useLive<T>(fetcher: () => Promise<T>, tables: string[], deps: un
   useEffect(() => {
     setLoading(true);
     reload();
+    const soon = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(reload, 300); };
     const ch = supabase.channel('live-' + ++channelSeq);
-    tables.forEach((t) => ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => {
+    tables.forEach((t) => ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, soon));
+    // when the live connection (re)joins after a drop, catch up on anything missed while it was down
+    let joined = false;
+    ch.subscribe((status) => { if (status === 'SUBSCRIBED') { if (joined) soon(); joined = true; } });
+
+    const visible = () => Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible';
+    const onAppState = (st: AppStateStatus) => { if (st === 'active') soon(); };
+    const appSub = AppState.addEventListener('change', onAppState);
+    const onVisible = () => { if (visible()) soon(); };
+    const web = Platform.OS === 'web' && typeof window !== 'undefined';
+    if (web) { document.addEventListener('visibilitychange', onVisible); window.addEventListener('online', onVisible); window.addEventListener('focus', onVisible); }
+    const poll = opts.pollMs ? setInterval(() => { if (visible()) reload(); }, opts.pollMs) : null;
+
+    return () => {
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(reload, 300);
-    }));
-    ch.subscribe();
-    return () => { if (timer.current) clearTimeout(timer.current); supabase.removeChannel(ch); };
+      if (poll) clearInterval(poll);
+      appSub.remove();
+      if (web) { document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('online', onVisible); window.removeEventListener('focus', onVisible); }
+      supabase.removeChannel(ch);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tables.join(','), ...deps]);
+  }, [tables.join(','), opts.pollMs ?? 0, ...deps]);
 
   return { data, error, loading, reload };
 }

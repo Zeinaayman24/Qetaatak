@@ -35,6 +35,8 @@ export default function PriceRequest() {
   const [busy, setBusy] = useState(false);
   useEffect(() => { cardAvailable().then(setCard); }, []);
 
+  // while any part is still waiting for offers, also check every 12 seconds in case the live connection dropped
+  const waitingRef = useRef(true);
   const { data, loading } = useLive<Data>(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
     if (!req) return { req: null, parts: [], quotes: [], shops: {}, orders: {}, declines: {}, shopCount: 0, transfer: {}, fees: {}, cards: {} };
@@ -67,12 +69,13 @@ export default function PriceRequest() {
       orders: Object.fromEntries((must(orderRows as any) as Order[]).map((o) => [o.id, o])),
       declines, shopCount: shops.filter((s) => s.status === 'approved' && (s.brands.length === 0 || s.brands.includes(req.car_make))).length,
     };
-  }, ['requests', 'quotes', 'orders', 'declines'], [id]);
+  }, ['requests', 'quotes', 'orders', 'declines'], [id], { pollMs: waitingRef.current ? 12000 : undefined });
 
   if (ready && !session) return <Redirect href="/login" />;
   const back = () => (router.canGoBack() ? router.back() : router.replace('/customer/requests'));
   if (loading && !data) return <Screen><Loading /></Screen>;
   const d = data!;
+  waitingRef.current = !!d.req && d.parts.some((p) => p.status === 'open');
   const r = d?.req;
   if (!r) return <Screen><BackBar title="الطلب" onBack={back} /><Empty text="الطلب ده مش موجود." /></Screen>;
   // a single part that already became an order lives on the order page

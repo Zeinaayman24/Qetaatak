@@ -36,7 +36,7 @@ export default function CustomerHome() {
     const quotes = ids.length ? (must(await supabase.from('quotes').select('id, request_id').in('request_id', ids)) as Pick<Quote, 'id' | 'request_id'>[]) : [];
     const orders = must(await supabase.from('orders').select('*').eq('customer_id', uid).in('status', ['preparing', 'ready', 'out_for_delivery', 'delivered']).order('created_at', { ascending: false }).limit(10)) as Order[];
     return { reqs, quotes, orders };
-  }, ['requests', 'quotes', 'orders'], [uid]);
+  }, ['requests', 'quotes', 'orders'], [uid], { pollMs: 20000 });
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && (!profile.is_customer || !profile.street)) return <Redirect href="/profile" />;
