@@ -39,7 +39,7 @@ export default function ShopInbox() {
   }, ['requests', 'quotes', 'orders'], [uid, shop?.status], { pollMs: 20000 });
 
   if (ready && !session) return <Redirect href="/login" />;
-  if (profile && (!shop || !shop.governorate)) return <Redirect href="/shop-setup" />;
+  if (profile && (!shop || shop.status === 'draft' || shop.status === 'changes')) return <Redirect href="/shop-setup" />;
   if (!profile || !shop) return <Screen><Loading /></Screen>;
 
   const rows = (data?.reqs ?? [])

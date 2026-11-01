@@ -76,18 +76,24 @@ export type Profile = {
   marketing_consent?: boolean; deleted_at?: string | null;
 };
 export type Shop = {
-  id: string; area: string; brands: string[]; status: 'pending' | 'approved' | 'suspended'; created_at: string;
+  id: string; area: string; brands: string[]; status: 'draft' | 'pending' | 'changes' | 'approved' | 'suspended' | 'closed'; created_at: string;
   governorate: string; shop_type: 'used' | 'new' | 'both'; specialties: string[]; offers_delivery: boolean;
   /** delivery fees by distance: same area, same governorate, other governorates (null = doesn't deliver there) */
   fee_area: number | null; fee_city: number | null; fee_far: number | null;
   /** paid visibility: listed first with a badge until this date */
   featured_until?: string | null;
+  lat?: number | null; lng?: number | null; hours?: ShopHours; photo_path?: string | null; review_note?: string;
+  agreement_version?: string | null; agreement_at?: string | null; approved_at?: string | null;
 };
 export type ShopPrivate = {
   id: string; name: string; owner_name: string; phone: string; phone2: string;
   street: string; building: string; landmark: string; postal_code: string; commercial_register: string;
   instapay_address: string; wallet_number: string;
+  payout_name?: string; doc_id_front?: string | null; doc_id_back?: string | null; doc_register?: string | null; doc_tax?: string | null;
 };
+/** Opening hours (Cairo time); days off are 0 = Sunday … 6 = Saturday. */
+export type ShopHours = { open: string; close: string; off: number[] };
+export const WEEKDAYS = ['الحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
 
 /** One readable line for an address. */
 export const addressLine = (a: { street?: string; building?: string; floor?: string; apartment?: string; area?: string; governorate?: string }) =>

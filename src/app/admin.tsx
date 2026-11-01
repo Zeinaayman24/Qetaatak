@@ -44,7 +44,7 @@ export default function Admin() {
     toast(error ? friendlyError(error) : status === 'approved' ? 'المحل اتوافق عليه' : 'المحل اتوقف');
   }
 
-  const order = { pending: 0, approved: 1, suspended: 2 } as const;
+  const order: Record<string, number> = { pending: 0, changes: 1, approved: 2, suspended: 3, draft: 4, closed: 5 };
   const shops = [...d.shops].sort((a, b) => order[a.status] - order[b.status]);
   return (
     <Screen>
