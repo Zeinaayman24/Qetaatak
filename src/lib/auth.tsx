@@ -1,4 +1,5 @@
 import { syncPush } from '@/lib/push';
+import { clearLiveCache } from '@/lib/live';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from './supabase';
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     ready, session, profile, shop, shopPrivate,
     refresh: () => load(session),
-    signOut: async () => { await supabase.auth.signOut(); },
+    signOut: async () => { clearLiveCache(); await supabase.auth.signOut(); },
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

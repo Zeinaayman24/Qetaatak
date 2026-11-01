@@ -6,7 +6,7 @@ import { Alexandria_900Black } from '@expo-google-fonts/alexandria/900Black';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { I18nManager, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/lib/auth';
@@ -23,6 +23,10 @@ export default function RootLayout() {
     NotoNaskhArabic_400Regular, NotoNaskhArabic_500Medium, NotoNaskhArabic_600SemiBold, NotoNaskhArabic_700Bold, Alexandria_900Black,
   });
 
+  // don't hold the whole app on the fonts: show it after at most 1.2 s, the fonts swap in when ready
+  const [waited, setWaited] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setWaited(true), 1200); return () => clearTimeout(t); }, []);
+
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       document.documentElement.dir = 'rtl';
@@ -32,7 +36,7 @@ export default function RootLayout() {
     }
   }, []);
 
-  if (!loaded) return <View style={{ flex: 1, backgroundColor: colors.ground }} />;
+  if (!loaded && !waited) return <View style={{ flex: 1, backgroundColor: colors.ground }} />;
 
   return (
     <SafeAreaProvider>

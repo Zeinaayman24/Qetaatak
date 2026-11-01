@@ -26,7 +26,7 @@ export default function ShopInbox() {
   const [area, setArea] = useState('الكل');
   const [showFilters, setShowFilters] = useState(false);
   const uid = session?.user.id;
-  const now = useNow(1000);
+  const now = useNow(60000);
   useEffect(() => { rememberRole('shop'); }, []);
 
   const { data, loading } = useLive(async () => {

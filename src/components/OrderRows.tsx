@@ -43,7 +43,7 @@ export function RowList({ children }: { children: ReactNode }) {
 
 /** One order as a slim row: number, parts, live timer; then total, handover and a status dot. */
 export function OrderRow({ o, title, first, onPress, flag }: { o: Order; title: string; first?: boolean; onPress: () => void; flag?: { label: string; tone: 'wait' | 'bad' | 'good' } }) {
-  const now = useNow(o.status === 'received' || o.status === 'cancelled' ? 60000 : 1000);
+  const now = useNow(o.status === 'received' || o.status === 'cancelled' ? 60000 : 30000);
   const live = o.status !== 'received' && o.status !== 'cancelled';
   const flagColor = flag ? (flag.tone === 'bad' ? colors.bad : flag.tone === 'good' ? colors.good : colors.warn) : undefined;
   return (

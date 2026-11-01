@@ -18,7 +18,7 @@ export default function MyRequests() {
   const params = useLocalSearchParams<{ tab?: string }>();
   const uid = session?.user.id;
   const [picked, setTab] = useState<Tab | null>((['quotes', 'preparing', 'ready', 'done'].includes(String(params.tab)) ? params.tab : null) as Tab | null);
-  const now = useNow(1000);
+  const now = useNow(60000);
   const { data, loading } = useLive(async () => {
     if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[], orders: [] as Order[] };
     const [reqs, orders] = await Promise.all([

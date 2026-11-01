@@ -3,6 +3,9 @@ import { AppState, AppStateStatus, Platform } from 'react-native';
 import { supabase } from './supabase';
 
 let channelSeq = 0;
+/** Last result per screen query, so coming back to a screen shows it instantly while it refreshes. */
+const cache = new Map<string, unknown>();
+export const clearLiveCache = () => cache.clear();
 
 /**
  * Runs `fetcher`, then re-runs it whenever any of `tables` changes (Supabase Realtime).
@@ -13,21 +16,27 @@ let channelSeq = 0;
  * and (when `pollMs` is given) every few seconds while the screen is visible.
  */
 export function useLive<T>(fetcher: () => Promise<T>, tables: string[], deps: unknown[] = [], opts: { pollMs?: number } = {}) {
-  const [data, setData] = useState<T | null>(null);
+  // the cache key: the fetcher's code + its inputs (same screen, same ids)
+  const key = fetcher.toString().length + ':' + fetcher.toString().slice(0, 400) + '|' + JSON.stringify(deps);
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  const [data, setData] = useState<T | null>(() => (cache.get(key) as T) ?? null);
   const [error, setError] = useState<unknown>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cache.has(key));
   const fetchRef = useRef(fetcher);
   fetchRef.current = fetcher;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reload = useCallback(async () => {
-    try { setData(await fetchRef.current()); setError(null); }
+    try { const k = keyRef.current; const v = await fetchRef.current(); cache.set(k, v); if (k === keyRef.current) setData(v); setError(null); }
     catch (e) { setError(e); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
-    setLoading(true);
+    const hit = cache.get(keyRef.current) as T | undefined;
+    setData(hit ?? null);
+    setLoading(hit === undefined);
     reload();
     const soon = () => { if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(reload, 300); };
     const ch = supabase.channel('live-' + ++channelSeq);
