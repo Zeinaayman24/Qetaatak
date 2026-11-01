@@ -46,10 +46,10 @@ export async function payByCard(orderId: string): Promise<string | null> {
   return null;
 }
 
-export type PaySettings = { instapay_address: string; wallet_number: string; account_name: string; payment_note: string };
+export type PaySettings = { instapay_address: string; wallet_number: string; account_name: string; payment_note: string; bank_account: string };
 /** The company's InstaPay / wallet details, set by the team in the management system. */
 export async function paySettings(): Promise<PaySettings> {
   const { data } = await supabase.from('app_settings').select('key, value');
   const m = Object.fromEntries(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
-  return { instapay_address: m.instapay_address ?? '', wallet_number: m.wallet_number ?? '', account_name: m.account_name ?? '', payment_note: m.payment_note ?? '' };
+  return { instapay_address: m.instapay_address ?? '', wallet_number: m.wallet_number ?? '', account_name: m.account_name ?? '', payment_note: m.payment_note ?? '', bank_account: m.bank_account ?? '' };
 }

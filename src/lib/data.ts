@@ -82,7 +82,7 @@ export type Shop = {
   fee_area: number | null; fee_city: number | null; fee_far: number | null;
   /** paid visibility: listed first with a badge until this date */
   featured_until?: string | null;
-  accepting?: boolean; lat?: number | null; lng?: number | null; hours?: ShopHours; photo_path?: string | null; review_note?: string;
+  accepting?: boolean; suspend_reason?: string; reopen_step?: string; suspended_at?: string | null; lat?: number | null; lng?: number | null; hours?: ShopHours; photo_path?: string | null; review_note?: string;
   agreement_version?: string | null; agreement_at?: string | null; approved_at?: string | null;
 };
 export type ShopPrivate = {

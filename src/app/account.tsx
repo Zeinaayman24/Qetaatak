@@ -57,6 +57,7 @@ export default function Account() {
             </Row>
           ) : null}
           {shop?.status === 'approved' ? (<><Line /><Item icon="star-outline" title="صفحة المحل والتقييمات" sub="زي ما العملاء بيشوفوها" onPress={() => router.push(`/shop-profile/${shop.id}`)} /></>) : null}
+          {shop && shop.status !== 'pending' && shop.status !== 'draft' ? (<><Line /><Item icon="pulse-outline" title="أداء محلك" sub="آخر ٣٠ يوم والشكاوى" onPress={() => router.push('/shop/performance')} /></>) : null}
         </Group>
       ) : (
         <Group>

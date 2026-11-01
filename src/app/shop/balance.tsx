@@ -11,14 +11,15 @@ import { supabase } from '@/lib/supabase';
 import { colors, radius } from '@/lib/theme';
 
 type Balance = {
-  mode: 'free' | 'owed'; pct: number; limit: number; fees: number; paid: number; owed: number;
-  orders: { id: string; order_no: number; at: string; total: number; fee: number; parts: string | null }[];
+  free: boolean; free_until: string; pct: number; limit: number; fees: number; paid: number; owed: number; due_at: string | null;
+  orders: { id: string; order_no: number; at: string; total: number; fee: number; state: 'free' | 'fee' | 'returned'; parts: string | null }[];
+  statements: { month: string; amount: number }[];
   payments: { id: string; amount: number; ref: string; status: 'pending' | 'confirmed' | 'rejected'; note: string; created_at: string }[];
 };
 
 /**
- * The shop's account with ضغطة. While ضغطة is free, it shows what the shop saved.
- * When commission starts, it is owed only AFTER a sale (no top-up), and the shop settles it here.
+ * «حسابك مع ضغطة» (Product Register B16). Each shop is free for a period from its approval; after that
+ * commission is owed only after a sale (no top-up), with a monthly statement, settled here.
  */
 export default function ShopBalance() {
   const { ready, session } = useAuth();
@@ -41,8 +42,10 @@ export default function ShopBalance() {
   if (loading && !data) return <Screen><BackBar title="حسابك مع ضغطة" onBack={back} /><Loading /></Screen>;
   const b = data;
   if (!b) return <Screen><BackBar title="حسابك مع ضغطة" onBack={back} /><Empty text="مقدرناش نحمّل الحساب." /></Screen>;
-  const free = b.mode === 'free';
-  const over = !free && b.owed >= b.limit;
+  const free = b.free && b.owed <= 0;
+  const over = b.owed >= b.limit;
+  const day = (iso: string) => new Date(iso).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
+  const endingSoon = b.free && new Date(b.free_until).getTime() - Date.now() < 30 * 86400000;
 
   async function openPay() {
     setAmount(String(Math.round(b!.owed)));
@@ -51,13 +54,13 @@ export default function ShopBalance() {
   }
   async function sendPayment() {
     const n = Number(amount.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))));
-    if (!n || n <= 0) return toast('اكتب المبلغ اللي حوّلته');
+    if (!n || n <= 0) return toast('اكتب المبلغ اللي حوّلته.');
     setBusy(true);
     try {
       const path = photo ? await uploadPhoto(photo, uid!, 'receipts') : null;
       const { error } = await supabase.rpc('submit_settlement', { p_amount: n, p_ref: ref.trim(), p_path: path });
       if (error) throw error;
-      setPay(false); setPhoto(null); setRef(''); toast('وصلنا، هنأكد ونبلّغك');
+      setPay(false); setPhoto(null); setRef(''); toast('وصلنا، هنأكّد خلال يوم عمل ونبلّغك.');
     } catch (e) { toast(friendlyError(e)); }
     setBusy(false);
   }
@@ -69,19 +72,19 @@ export default function ShopBalance() {
       <View style={{ backgroundColor: colors.ink, borderRadius: 20, padding: 18, gap: 12 }}>
         {free ? (
           <>
-            <Row gap={8}><Pill label="ضغطة مجاناً دلوقتي" tone="good" icon="sparkles" /></Row>
-            <T size={13} color="rgba(255,255,255,.7)">وفّرت لحد دلوقتي</T>
-            <T w="bold" size={34} color="#fff">{money(b.fees)} <T size={15} color="rgba(255,255,255,.6)">ج.م</T></T>
-            <T size={13} color="rgba(255,255,255,.75)">ده اللي كنت هتدفعه لو العمولة {ar(b.pct)}٪ على {ar(b.orders.length)} أوردر اتباعوا من خلال ضغطة. انت مش مطالب بأي حاجة.</T>
+            <T w="bold" size={22} color="#fff">ضغطة مجاناً لحد {day(b.free_until)}</T>
+            <T size={14} color="rgba(255,255,255,.8)">انت مش مطالب بأي حاجة دلوقتي.</T>
+            {endingSoon ? <T size={13} color={colors.accent}>الفترة المجانية بتخلص {day(b.free_until)}. بعدها العمولة {ar(b.pct)}٪ من سعر القطع بس.</T> : null}
           </>
         ) : (
           <>
             <T size={13} color="rgba(255,255,255,.7)">عليك لضغطة</T>
             <T w="bold" size={34} color={over ? '#FFB4B4' : '#fff'}>{money(b.owed)} <T size={15} color="rgba(255,255,255,.6)">ج.م</T></T>
+            {b.due_at && b.owed > 0 ? <T size={13} color="rgba(255,255,255,.75)">مستحق يوم {day(b.due_at)}</T> : null}
             <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,.15)' }}>
               <View style={{ width: `${Math.min(100, (b.owed / Math.max(1, b.limit)) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: over ? colors.bad : colors.accent }} />
             </View>
-            <T size={12.5} color="rgba(255,255,255,.7)">{over ? `وصلت للحد (${money(b.limit)} ج.م). سدّد عشان تفضل تستقبل طلبات جديدة.` : `الحد ${money(b.limit)} ج.م، سدّد قبله عشان الطلبات الجديدة ماتقفش.`}</T>
+            <T size={12.5} color="rgba(255,255,255,.7)">{over ? 'وصلت للحد. سدّد عشان ترجع تستقبل طلبات جديدة.' : `الحد ${money(b.limit)} ج.م، سدّد قبله عشان الطلبات الجديدة ماتقفش.`}</T>
             {b.owed > 0 ? <Btn kind="primary" icon="wallet" title="سدّد دلوقتي" onPress={openPay} /> : null}
           </>
         )}
@@ -90,10 +93,11 @@ export default function ShopBalance() {
       <Card>
         <T w="bold" size={15}>إزاي العمولة بتشتغل</T>
         {[
-          ['checkmark-circle', 'بتدفع بس لما تبيع: العمولة بتتحسب لما العميل يأكد إنه استلم.'],
-          ['cash', 'الفلوس كلها بتوصلك انت من العميل (كاش أو تحويل)، مفيش شحن رصيد مقدّم.'],
+          ['checkmark-circle', 'بتدفع بس لما تبيع: العمولة بتتحسب لما العميل يستلم.'],
+          ['cash', 'الفلوس كلها بتوصلك انت من العميل، مفيش شحن رصيد.'],
           ['receipt', `العمولة ${ar(b.pct)}٪ من سعر القطع بس، من غير التوصيل.`],
-          ['time', 'بتسدّد اللي عليك كل فترة بتحويل، وبتشوف كل أوردر وعمولته هنا.'],
+          ['return-up-back', 'لو العميل رجّع القطعة، العمولة بتتشال.'],
+          ['calendar', 'كشف حساب كل شهر، والسداد خلال ٧ أيام.'],
         ].map(([icon, t]) => (
           <Row key={t} gap={10} style={{ alignItems: 'flex-start' }}><Icon name={icon} size={18} color={colors.primary} /><T size={13.5} style={{ flex: 1 }}>{t}</T></Row>
         ))}
@@ -106,17 +110,28 @@ export default function ShopBalance() {
               <Row key={o.id} gap={12} style={[{ paddingVertical: 12 }, i < b.orders.length - 1 && { borderBottomWidth: 1, borderColor: colors.line }]}>
                 <View style={{ flex: 1 }}>
                   <T w="semibold" size={14} numberOfLines={1}>{o.parts || 'أوردر'}</T>
-                  <Muted size={12}>أوردر {orderNo(o.order_no)}، {money(o.total)} ج.م، {o.at ? ago(o.at) : ''}</Muted>
+                  <Muted size={12}>أوردر {orderNo(o.order_no)}، {money(o.total)} ج.م{o.at ? ` · ${ago(o.at)}` : ''}</Muted>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <T w="bold" size={14} color={free ? colors.good : colors.ink} style={free ? { textDecorationLine: 'line-through' } : undefined}>{money(o.fee)} ج.م</T>
-                  <Muted size={11}>{free ? 'مجاناً' : 'عمولة'}</Muted>
+                  {o.state === 'fee' ? <T w="bold" size={14}>{money(o.fee)} ج.م</T> : null}
+                  <Muted size={11.5}>{o.state === 'fee' ? 'عمولة' : o.state === 'free' ? 'مجاناً' : 'اتشالت (مرتجع)'}</Muted>
                 </View>
               </Row>
             ))}
           </View>
         ) : <Empty icon="receipt-outline" text="لما عميل يستلم أوردر منك، هيظهر هنا." />}
       </Section>
+
+      {b.statements.length ? (
+        <Section title="كشوف الحساب">
+          {b.statements.map((st) => (
+            <Row key={st.month} gap={10} style={{ backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, padding: 12 }}>
+              <T w="semibold" size={14} style={{ flex: 1 }}>{new Date(st.month).toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}</T>
+              <T w="bold" size={14}>{money(st.amount)} ج.م</T>
+            </Row>
+          ))}
+        </Section>
+      ) : null}
 
       {b.payments.length ? (
         <Section title="مدفوعاتك">
@@ -131,12 +146,13 @@ export default function ShopBalance() {
 
       <Sheet open={pay} onClose={() => setPay(false)} title="سدّد العمولة">
         <View style={{ gap: 12 }}>
-          <Muted size={13}>حوّل المبلغ على حساب ضغطة، وارفع صورة التحويل.</Muted>
+          <Muted size={13}>حوّل المبلغ لضغطة على واحد من دول، وارفع صورة التحويل:</Muted>
           {bank?.instapay_address ? <View style={{ gap: 4 }}><Muted size={12}>InstaPay</Muted><CopyBox text={bank.instapay_address} /></View> : null}
           {bank?.wallet_number ? <View style={{ gap: 4 }}><Muted size={12}>محفظة</Muted><CopyBox text={bank.wallet_number} /></View> : null}
+          {bank?.bank_account ? <View style={{ gap: 4 }}><Muted size={12}>حساب بنكي</Muted><CopyBox text={bank.bank_account} /></View> : null}
           <Field label="المبلغ اللي حوّلته" value={amount} onChangeText={setAmount} keyboardType="number-pad" ltr />
           <Field label="رقم العملية (اختياري)" value={ref} onChangeText={setRef} ltr />
-          <PhotoPicker uri={photo} onPick={async () => { try { const u = await pickPhoto(); if (u) setPhoto(u); } catch { toast('الصورة دي مش مدعومة.'); } }} hint="سكرين شوت التحويل" />
+          <PhotoPicker uri={photo} onPick={async () => { try { const u = await pickPhoto(); if (u) setPhoto(u); } catch { toast('الصورة دي مش مدعومة.'); } }} hint="صورة الشاشة للتحويل" />
           <Btn icon="upload" title="ابعت" loading={busy} onPress={sendPayment} />
         </View>
       </Sheet>
