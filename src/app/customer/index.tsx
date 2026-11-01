@@ -57,7 +57,7 @@ export default function CustomerHome() {
           <Bell light />
         </Row>
         <View style={{ gap: 2 }}>
-          <T size={15} w="medium" color="rgba(255,255,255,.72)">أهلاً يا {first} 👋</T>
+          <T size={15} w="medium" color="rgba(255,255,255,.72)">أهلاً يا {first}</T>
           <T w="bold" size={28} color="#fff" style={{ lineHeight: 40, letterSpacing: -0.4 }}>محتاج قطعة إيه النهارده؟</T>
         </View>
         <Press onPress={() => newReq()} label="اكتب اسم القطعة"

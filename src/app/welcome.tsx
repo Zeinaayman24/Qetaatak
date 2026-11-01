@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { colors, lift } from '@/lib/theme';
 
 export default function Welcome() {
-  const { session, ready } = useAuth();
+  const { session, ready, signOut } = useAuth();
   if (ready && !session) return <Redirect href="/login" />;
   const option = (icon: string, title: string, sub: string, href: '/profile' | '/shop-setup', dark: boolean) => (
     <Press onPress={() => router.push(href)}
@@ -25,10 +25,14 @@ export default function Welcome() {
   );
   return (
     <Screen header={<AppHeader />}>
-      <Title sub="اختار مرة واحدة. لو عندك عربية ومحل، اعمل حساب لكل واحد بإيميل مختلف.">هتستخدم ضغطة إزاي؟</Title>
-      {option('car-side', 'عندي عربية', 'عايز أدوّر على قطعة غيار بأحسن سعر', '/profile', true)}
-      {option('store', 'عندي محل أو تشليح', 'عايز طلبات زباين من غير إعلانات', '/shop-setup', false)}
-      <Muted center size={12.5}>تقدر تغيّر بياناتك بعدين من صفحة حسابي.</Muted>
+      <Title sub="الاختيار ده مرة واحدة لكل رقم. لو عندك عربية ومحل، استخدم رقم مختلف لكل واحد.">هتستخدم ضغطة إزاي؟</Title>
+      {option('car-side', 'عندي عربية', 'اطلب أي قطعة وقارن أسعار أكتر من محل', '/profile', true)}
+      {option('store', 'عندي محل', 'استقبل طلبات العملاء وابعت عروضك', '/shop-setup', false)}
+      <Muted center size={12.5}>بنراجع بيانات كل محل قبل ما يبدأ يستقبل طلبات.</Muted>
+      <Press onPress={signOut} label="مش رقمك؟ سجّل خروج" style={{ alignSelf: 'center', paddingVertical: 6 }}>
+        <T size={13.5} w="semibold" color={colors.primary}>مش رقمك؟ سجّل خروج</T>
+      </Press>
+      <Muted center size={12}>اخترت غلط؟ كلّم الدعم وهنغيّرهالك.</Muted>
     </Screen>
   );
 }

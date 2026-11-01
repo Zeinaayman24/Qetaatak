@@ -65,7 +65,7 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
       return escalate();
     }
     if (t.category === 'app') {
-      await botSay('آسفين على الإزعاج 🙏 جرّب الحاجات دي الأول:\n• اقفل التطبيق وافتحه تاني\n• اتأكد إن النت شغال\n• لو على الموقع، اعمل تحديث للصفحة\n• اتأكد إنك على آخر نسخة من التطبيق');
+      await botSay('آسفين على المشكلة. جرّب ده الأول:\n• اقفل التطبيق وافتحه تاني\n• اتأكد إن النت شغال\n• لو على الموقع، اعمل تحديث للصفحة\n• حدّث التطبيق لآخر نسخة آخر نسخة من التطبيق');
     } else if (!r) {
       await botSay('شوف صفحة «طلباتي»، فيها حالة كل طلب ورقمه. ولو المشكلة في قطعة اشتريتها، المحل عليه ضمان وتقدر تكلّمه من صفحة الطلب.');
     } else if (r.status === 'open') {
@@ -93,13 +93,13 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
 
   async function escalate() {
     if (status !== 'bot') return;
-    await botSay('هحوّلك لحد من خدمة العملاء 👋 هيكمّل معاك هنا في نفس المحادثة. مش لازم تفضل فاتح التطبيق، هيوصلك إشعار أول ما يرد.');
+    await botSay('هحوّلك لحد من خدمة العملاء، وهيرد عليك هنا. مش لازم تفضل فاتح التطبيق، هيوصلك إشعار.');
     const { error } = await supabase.rpc('escalate_ticket', { p_report: id });
     if (error) toast(friendlyError(error));
     reload();
   }
   async function resolve() {
-    if (status === 'bot') await botSay('العفو! مبسوط إن المشكلة اتحلّت 🙏 لو احتجت أي حاجة أنا هنا.');
+    if (status === 'bot') await botSay('تمام، المحادثة اتقفلت. لو احتجت أي حاجة ابدأ محادثة جديدة.');
     const { error } = await supabase.rpc('customer_resolve_ticket', { p_report: id });
     if (error) toast(friendlyError(error));
     reload();

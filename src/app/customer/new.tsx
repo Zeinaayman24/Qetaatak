@@ -14,7 +14,7 @@ import { colors, fonts, lift } from '@/lib/theme';
 type Cond = 'used' | 'new' | 'any';
 type Item = { key: string; part: string; side: string; cond: Cond; qty: number; photo: string | null; notes: string; budget: string };
 type CarOpt = { key: string; make: string; model: string; year: number; vin: string };
-const item = (part: string): Item => ({ key: newId(), part, side: '', cond: 'used', qty: 1, photo: null, notes: '', budget: '' });
+const item = (part: string): Item => ({ key: newId(), part, side: '', cond: 'any', qty: 1, photo: null, notes: '', budget: '' });
 
 const CATALOG: { part: string; icon: string }[] = [
   { part: 'فانوس أمامي', icon: 'car-light-high' }, { part: 'فانوس خلفي', icon: 'car-light-dimmed' }, { part: 'مراية جانبية', icon: 'mirror' },
@@ -36,7 +36,7 @@ export default function NewRequest() {
     const p = str(params.part);
     if (!p) return [];
     const cond = str(params.cond);
-    return [{ ...item(p), notes: str(params.notes), side: Object.keys(SIDES).includes(str(params.side)) ? str(params.side) : '', cond: (['used', 'new', 'any'].includes(cond) ? cond : 'used') as Cond }];
+    return [{ ...item(p), notes: str(params.notes), side: Object.keys(SIDES).includes(str(params.side)) ? str(params.side) : '', cond: (['used', 'new', 'any'].includes(cond) ? cond : 'any') as Cond }];
   });
   const [q, setQ] = useState('');
   const urgency = 'normal'; // every request is treated as fast; no "when do you need it" question
@@ -176,13 +176,13 @@ export default function NewRequest() {
                     </Row>
                   </Row>
                   {partIsSided(it.part) ? <Chips options={Object.entries(SIDES).map(([v, label]) => ({ v, label }))} selected={[it.side]} onPick={(v) => upd(it.key, { side: v })} /> : null}
-                  <Seg options={[{ v: 'used', label: 'مستعمل' }, { v: 'new', label: 'جديد' }, { v: 'any', label: 'أي حاجة' }]} value={it.cond} onPick={(v) => upd(it.key, { cond: v as Cond })} />
+                  <Seg options={[{ v: 'any', label: 'جديد أو مستعمل' }, { v: 'used', label: 'مستعمل بس' }, { v: 'new', label: 'جديد بس' }]} value={it.cond} onPick={(v) => upd(it.key, { cond: v as Cond })} />
                   <Press onPress={async () => { try { const uri = await pickPhoto(); if (uri) upd(it.key, { photo: uri }); } catch { toast('الصورة دي مش مدعومة.'); } }}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: it.photo ? colors.good : colors.line }}>
                     {it.photo ? <Image source={{ uri: it.photo }} style={{ width: 44, height: 44, borderRadius: 10 }} /> : (
                       <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={20} color={colors.accentDeep} /></View>
                     )}
-                    <T size={13.5} w="medium" style={{ flex: 1 }}>{it.photo ? 'الصورة اتضافت ✓' : 'صوّر القطعة القديمة'}</T>
+                    <T size={13.5} w="medium" style={{ flex: 1 }}>{it.photo ? 'الصورة اتضافت · تغيير' : 'صوّر القطعة القديمة'}</T>
                   </Press>
                   <Row gap={10} style={{ alignItems: 'flex-start' }}>
                     <View style={{ flex: 1 }}><Field value={it.budget} onChangeText={(v) => upd(it.key, { budget: v })} keyboardType="number-pad" ltr placeholder="ميزانية (اختياري)" /></View>

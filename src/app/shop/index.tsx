@@ -1,3 +1,4 @@
+import { PushPrompt } from '@/components/PushPrompt';
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
@@ -88,6 +89,7 @@ export default function ShopInbox() {
     }>
       <View style={{ marginTop: -40, gap: 12 }}>
       {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
+      {shop.status === 'approved' ? <PushPrompt kind="banner" shop /> : null}
       {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}
       <StatusTabs<Tab> value={tab} onPick={setTab} items={[
         { v: 'open', label: 'جديد', n: waiting, hot: waiting > 0 },

@@ -53,7 +53,7 @@ export default function Dashboard() {
                 })}
               </tbody>
             </table>
-          ) : <p className="empty">مفيش شكاوى مفتوحة 🎉</p>}
+          ) : <p className="empty">مفيش شكاوى مفتوحة.</p>}
         </section>
 
         <section className="panel">
@@ -76,7 +76,7 @@ export default function Dashboard() {
 
       {flagged?.length ? (
         <section className="panel">
-          <div className="panel-head"><h2>🔒 محاولات تبادل أرقام قبل الأوردر</h2><span className="muted small">اتشالت تلقائياً من الرسائل</span></div>
+          <div className="panel-head"><h2>لينكات اتشالت من الرسائل</h2><span className="muted small">اتشالت تلقائياً من الرسائل</span></div>
           <table className="table">
             <tbody>
               {flagged.map((m) => {

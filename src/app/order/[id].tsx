@@ -6,7 +6,7 @@ import { ReceiptButton } from '@/components/ReceiptButton';
 import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  CONDITIONS, MATCH_HOURS, ORDER_LABEL, ORDER_STEP_NAME, warrantyLabel, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
+  CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, warrantyLabel, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
   type Order, type Quote, type Request, type Shop, type ShopPrivate,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -163,8 +163,8 @@ export default function OrderPage() {
         <Row gap={12} style={{ backgroundColor: colors.primarySoft, borderRadius: 16, padding: 16, alignItems: 'flex-start' }}>
           <Icon name="shield-checkmark" size={24} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <T w="bold" size={14.5}>القطعة لازم تكون زي الوصف</T>
-            <Muted size={12.5}>افحصها وانت بتستلم. لو غلط في الموديل أو الجنب أو الحالة أو مش زي الصورة، ارفضها، أو بلّغنا خلال {ar(MATCH_HOURS)} ساعة من الاستلام ونرجّعلك حقك.</Muted>
+            <T w="bold" size={14.5}>افحص قبل ما تستلم</T>
+            <Muted size={12.5}>افحصها كويس قبل ما تدّي الكود: الموديل، الجهة، الحالة، وإنها زي صورة العرض. لو مش زي العرض ارفضها. بعد الاستلام، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
           </View>
         </Row>
       ) : null}
@@ -172,8 +172,8 @@ export default function OrderPage() {
         <Row gap={12} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 16 }}>
           <Icon name="shield-checkmark" size={26} color={colors.good} />
           <View style={{ flex: 1 }}>
-            <T w="bold" size={14.5}>الضمان شغال لحد {warrantyEnd.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</T>
-            <Muted size={12.5}>لو قطعة مركبتش أو فيها عيب، المحل يبدّلها أو يرجّع فلوسها.</Muted>
+            <T w="bold" size={14.5}>ضمان المحل لحد {warrantyEnd.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</T>
+            <Muted size={12.5}>لو ظهر عيب في القطعة خلال المدة دي، كلّم المحل. ولو مردّش، بلّغنا وهنوصّل شكوتك للمحل.</Muted>
           </View>
         </Row>
       ) : null}

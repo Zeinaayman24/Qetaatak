@@ -26,7 +26,7 @@ export default function Payments() {
       <section className="panel">
         <div className="panel-head"><h2>تحويلات مستنية تأكيد المحل</h2></div>
         <p className="muted small">التحويلات بتروح لحساب المحل مباشرة، والمحل وحده هو اللي يأكد إن الفلوس وصلته. إحنا مانقدرش نشوف حسابه، فدورنا هنا المتابعة: لو المحل اتأخر ابعتله تذكير.</p>
-        {review.length ? review.map((o) => <ReceiptCard key={o.id} o={o} total={total(o)} />) : <p className="empty">مفيش تحويلات مستنية. 👌</p>}
+        {review.length ? review.map((o) => <ReceiptCard key={o.id} o={o} total={total(o)} />) : <p className="empty">مفيش تحويلات مستنية.</p>}
       </section>
 
       {refunds.length ? (
@@ -80,7 +80,7 @@ function ReceiptCard({ o, total }: { o: Order; total: number }) {
     setBusy(true); setMsg('');
     const { error } = await supabase.rpc('remind_shop_payment', { p_order: o.id });
     setBusy(false);
-    setMsg(error ? error.message : 'اتبعت تذكير للمحل ✓');
+    setMsg(error ? error.message : 'اتبعت تذكير للمحل.');
   }
   return (
     <div className="receipt">
@@ -115,7 +115,7 @@ function RefundRow({ o, total }: { o: Order; total: number }) {
     setBusy(true); setMsg('');
     const { error } = await supabase.rpc('remind_shop_payment', { p_order: o.id });
     setBusy(false);
-    setMsg(error ? error.message : 'اتبعت تذكير ✓');
+    setMsg(error ? error.message : 'اتبعت تذكير.');
   }
   return (
     <div className="refund">
@@ -160,7 +160,7 @@ function Commission({ admin }: { admin: boolean }) {
       const { error } = await supabase.rpc('set_setting', { p_key: k, p_value: (form![k] ?? '').trim() });
       if (error) return setMsg(error.message);
     }
-    setMsg('اتحفظ ✓'); reload();
+    setMsg('اتحفظ.'); reload();
   }
   async function review(x: Settlement, ok: boolean) {
     const note = ok ? '' : (prompt('سبب الرفض (بيوصل للمحل)') ?? '');

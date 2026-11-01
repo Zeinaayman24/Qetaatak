@@ -50,7 +50,7 @@ export default function Messages() {
 }
 
 function ThreadRow({ t, last }: { t: Thread; last: boolean }) {
-  const preview = t.last_photo && !t.last_body ? '📷 صورة' : t.last_body;
+  const preview = t.last_photo && !t.last_body ? 'صورة' : t.last_body;
   const unread = t.unread > 0;
   return (
     <Press onPress={() => router.push(`/chat/${t.request_id}/${t.shop_id}`)} label={t.other_name}

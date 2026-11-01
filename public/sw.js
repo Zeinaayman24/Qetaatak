@@ -1,6 +1,6 @@
 // ضغطة service worker: makes the site installable and keeps the app shell available when the network drops.
 // Data always comes live from the server; only the page shell and built files are cached.
-const CACHE = 'daghta-shell-v1';
+const CACHE = 'daghta-shell-v2';
 const SHELL = '/Qetaatak/';
 
 self.addEventListener('install', (e) => {
@@ -27,4 +27,27 @@ self.addEventListener('fetch', (e) => {
       return res;
     })));
   }
+});
+
+// Phone notifications (Product Register A23 / B19): show the push, open the right page on tap.
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: e.data ? e.data.text() : 'ضغطة' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'ضغطة', {
+    body: d.body || '',
+    icon: SHELL + 'icons/icon-192.png',
+    badge: SHELL + 'icons/icon-192.png',
+    dir: 'rtl', lang: 'ar',
+    tag: d.tag || undefined,
+    data: { link: d.link || '' },
+  }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const link = (e.notification.data && e.notification.data.link) || '';
+  const url = new URL(SHELL.replace(/\/$/, '') + (link.startsWith('/') ? link : '/'), location.origin).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+    for (const w of wins) { if (w.url.startsWith(location.origin + SHELL)) { w.focus(); return w.navigate(url); } }
+    return self.clients.openWindow(url);
+  }));
 });

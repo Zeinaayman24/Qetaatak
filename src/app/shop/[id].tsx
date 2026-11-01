@@ -184,7 +184,7 @@ export default function ShopRequest() {
   } else if (st === 'sold' && mine) {
     body = (
       <Card style={{ backgroundColor: colors.goodSoft }}>
-        <T w="bold" size={19}>العميل اختار عرضك 🎉</T>
+        <T w="bold" size={19}>العميل اختار عرضك</T>
         {sum}
         <Muted size={13}>القطعة دي بقت جزء من أوردر. جهّزه وحرّكه من صفحة الأوردر.</Muted>
         {r.order_id ? <Btn icon="cube" title="افتح الأوردر" onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: r.order_id! } })} /> : null}

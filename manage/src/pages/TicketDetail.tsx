@@ -83,11 +83,11 @@ export default function TicketDetail() {
           {(msgs ?? []).map((m) => {
             if (m.kind === 'system') return <div key={m.id} className="chat-event">{m.body} · {dateTime(m.created_at)}</div>;
             const fromReporter = m.sender_id === t.reporter_id && m.kind === 'user';
-            const who = m.kind === 'bot' ? '🤖 المساعد الآلي' : fromReporter ? reporterName : (all.byId[m.sender_id]?.full_name || 'خدمة العملاء');
+            const who = m.kind === 'bot' ? 'المساعد الآلي' : fromReporter ? reporterName : (all.byId[m.sender_id]?.full_name || 'خدمة العملاء');
             const cls = m.internal ? 'internal' : m.kind === 'bot' ? 'bot' : fromReporter ? 'them' : 'us';
             return (
               <div key={m.id} className={'bubble ' + cls}>
-                <span className="small muted">{m.internal ? '🔒 ملاحظة داخلية · ' : ''}{who} · {dateTime(m.created_at)}</span>
+                <span className="small muted">{m.internal ? 'ملاحظة داخلية · ' : ''}{who} · {dateTime(m.created_at)}</span>
                 <p>{m.body}</p>
               </div>
             );
@@ -180,8 +180,8 @@ function BriefPanel({ brief, ticket, msgs }: { brief: Brief; ticket: { id: strin
         <div className="brief-block"><span>المساعد قاله</span><ul>{brief.botTried.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
       ) : null}
       <div className="brief-block suggest"><span>اقتراح للتعامل</span><ul>{brief.suggest.map((x, i) => <li key={i}>{x}</li>)}</ul></div>
-      {ai.text ? <div className="brief-block ai"><span>✨ ملخص بالذكاء الاصطناعي</span><p>{ai.text}</p></div> : null}
-      {ai.on && !ai.text ? <button className="btn ghost small" disabled={ai.busy} onClick={summarize}>{ai.busy ? 'بيكتب الملخص…' : '✨ لخّص المحادثة بالذكاء الاصطناعي'}</button> : null}
+      {ai.text ? <div className="brief-block ai"><span>ملخص بالذكاء الاصطناعي</span><p>{ai.text}</p></div> : null}
+      {ai.on && !ai.text ? <button className="btn ghost small" disabled={ai.busy} onClick={summarize}>{ai.busy ? 'بيكتب الملخص…' : 'لخّص المحادثة'}</button> : null}
     </section>
   );
 }

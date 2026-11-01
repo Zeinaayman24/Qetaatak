@@ -6,7 +6,7 @@ export const GOVERNORATES = ['القاهرة', 'الجيزة', 'الإسكندر
 
 export const COUNTRIES = ['مصر'];
 
-export const SHOP_TYPES: Record<string, string> = { used: 'مستعمل / تشليح', new: 'جديد', both: 'مستعمل وجديد' };
+export const SHOP_TYPES: Record<string, string> = { used: 'قطع مستعملة', new: 'قطع جديدة', both: 'مستعمل وجديد' };
 
 export const SPECIALTIES = ['ميكانيكا', 'كهرباء', 'صاج وبودي', 'فوانيس ومرايات', 'تكييف وتبريد', 'عفشة ودبرياج', 'فرامل', 'فرش وإكسسوارات', 'إطارات وجنوط', 'زيوت وفلاتر', 'زجاج'];
 
@@ -14,13 +14,13 @@ export const COMMON_PARTS = ['فانوس أمامي', 'مراية جانبية',
 
 export const YEARS = Array.from({ length: 36 }, (_, i) => new Date().getFullYear() - i);
 
-export const WANTED: Record<string, string> = { used: 'مستعمل', new: 'جديد', any: 'أي حاجة' };
+export const WANTED: Record<string, string> = { any: 'جديد أو مستعمل', used: 'مستعمل بس', new: 'جديد بس' };
 
 export const CONDITIONS: Record<string, string> = {
   used_original: 'مستعمل أصلي',
-  used_clean: 'مستعمل نضيف جداً',
-  new_aftermarket: 'تجاري جديد',
-  new_original: 'أصلي جديد',
+  used_clean: 'مستعمل بحالة ممتازة',
+  new_aftermarket: 'جديد تجاري',
+  new_original: 'جديد أصلي',
 };
 
 /** Warranty is optional: most shops sell parts without one. 0 = no warranty; otherwise the shop types the days. */
@@ -73,6 +73,7 @@ export type Profile = {
   is_customer: boolean; is_shop: boolean; is_admin: boolean;
   email: string; country: string; governorate: string; street: string; building: string;
   floor: string; apartment: string; landmark: string; postal_code: string;
+  marketing_consent?: boolean; deleted_at?: string | null;
 };
 export type Shop = {
   id: string; area: string; brands: string[]; status: 'pending' | 'approved' | 'suspended'; created_at: string;
@@ -107,7 +108,7 @@ export type Report = { id: string; ticket_no: number; reporter_id: string; reque
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; kind: 'user' | 'bot' | 'system'; internal?: boolean; created_at: string };
 export const TICKET_STATUS: Record<string, string> = { bot: 'مع المساعد', open: 'مستنية موظف', in_progress: 'بنحلّها', resolved: 'اتحلّت' };
 
-export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', front: 'قدام', rear: 'ورا' };
+export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', front: 'أمامي', rear: 'خلفي' };
 export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };
 export const ORDER_STEPS: { key: string; label: string; pickupLabel?: string }[] = [
   { key: 'preparing', label: 'المحل بيجهّز' },

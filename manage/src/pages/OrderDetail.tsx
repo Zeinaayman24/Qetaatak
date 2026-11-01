@@ -79,7 +79,7 @@ export default function OrderDetail() {
             <h3>مع {all.priv[shopId]?.name} <span className="mono small muted">{memberId(all.byId[shopId])}</span></h3>
             {(msgs ?? []).filter((m) => m.shop_id === shopId).map((m) => (
               <div key={m.id} className={'bubble ' + (m.sender_id === shopId ? 'them' : 'us') + (m.flagged ? ' flagged' : '')}>
-                <span className="small muted">{m.sender_id === shopId ? 'المحل' : 'العميل'} · {dateTime(m.created_at)}{m.flagged ? ' · 🔒 حاول يبعت رقم أو لينك واتشال' : ''}</span>
+                <span className="small muted">{m.sender_id === shopId ? 'المحل' : 'العميل'} · {dateTime(m.created_at)}{m.flagged ? ' · اتشال لينك' : ''}</span>
                 {m.body ? <p>{m.body}</p> : null}
                 {m.photo_path ? <img src={photoUrl(m.photo_path)!} alt="صورة" /> : null}
               </div>

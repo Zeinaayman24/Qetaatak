@@ -54,7 +54,7 @@ export default function ShopProfile() {
           <Muted>{s.governorate}، {SHOP_TYPES[s.shop_type]}</Muted>
           <Row gap={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>
             <Pill label={s.offers_delivery ? 'بيوصّل' : 'استلام من المحل'} />
-            <Pill label="محل متراجع ✓" tone="good" />
+            <Pill label="موثّق من ضغطة" tone="good" />
           </Row>
         </View>
         {profile?.is_customer ? (

@@ -41,7 +41,7 @@ export default function ShopDetail() {
       actions={me.is_admin ? (
         <>
           {s.status !== 'approved' ? <button className="btn" onClick={() => setStatus('approved')}>وافق على المحل</button> : <button className="btn ghost" onClick={() => setStatus('suspended')}>إيقاف المحل</button>}
-          {s.status === 'approved' ? <button className="btn ghost" onClick={feature}>{featured ? '★ عدّل التمييز' : '★ خلّيه مميز'}</button> : null}
+          {s.status === 'approved' ? <button className="btn ghost" onClick={feature}>{featured ? 'عدّل التمييز' : 'خلّيه مميّز'}</button> : null}
           <button className={'btn ' + (pr?.is_blocked ? 'ghost' : 'danger')} onClick={toggleBlock}>{pr?.is_blocked ? 'إلغاء الحظر' : 'حظر'}</button>
         </>
       ) : null}>

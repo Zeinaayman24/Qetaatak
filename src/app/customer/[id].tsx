@@ -1,3 +1,5 @@
+import { PushPrompt } from '@/components/PushPrompt';
+import { LegalLinks } from '@/components/LegalLinks';
 import { isFeatured } from '@/components/AdBanner';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -8,7 +10,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  CONDITIONS, MATCH_HOURS, warrantyLabel, ORDER_LABEL, SIDES, WANTED, addressLine, ar, elapsed, friendlyError, money, orderNo, replyLabel, reqNo,
+  CONDITIONS, warrantyLabel, ORDER_LABEL, SIDES, WANTED, addressLine, ar, elapsed, friendlyError, money, orderNo, replyLabel, reqNo,
   type Order, type PayMethod, type Quote, type Request, type Shop, type ShopCard,
 } from '@/lib/data';
 import { PAY_NAME, cardAvailable, payByCard } from '@/lib/payments';
@@ -198,8 +200,8 @@ export default function PriceRequest() {
           </>
         ) : dec?.n && dec.n >= d.shopCount ? (
           <View style={{ backgroundColor: colors.badSoft, borderRadius: 20, padding: 16, gap: 6 }}>
-            <Row gap={8}><Icon name="alert-circle" size={22} color={colors.bad} /><T w="bold" size={15} color={colors.bad}>مش متوفرة عند المحلات دلوقتي</T></Row>
-            <Muted size={13}>كل المحلات اللي شافت الطلب قالت إنها مش عندها.{dec.reasons.length ? ` السبب: «${dec.reasons[0]}»` : ''} جرّب "أي حاجة" بدل مستعمل/جديد، أو اسأل المساعد.</Muted>
+            <Row gap={8}><Icon name="alert-circle" size={22} color={colors.bad} /><T w="bold" size={15} color={colors.bad}>مش متوفرة دلوقتي</T></Row>
+            <Muted size={13}>كل المحلات اللي شافت الطلب قالت إنها مش عندها.{dec.reasons.length ? ` السبب: «${dec.reasons[0]}»` : ''} جرّب تختار «جديد أو مستعمل» أو تضيف صورة.</Muted>
           </View>
         ) : (
           <>
@@ -303,7 +305,8 @@ export default function PriceRequest() {
               <Muted size={12.5} style={{ flex: 1 }}>بعد التأكيد هيتعمل لك إيصال PDF تقدر تحمّله من صفحة الأوردر.</Muted>
             </Row>
             {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في طلب الأسعار مستنية عروض.</Muted> : null}
-            <Muted size={12} center>بتأكيد الأوردر انت موافق على الشروط. افحص القطعة وانت بتستلم: لو مش زي الوصف ترفضها، أو بلّغنا خلال {ar(MATCH_HOURS)} ساعة.</Muted>
+            <Muted size={12} center>افحص القطعة قبل ما تدّي الكود أو تدفع. لو مش زي العرض ارفضها. بعد الاستلام، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
+            <LegalLinks lead="بتأكيد الأوردر بتوافق على" withCancellation />
           </>
         )}
       </Screen>
@@ -354,6 +357,8 @@ export default function PriceRequest() {
           <Muted size={12.5}>{d.cards[bundle.sid]?.name ?? 'محل'} عنده كل القطع اللي لسه مفتوحة. أوردر واحد وتوصيل واحد.</Muted>
         </Press>
       ) : null}
+
+      {!d.quotes.length ? <PushPrompt kind="ask" /> : null}
 
       {d.parts.length > 1 ? (
         <TabPills items={d.parts.map((p) => ({ v: p.id, label: p.part, mark: partMark(p) }))} value={current.id} onPick={setTab} />

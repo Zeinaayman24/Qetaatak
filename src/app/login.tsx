@@ -1,3 +1,4 @@
+import { LegalLinks } from '@/components/LegalLinks';
 import { Redirect } from 'expo-router';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
@@ -73,7 +74,7 @@ export default function Login() {
         <Field icon="lock-closed-outline" label="كلمة السر" value={password} onChangeText={setPassword} secure ltr placeholder="٦ حروف أو أكتر" />
         <ErrorText text={err} />
       </View>
-      <Muted center size={12.5}>بتسجيلك بتوافق على شروط الاستخدام وسياسة الخصوصية.</Muted>
+      <LegalLinks lead="بتسجيلك بتوافق على" />
     </Screen>
   );
 }

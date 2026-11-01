@@ -100,13 +100,13 @@ export default function Assistant() {
     const first = (profile.full_name || '').split(' ')[0];
     const mode = str(params.mode);
     if (mode === 'complaint') {
-      say({ text: `أهلاً يا ${first} 👋 أنا مساعد ضغطة. خليني أسجّل مشكلتك وأوصّلها لخدمة العملاء.` });
+      say({ text: `أهلاً يا ${first}. أنا مساعد ضغطة. احكيلنا المشكلة وهنوصّلها لخدمة العملاء.` });
       const rid = str(params.request);
       return advanceC({ ...emptyC(), category: rid ? 'order' : null, requestId: rid || null, requestAsked: !!rid });
     }
-    if (mode === 'track') { say({ text: `أهلاً يا ${first} 👋` }); return showTrack(); }
+    if (mode === 'track') { say({ text: `أهلاً يا ${first}.` }); return showTrack(); }
     if (mode === 'request' && !isShop) {
-      say({ text: `أهلاً يا ${first} 👋 هسألك كام سؤال سريع وأبعت طلبك لكل المحلات المناسبة.` });
+      say({ text: `أهلاً يا ${first}. هسألك كام سؤال سريع وأبعت طلبك للمحلات المناسبة.` });
       const p = str(params.part);
       const cond = str(params.cond);
       return advance({
@@ -122,8 +122,8 @@ export default function Assistant() {
         if (live) say({ text: `عندك محادثة مفتوحة مع خدمة العملاء (T-${live.ticket_no}).`, links: [{ label: 'كمّل المحادثة', href: `/assistant?ticket=${live.id}` }] });
       });
     say({ text: isShop
-      ? `أهلاً يا ${first} 👋 أنا مساعد ضغطة. لو عندك مشكلة أو شكوى اكتبهالي وأنا أوصّلها لخدمة العملاء.`
-      : `أهلاً يا ${first} 👋 أنا مساعد ضغطة.\nأقدر أدوّرلك على أي قطعة عند المحلات، أو أسجّل شكوى، أو أتابعلك طلب.\nاكتبلي محتاج إيه، مثلاً «عايز فانوس يمين مستعمل».` });
+      ? `أهلاً يا ${first}. أنا مساعد ضغطة. لو عندك مشكلة أو شكوى اكتبها هنا وهنوصّلها لخدمة العملاء.`
+      : `أهلاً يا ${first}. أنا مساعد ضغطة، وأقدر أساعدك تطلب قطعة، أو تتابع طلب، أو تسجّل شكوى. اكتب طلبك، مثلاً «فانوس أمامي يمين مستعمل»، أو اختار من تحت.` });
     setStep('menu');
   }
 
@@ -196,7 +196,7 @@ export default function Assistant() {
       setRecent((r) => [...sorted, ...r]);
       setStep('done');
       setDraft(emptyDraft()); setBasket([]);
-      say({ text: `اتبعت ✅ طلبك رقم ${reqNo(data.num)}${all.length > 1 ? ` (${ar(all.length)} قطع)` : ''} وصل للمحلات اللي بتشتغل في ${car.make}.\nأول ما محل يبعت سعر هيوصلك إشعار، وتقدر تقارن العروض وتختار.`, links: [{ label: 'افتح الطلب', href: `/customer/${data.id}` }] });
+      say({ text: `اتبعت. طلبك رقم ${reqNo(data.num)}${all.length > 1 ? ` (${ar(all.length)} قطع)` : ''} وصل للمحلات اللي بتشتغل في ${car.make}.\nأول ما محل يبعت سعر هيوصلك إشعار، وتقدر تقارن العروض وتختار.`, links: [{ label: 'افتح الطلب', href: `/customer/${data.id}` }] });
     } catch (x) {
       say({ text: 'معرفتش أبعت الطلب: ' + friendlyError(x) + '\nجرّب تاني.' });
     } finally { setBusy(false); }
@@ -206,7 +206,7 @@ export default function Assistant() {
   const complaintCats = Object.entries(REPORT_CATEGORIES).filter(([k]) => (isShop ? k !== 'shop' : k !== 'customer'));
   function advanceC(c: CDraft) {
     setC(c);
-    if (!c.category) { setStep('c_cat'); return say({ text: 'آسفين إن في مشكلة 🙏 الشكوى عن إيه؟' }); }
+    if (!c.category) { setStep('c_cat'); return say({ text: 'آسفين على اللي حصل. الشكوى عن إيه؟' }); }
     if ((c.category === 'order' || c.category === 'shop') && !c.requestId && !c.requestAsked && recent.length) {
       setStep('c_order'); return say({ text: 'عن أنهي طلب؟' });
     }
@@ -231,7 +231,7 @@ export default function Assistant() {
       .insert({ category: cdraft.category, body: cdraft.body.trim(), request_id: cdraft.requestId, status: 'bot' })
       .select('id, ticket_no').single();
     if (error) { setBusy(false); return say({ text: 'معرفتش أسجّل الشكوى: ' + friendlyError(error) }); }
-    const history = [...msgs, { id: 0, from: 'me' as const, text: 'ابعت الشكوى' }, { id: 0, from: 'bot' as const, text: `سجّلت شكوتك برقم T-${data.ticket_no} ✅` }]
+    const history = [...msgs, { id: 0, from: 'me' as const, text: 'ابعت الشكوى' }, { id: 0, from: 'bot' as const, text: `سجّلنا شكوتك برقم T-${data.ticket_no}. هيرد عليك موظف هنا في المحادثة.` }]
       .map((m) => ({ report_id: data.id, kind: m.from === 'bot' ? 'bot' : 'user', body: asText(m) }))
       .filter((m) => m.body);
     await supabase.from('ticket_messages').insert(history);
@@ -278,10 +278,10 @@ export default function Assistant() {
       if (car) d = { ...d, carKey: car.key };
       return advance(d);
     }
-    if (p.intent === 'thanks') return say({ text: 'العفو 🙏 أي خدمة تانية؟' });
+    if (p.intent === 'thanks') return say({ text: 'العفو. أقدر أساعدك في حاجة تانية؟' });
     if (p.intent === 'greet') return say({ text: 'أهلاً بيك! محتاج قطعة، ولا عندك مشكلة؟' });
     setStep('menu');
-    say({ text: 'مفهمتش قصدك أوي 😅 جرّب تكتبها كده: «عايز رديتر مستعمل»، أو «عندي شكوى من محل»، أو اختار من تحت.' });
+    say({ text: 'مفهمتش قصدك. جرّب تكتب مثلاً «رديتر مستعمل» أو «عندي شكوى من محل»، أو اختار من تحت.' });
   }
 
   async function onText(raw: string) {
@@ -307,8 +307,8 @@ export default function Assistant() {
         const c = cars?.find((x) => t.includes(x.make) || t.includes(x.model));
         return c ? advance({ ...draft, carKey: c.key }) : say({ text: 'اختار العربية من الأزرار تحت.' });
       }
-      case 'side': return p.side !== undefined || p.skip ? advance({ ...draft, side: p.side ?? '' }) : say({ text: 'يمين ولا شمال؟ (أو قدام / ورا)' });
-      case 'cond': return p.cond ? advance(merge(draft, p)) : say({ text: 'مستعملة، جديدة، ولا أي حاجة؟' });
+      case 'side': return p.side !== undefined || p.skip ? advance({ ...draft, side: p.side ?? '' }) : say({ text: 'أنهي جهة؟' });
+      case 'cond': return p.cond ? advance(merge(draft, p)) : say({ text: 'جديدة ولا مستعملة؟' });
       case 'urgency': return p.urgency ? advance(merge(draft, p)) : say({ text: 'عادي، النهارده، ولا مستعجل جداً؟' });
       case 'photo': return advance({ ...draft, photoAsked: true, notes: p.skip || p.no ? draft.notes : [draft.notes, t].filter(Boolean).join('، ') });
       case 'budget':
@@ -321,7 +321,7 @@ export default function Assistant() {
         if (p.part || p.side !== undefined || p.cond || p.urgency || p.budget) {
           return advance({ ...draft, ...(p.part ? { part: p.part } : {}), ...(p.side !== undefined ? { side: p.side } : {}), ...(p.cond ? { cond: p.cond } : {}), ...(p.urgency ? { urgency: p.urgency } : {}), ...(p.budget ? { budget: p.budget } : {}) });
         }
-        say({ text: 'ضفت ده كملاحظة للمحلات 👍' });
+        say({ text: 'ضفت ده كملاحظة للمحل.' });
         return advance({ ...draft, notes: [draft.notes, t].filter(Boolean).join('، ') });
       case 'c_cat': {
         const cat = p.category && complaintCats.some(([k]) => k === p.category) ? p.category : 'other';
@@ -460,4 +460,4 @@ export default function Assistant() {
 }
 
 /** One readable line per chat message, for the case history customer service sees. */
-const asText = (m: Msg) => [m.photo ? '📷 صورة' : '', m.text ?? '', ...(m.lines ?? []).map(([k, v]) => `${k}: ${v}`)].filter(Boolean).join('\n').slice(0, 2000);
+const asText = (m: Msg) => [m.photo ? 'صورة' : '', m.text ?? '', ...(m.lines ?? []).map(([k, v]) => `${k}: ${v}`)].filter(Boolean).join('\n').slice(0, 2000);

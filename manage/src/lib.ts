@@ -62,10 +62,10 @@ export const RESOLVED_BY: Record<string, string> = { bot: 'المساعد حلّ
 export const needsPeople = (t: { status: string }) => t.status === 'open' || t.status === 'in_progress';
 export const PRIORITY: Record<string, string> = { low: 'منخفضة', normal: 'عادية', high: 'عاجلة' };
 export const CATEGORY: Record<string, string> = { order: 'مشكلة في طلب', shop: 'شكوى من محل', customer: 'شكوى من عميل', app: 'مشكلة في التطبيق', other: 'حاجة تانية' };
-export const CONDITION: Record<string, string> = { used_original: 'مستعمل أصلي', used_clean: 'مستعمل نضيف جداً', new_aftermarket: 'تجاري جديد', new_original: 'أصلي جديد' };
-export const WANTED: Record<string, string> = { used: 'مستعمل', new: 'جديد', any: 'أي حاجة' };
-export const SHOP_TYPE: Record<string, string> = { used: 'مستعمل / تشليح', new: 'جديد', both: 'مستعمل وجديد' };
-export const SIDE: Record<string, string> = { '': '', right: 'يمين', left: 'شمال', front: 'قدام', rear: 'ورا' };
+export const CONDITION: Record<string, string> = { used_original: 'مستعمل أصلي', used_clean: 'مستعمل بحالة ممتازة', new_aftermarket: 'جديد تجاري', new_original: 'جديد أصلي' };
+export const WANTED: Record<string, string> = { any: 'جديد أو مستعمل', used: 'مستعمل بس', new: 'جديد بس' };
+export const SHOP_TYPE: Record<string, string> = { used: 'قطع مستعملة', new: 'قطع جديدة', both: 'مستعمل وجديد' };
+export const SIDE: Record<string, string> = { '': '', right: 'يمين', left: 'شمال', front: 'أمامي', rear: 'خلفي' };
 export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };
 
 export const money = (n: number) => Math.round(n || 0).toLocaleString('en-US') + ' ج.م';

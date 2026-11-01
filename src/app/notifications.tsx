@@ -1,6 +1,7 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
+import { PushPrompt } from '@/components/PushPrompt';
 import { BackBar, Btn, Empty, Icon, Loading, Muted, Screen, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { ago, type Notification } from '@/lib/data';
@@ -28,6 +29,7 @@ export default function Notifications() {
   return (
     <Screen>
       <BackBar title="الإشعارات" onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <PushPrompt kind="banner" />
       {loading && !data ? <Loading /> : list.length ? (
         <View>
           {list.map((n, i) => (

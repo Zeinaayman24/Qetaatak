@@ -87,7 +87,7 @@ export default function ShopSetup() {
 
       <Section title="المحل">
         <View style={{ gap: 14, marginTop: 8 }}>
-          <Field label="اسم المحل" value={f.name} onChangeText={set('name')} placeholder="مثلاً: تشليح الأمانة" />
+          <Field label="اسم المحل" value={f.name} onChangeText={set('name')} placeholder="مثلاً: محل الأمانة لقطع الغيار" />
           <Field label="اسم صاحب المحل بالكامل" value={f.owner} onChangeText={set('owner')} placeholder="مثلاً: سيد محمود حسن" />
           <Field label="رقم الموبايل (واتساب)" value={f.phone} onChangeText={set('phone')} keyboardType="phone-pad" ltr placeholder="01xxxxxxxxx" />
           <Field label="رقم تاني (اختياري)" value={f.phone2} onChangeText={set('phone2')} keyboardType="phone-pad" ltr placeholder="01xxxxxxxxx" />

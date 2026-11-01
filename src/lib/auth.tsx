@@ -1,3 +1,4 @@
+import { syncPush } from '@/lib/push';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from './supabase';
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile((p.data as Profile) ?? null);
     setShop((sh.data as Shop) ?? null);
     setShopPrivate((sp.data as ShopPrivate) ?? null);
+    syncPush();
   }, []);
 
   useEffect(() => {

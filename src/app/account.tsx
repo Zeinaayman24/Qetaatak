@@ -27,6 +27,8 @@ const Group = ({ children }: { children: React.ReactNode }) => (
   <View style={{ backgroundColor: colors.ground, borderWidth: 1, borderColor: colors.line, borderRadius: 18, paddingHorizontal: 14 }}>{children}</View>
 );
 
+const APP_VERSION = '1.0.0';
+
 export default function Account() {
   const { ready, session, profile, shop, shopPrivate, signOut } = useAuth();
   if (ready && !session) return <Redirect href="/login" />;
@@ -41,7 +43,7 @@ export default function Account() {
         </View>
         <View style={{ flex: 1 }}>
           <T w="bold" size={20}>{isShop ? shopPrivate?.name : profile.full_name}</T>
-          <Muted size={13} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{session?.user.email}</Muted>
+          <Muted size={13} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{profile.phone || session?.user.email}</Muted>
         </View>
       </Row>
 
@@ -68,18 +70,28 @@ export default function Account() {
 
       <Group>
         <Item icon="notifications-outline" title="الإشعارات" onPress={() => router.push('/notifications')} />
+        {!isShop ? (<><Line /><Item icon="lock-closed-outline" title="الخصوصية" onPress={() => router.push('/privacy')} /></>) : null}
+      </Group>
+
+      <Group>
+        <Item icon="chatbubbles-outline" title="المساعد" onPress={() => router.push('/assistant')} />
         <Line />
-        <Item icon="chatbubbles-outline" title="المساعد" sub="اشتكي أو اسأل، وهو يوصّلك لخدمة العملاء" onPress={() => router.push('/assistant')} />
+        <Item icon="help-circle-outline" title="الدعم" onPress={() => router.push('/support')} />
+      </Group>
+
+      <Group>
+        <Item icon="document-text-outline" title="الشروط والأحكام" onPress={() => router.push('/legal/terms')} />
         <Line />
-        <Item icon="help-circle-outline" title="شكاويّا" sub="تابع شكاويك وردود خدمة العملاء" onPress={() => router.push('/support')} />
-        {profile.is_admin ? (<><Line /><Item icon="shield-checkmark-outline" title="لوحة الإدارة" sub="المحلات، الطلبات، الشكاوى" onPress={() => router.push('/admin')} /></>) : null}
+        <Item icon="shield-outline" title="سياسة الخصوصية" onPress={() => router.push('/legal/privacy')} />
+        <Line />
+        <Item icon="receipt-outline" title="سياسة الإلغاء" onPress={() => router.push('/legal/cancellation')} />
       </Group>
 
       <Group>
         <Item icon="log-out-outline" title="تسجيل خروج" onPress={signOut} danger />
       </Group>
       <InstallCard />
-      <Muted center size={12}>ضغطة، نسخة تجريبية</Muted>
+      <Muted center size={12}>ضغطة · نسخة {APP_VERSION}</Muted>
     </Screen>
   );
 }
