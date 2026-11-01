@@ -82,7 +82,7 @@ export type Shop = {
   fee_area: number | null; fee_city: number | null; fee_far: number | null;
   /** paid visibility: listed first with a badge until this date */
   featured_until?: string | null;
-  lat?: number | null; lng?: number | null; hours?: ShopHours; photo_path?: string | null; review_note?: string;
+  accepting?: boolean; lat?: number | null; lng?: number | null; hours?: ShopHours; photo_path?: string | null; review_note?: string;
   agreement_version?: string | null; agreement_at?: string | null; approved_at?: string | null;
 };
 export type ShopPrivate = {
@@ -197,7 +197,7 @@ export type Order = {
   status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'received' | 'cancelled';
   items_total: number; delivery_fee: number; rating: number | null; review: string;
   created_at: string; updated_at: string; received_at: string | null;
-  delivery_address?: DeliveryAddress | null; refused_at?: string | null; refusal_reason?: string; cancel_reason?: string;
+  delivery_address?: DeliveryAddress | null; refused_at?: string | null; refund_due_at?: string | null; refusal_reason?: string; cancel_reason?: string;
   payment_method: PayMethod; payment_status: PayStatus; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null;
 };
 export type DeliveryAddress = { governorate: string; area: string; street: string; building: string; floor: string; apartment: string; landmark: string; contact_phone: string };

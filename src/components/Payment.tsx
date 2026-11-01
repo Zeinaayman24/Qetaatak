@@ -186,30 +186,35 @@ export function ShopPaymentReview({ order: o }: { order: Order }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const total = Number(o.items_total) + Number(o.delivery_fee);
+  const now = useNow(60000);
+  const leftFrom = (iso: string | null | undefined, hours: number) => {
+    const ms = Math.max(0, new Date(iso ?? 0).getTime() + hours * 3600000 - now);
+    return ms >= 3600000 ? `${ar(Math.floor(ms / 3600000))} ساعة${ms % 3600000 >= 60000 ? ` و${ar(Math.floor((ms % 3600000) / 60000))} دقيقة` : ''}` : `${ar(Math.max(1, Math.ceil(ms / 60000)))} دقيقة`;
+  };
   useEffect(() => {
     if (!o.payment_proof) return;
     supabase.storage.from('receipts').createSignedUrl(o.payment_proof, 600).then(({ data }) => setUrl(data?.signedUrl ?? null));
   }, [o.payment_proof]);
 
   async function decide(ok: boolean) {
-    if (!ok && !note.trim()) return toast('اكتب للعميل سبب الرفض');
+    if (!ok && !note.trim()) return toast('اكتب سبب الرفض.');
     setBusy(true);
     const { error } = await supabase.rpc('review_payment', { p_order: o.id, p_ok: ok, p_note: note.trim() });
     setBusy(false);
-    if (error) toast(friendlyError(error)); else toast(ok ? 'تمام، ابدأ جهّز الأوردر' : 'بلّغنا العميل');
+    if (error) toast(friendlyError(error)); else toast(ok ? 'تمام، ابدأ جهّز الأوردر.' : 'بلّغنا العميل.');
   }
   async function refunded() {
     setBusy(true);
     const { error } = await supabase.rpc('mark_refunded', { p_order: o.id, p_note: note.trim() });
     setBusy(false);
-    if (error) toast(friendlyError(error)); else toast('اتسجّل إنك رجّعت الفلوس');
+    if (error) toast(friendlyError(error)); else toast('اتسجّل إنك رجّعت الفلوس.');
   }
 
   if (o.payment_method !== 'instapay') return null;
   if (o.payment_status === 'refund_due') {
     return (
       <View style={{ backgroundColor: colors.warnSoft, borderRadius: radius.lg, padding: 16, gap: 10 }}>
-        <T w="bold" size={15} color={colors.warn}>العميل لغى بعد ما حوّل، رجّعله {money(total)} ج.م</T>
+        <T w="bold" size={15} color={colors.warn}>العميل لغى بعد ما حوّل، رجّعله {money(total)} ج.م خلال {leftFrom(o.refund_due_at ?? o.updated_at, 48)}</T>
         <Field value={note} onChangeText={setNote} placeholder="رقم عملية الاسترجاع (اختياري)" ltr />
         <Btn kind="dark" icon="checkmark-done" title="رجّعت المبلغ للعميل" loading={busy} onPress={refunded} />
       </View>
@@ -219,14 +224,15 @@ export function ShopPaymentReview({ order: o }: { order: Order }) {
     return (
       <Row gap={10} style={{ backgroundColor: colors.warnSoft, borderRadius: radius.lg, padding: 14 }}>
         <Icon name="hourglass" size={20} color={colors.warn} />
-        <T size={13.5} color={colors.warn} style={{ flex: 1 }}>العميل هيحوّل {money(total)} ج.م على InstaPay / محفظتك ويرفع الإيصال هنا.{o.payment_status === 'failed' ? ' رفضت الإيصال اللي فات، مستنيين واحد جديد.' : ''}</T>
+        <T size={13.5} color={colors.warn} style={{ flex: 1 }}>العميل لسه ماحوّلش. متبدأش تجهّز قبل ما تأكّد الدفع. لو ماحوّلش خلال {leftFrom(o.created_at, 2)} الأوردر بيتلغى.</T>
       </Row>
     );
   }
   if (o.payment_status !== 'review') return null;
   return (
     <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1.5, borderColor: colors.primary, padding: 16, gap: 12 }}>
-      <Row gap={8}><Icon name="receipt" size={20} color={colors.primary} /><T w="bold" size={16}>العميل حوّل، راجع الإيصال</T></Row>
+      <Row gap={8}><Icon name="receipt" size={20} color={colors.primary} /><T w="bold" size={16} style={{ flex: 1 }}>العميل حوّل، راجع الإيصال</T></Row>
+      <Muted size={13}>أكّد خلال {leftFrom(o.updated_at, 2)}</Muted>
       <Row gap={12} style={{ alignItems: 'flex-start' }}>
         {url ? <Image source={{ uri: url }} style={{ width: 110, height: 150, borderRadius: 10, backgroundColor: colors.soft }} resizeMode="cover" accessibilityLabel="صورة إيصال التحويل" />
           : <View style={{ width: 110, height: 150, borderRadius: 10, backgroundColor: colors.soft }} />}
@@ -237,11 +243,11 @@ export function ShopPaymentReview({ order: o }: { order: Order }) {
           <T w="semibold" size={14} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{o.payment_ref || 'مش مكتوب'}</T>
         </View>
       </Row>
-      <Muted size={12.5}>افتح InstaPay أو المحفظة واتأكد إن المبلغ وصلك فعلاً قبل ما تأكّد.</Muted>
-      <Field value={note} onChangeText={setNote} placeholder="سبب الرفض (لو هترفض)" />
+      <Muted size={12.5}>افتح InstaPay أو المحفظة واتأكد إن المبلغ وصلك فعلاً. صورة الإيصال لوحدها مش دليل.</Muted>
+      <Field value={note} onChangeText={setNote} placeholder="سبب الرفض (مطلوب)" />
       <Row gap={10}>
         <Btn icon="checkmark-circle" title="الفلوس وصلت" loading={busy} onPress={() => decide(true)} style={{ flex: 1 }} />
-        <Btn kind="danger" title="ارفض" loading={busy} onPress={() => decide(false)} style={{ minWidth: 96 }} />
+        <Btn kind="danger" title="الفلوس ماوصلتش" loading={busy} onPress={() => decide(false)} style={{ flex: 1 }} />
       </Row>
     </View>
   );

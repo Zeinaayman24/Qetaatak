@@ -1,6 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { ConfirmSheet } from '@/components/Confirm';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -28,6 +29,8 @@ export default function ShopRequest() {
   const [err, setErr] = useState<string | null>(null);
   const [ask, setAsk] = useState(false);
   const [why, setWhy] = useState('');
+  const [removing, setRemoving] = useState<Quote | null>(null);
+  const now = useNow(60000);
 
   const { data, loading, reload } = useLive(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', id).maybeSingle()) as Request | null;
@@ -64,13 +67,18 @@ export default function ShopRequest() {
   const pf = partFee.trim() ? parseFloat(latin(partFee)) : null;
   const offers = data!.offers;
   const approved = shop?.status === 'approved';
-  const extras = [
-    r.side ? 'الجهة: ' + SIDES[r.side] : '',
-    r.budget ? 'ميزانية العميل ' + money(r.budget) + ' ج.م' : '', r.vin ? 'شاسيه ' + r.vin : '',
-  ].filter(Boolean);
+  const line = ['عايزها ' + WANTED[r.wanted_condition], r.side ? 'الجهة: ' + SIDES[r.side] : '', r.vin ? 'شاسيه ' + r.vin : '', r.area, ago(r.created_at)].filter(Boolean).join(' · ');
+  // free for shops for 6 months from approval (Register B16; final length still to be decided)
+  const freeUntil = new Date(shop?.approved_at ?? shop?.created_at ?? Date.now());
+  freeUntil.setMonth(freeUntil.getMonth() + 6);
+  const expiresIn = (q: Quote) => {
+    const ms = new Date(q.expires_at).getTime() - now;
+    if (ms <= 0) return null;
+    return ms >= 3600000 ? `${ar(Math.floor(ms / 3600000))} ساعة` : `${ar(Math.max(1, Math.ceil(ms / 60000)))} دقيقة`;
+  };
 
   async function choosePhoto() {
-    try { const uri = await pickPhoto(); if (uri) setPhoto(uri); } catch { toast('الصورة دي مش مدعومة. جرّب صورة تانية.'); }
+    try { const uri = await pickPhoto(); if (uri) setPhoto(uri); } catch { toast('الصورة دي مش مدعومة. اختار صورة JPG أو PNG.'); }
   }
 
   async function send() {
@@ -87,7 +95,7 @@ export default function ShopRequest() {
       if (error) throw error;
       setPrice(''); setPhoto(null); setBrand(''); setNote(''); setPartFee(''); setAdding(false);
       const next = !offers.length ? data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open') : undefined;
-      if (next) { toast('العرض اتبعت، كمّل القطعة اللي بعدها'); router.replace(`/shop/${next.r.id}`); }
+      if (next) { toast('العرض اتبعت، كمّل القطعة اللي بعدها.'); router.replace(`/shop/${next.r.id}`); }
       else { toast('العرض اتبعت للعميل'); reload(); }
     } catch (x) { setErr(friendlyError(x)); }
     finally { setBusy(false); }
@@ -104,7 +112,8 @@ export default function ShopRequest() {
 
   async function removeOffer(q: Quote) {
     const { error } = await supabase.from('quotes').delete().eq('id', q.id);
-    if (error) toast(friendlyError(error)); else { toast('العرض اتشال'); reload(); }
+    setRemoving(null);
+    if (error) toast(friendlyError(error)); else { toast('العرض اتشال.'); reload(); }
   }
 
   /** One of this shop's offers: brand, price, condition, warranty (and remove while the request is open). */
@@ -118,9 +127,10 @@ export default function ShopRequest() {
         <Pill label={CONDITIONS[q.condition]} /><Pill label={warrantyLabel(q.warranty_days)} tone={q.warranty_days ? 'good' : 'plain'} />
         <Pill label={!q.can_deliver ? 'استلام من المحل بس' : q.delivery_fee != null ? `توصيل ${money(q.delivery_fee)} ج.م` : 'توصيل حسب المنطقة'} icon={q.can_deliver ? 'bicycle' : 'walk'} />
         {r.chosen_quote_id === q.id ? <Pill label="العميل اختاره" tone="good" icon="checkmark" /> : null}
+        {r.status === 'open' && r.chosen_quote_id !== q.id ? (expiresIn(q) ? <Pill label={`بينتهي بعد ${expiresIn(q)}`} tone="wait" icon="time" /> : <Pill label="العرض ده انتهى" tone="plain" />) : null}
       </Row>
       {q.note ? <Muted size={12.5}>{q.note}</Muted> : null}
-      {canRemove ? <Btn kind="link" title="شيل العرض ده" onPress={() => removeOffer(q)} /> : null}
+      {canRemove ? <Btn kind="link" title="شيل العرض ده" onPress={() => setRemoving(q)} /> : null}
     </View>
   );
   const sum = offers.length ? <View>{offers.map((q) => offerRow(q, false))}</View> : null;
@@ -144,8 +154,8 @@ export default function ShopRequest() {
         {offers.length ? <Card><T w="bold" size={15}>عروضك على القطعة دي ({ar(offers.length)})</T>{offers.map((q) => offerRow(q, true))}</Card> : null}
         <T w="bold" size={17}>{offers.length ? 'عرض جديد بماركة أو سعر تاني' : 'ابعت عرضك'}</T>
         <Field label="الماركة / النوع" value={brand} onChangeText={setBrand} placeholder="مثلاً: أصلي هيونداي، Bosch، Valeo، صيني" icon="pricetag"
-          hint="لو عندك أكتر من ماركة، ابعت كل واحدة كعرض لوحدها بسعرها." />
-        <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0" hint="ده السعر اللي العميل هيدفعه ليك كامل. ضغطة مجاناً للمحلات." />
+          hint="لو عندك أكتر من ماركة، ابعت كل واحدة كعرض لوحدها." />
+        <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0" hint={`السعر ده نهائي ومينفعش يتغيّر عند الاستلام. ضغطة مجاناً للمحلات لحد ${freeUntil.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}.`} />
         <Labeled label="حالة القطعة">
           <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
         </Labeled>
@@ -153,7 +163,8 @@ export default function ShopRequest() {
           <Seg options={[{ v: 'no', label: 'لأ، من غير ضمان' }, { v: 'yes', label: 'أيوه، فيه ضمان' }]} value={hasWarranty ? 'yes' : 'no'} onPick={(v) => setHasWarranty(v === 'yes')} />
           {hasWarranty
             ? <Field label="مدة الضمان بالأيام (مطلوب)" value={days} onChangeText={setDays} keyboardType="number-pad" ltr placeholder="مثلاً 30" icon="shield-checkmark" />
-            : <Muted size={12}>مش لازم تدي ضمان. العروض اللي عليها ضمان بتظهر بعلامة «بضمان» والعملاء بيختاروها أكتر.</Muted>}
+            : null}
+          <Muted size={12}>الضمان بيتكتب في إيصال العميل وهو التزام منك. العروض اللي عليها ضمان بتتباع أكتر.</Muted>
         </Labeled>
         <Labeled label="التوصيل للقطعة دي">
           {shopDelivers ? (
@@ -161,14 +172,16 @@ export default function ShopRequest() {
               <Seg options={[{ v: 'yes', label: 'ينفع تتوصّل' }, { v: 'no', label: 'استلام من المحل بس' }]} value={deliverable ? 'yes' : 'no'} onPick={(v) => setDeliverable(v === 'yes')} />
               {deliverable ? (
                 <Field value={partFee} onChangeText={setPartFee} keyboardType="number-pad" ltr icon="bicycle" placeholder="سعر توصيل خاص للقطعة دي (اختياري)"
-                  hint={`لو سيبته فاضي: ${shop?.fee_area != null ? money(Number(shop.fee_area)) : '—'} ج.م لنفس المنطقة، ${shop?.fee_city != null ? money(Number(shop.fee_city)) : '—'} ج.م لنفس المحافظة${shop?.fee_far != null ? `، ${money(Number(shop.fee_far))} ج.م لبرّه` : ''}. اكتب سعر لو القطعة تقيلة أو كبيرة.`} />
+                  hint={`لو سيبته فاضي: ${shop?.fee_area != null ? money(Number(shop.fee_area)) : '—'} ج.م لنفس المنطقة، ${shop?.fee_city != null ? money(Number(shop.fee_city)) : '—'} ج.م لنفس المحافظة${shop?.fee_far != null ? `، ${money(Number(shop.fee_far))} ج.م لمحافظات تانية` : ''}`} />
               ) : <Muted size={12}>العميل هيشوف إن القطعة دي استلام من المحل بس.</Muted>}
             </>
           ) : <Muted size={12.5}>محلك مش بيوصّل، فالعميل هيستلم من المحل. تقدر تفعّل التوصيل وأسعاره من بيانات المحل.</Muted>}
         </Labeled>
         <Field label="ملاحظة للعميل (اختياري)" value={note} onChangeText={setNote} placeholder="مثلاً: فرز أول، متجربة على العربية" multiline />
-        <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر" />
-        <Muted size={12}>السعر اللي تبعته هو اللي العميل هيدفعه وقت الاستلام.</Muted>
+        <Labeled label="صوّر القطعة نفسها (مش صورة من النت)">
+          <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر، والعميل بيقارن بيها وهو بيستلم." />
+        </Labeled>
+        <Muted size={12}>العرض صالح ٤٨ ساعة. لو القطعة اتباعت، شيل العرض.</Muted>
       </>
     );
   } else if (st === 'quoted') {
@@ -186,14 +199,14 @@ export default function ShopRequest() {
       <Card style={{ backgroundColor: colors.goodSoft }}>
         <T w="bold" size={19}>العميل اختار عرضك</T>
         {sum}
-        <Muted size={13}>القطعة دي بقت جزء من أوردر. جهّزه وحرّكه من صفحة الأوردر.</Muted>
+        <Muted size={13}>القطعة دي بقت جزء من أوردر. جهّزه من صفحة الأوردر.</Muted>
         {r.order_id ? <Btn icon="cube" title="افتح الأوردر" onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: r.order_id! } })} /> : null}
       </Card>
     );
   } else if (st === 'lost') {
     body = <Card><T w="bold">العميل اختار عرض تاني المرة دي</T>{sum}<Muted>العروض اللي فيها صورة وماركة واضحة وضمان بتكسب أكتر.</Muted></Card>;
   } else {
-    body = <Card><T w="bold">الطلب ده اتقفل</T></Card>;
+    body = <Card><T w="bold">الطلب ده اتقفل.</T></Card>;
   }
 
   return (
@@ -222,15 +235,15 @@ export default function ShopRequest() {
         <View style={{ flex: 1 }}>
           <T w="bold" size={18}>{r.part}{r.qty > 1 ? ` × ${ar(r.qty)}` : ''}</T>
           <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
-          <Muted>عايزها {WANTED[r.wanted_condition]}، {r.area}، {ago(r.created_at)}</Muted>
+          <Muted>{line}</Muted>
         </View>
       </Row>
-      {extras.length ? <Row gap={6} style={{ flexWrap: 'wrap' }}>{extras.map((e) => <Pill key={e} label={e} tone="plain" />)}</Row> : null}
       {r.notes ? <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.line }}><Muted size={12}>ملاحظة العميل</Muted><T size={14}>{r.notes}</T></View> : null}
       {approved && (st === 'open' || st === 'quoted' || st === 'declined' || st === 'sold') ? (
         <Btn kind="secondary" title="رسالة للعميل" onPress={() => router.push(`/chat/${r.id}/${uid}`)} />
       ) : null}
       {body}
+      <ConfirmSheet open={!!removing} title="تشيل العرض؟" body="العميل مش هيشوفه تاني." yes="شيل" danger onYes={() => removing && removeOffer(removing)} onClose={() => setRemoving(null)} />
       <Sheet open={ask} onClose={() => setAsk(false)} title="مش متوفرة؟ قول للعميل ليه">
         <View style={{ gap: 10 }}>
           {['مش متوفرة دلوقتي', 'متوفرة جديد بس', 'متوفرة مستعمل بس', 'مش بشتغل في الماركة دي'].map((x) => (

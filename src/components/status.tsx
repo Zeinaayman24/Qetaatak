@@ -17,7 +17,7 @@ export function shopState(r: Request, myQuote: Pick<Quote, 'id'> | undefined, de
     if (myQuote && r.chosen_quote_id === myQuote.id) return 'sold';
     return myQuote ? 'lost' : 'closed';
   }
-  if (r.status === 'cancelled') return 'closed';
+  if (r.status === 'cancelled' || r.status === 'expired') return 'closed';
   if (myQuote) return 'quoted';
   if (declined) return 'declined';
   return 'open';

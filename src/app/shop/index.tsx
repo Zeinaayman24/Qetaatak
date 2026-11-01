@@ -1,7 +1,7 @@
 import { PushPrompt } from '@/components/PushPrompt';
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Switch, View } from 'react-native';
 import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { shopPill, shopState, type ShopState } from '@/components/status';
@@ -19,7 +19,8 @@ type Tab = 'open' | 'quoted' | 'preparing' | 'ready' | 'done';
 const SLOW_MIN = 15; // after this, an unanswered request turns red
 
 export default function ShopInbox() {
-  const { ready, session, profile, shop, shopPrivate } = useAuth();
+  const { ready, session, profile, shop, shopPrivate, refresh } = useAuth();
+  const [switching, setSwitching] = useState(false);
   const [tab, setTab] = useState<Tab>('open');
   const [q, setQ] = useState('');
   const [cond, setCond] = useState<'all' | 'used' | 'new'>('all');
@@ -59,7 +60,20 @@ export default function ShopInbox() {
   const activeFilters = Number(cond !== 'all') + Number(area !== 'الكل');
   const orders = data?.orders ?? [];
   const activeOrders = orders.filter(orderActive);
-  const sales = orders.filter((o) => o.status === 'received').reduce((s, o) => s + Number(o.items_total), 0);
+  const monthStart = new Date(new Date(now).getFullYear(), new Date(now).getMonth(), 1).getTime();
+  const sales = orders.filter((o) => o.status === 'received' && new Date(o.received_at ?? o.updated_at).getTime() >= monthStart).reduce((s, o) => s + Number(o.items_total), 0);
+  const left = (fromIso: string | null | undefined, hours: number) => {
+    const ms = Math.max(0, new Date(fromIso ?? 0).getTime() + hours * 3600000 - now);
+    return ms >= 3600000 ? `${ar(Math.floor(ms / 3600000))} ساعة` : `${ar(Math.max(1, Math.ceil(ms / 60000)))} دقيقة`;
+  };
+  const toConfirm = orders.filter((o) => o.payment_status === 'review');
+  const toRefund = orders.filter((o) => o.payment_status === 'refund_due');
+  const accepting = shop.accepting !== false;
+  async function toggleOpen(v: boolean) {
+    setSwitching(true);
+    await supabase.from('shops').update({ accepting: v }).eq('id', shop!.id);
+    await refresh(); setSwitching(false);
+  }
   const waiting = rows.filter((x) => x.st === 'open').length;
   const inTab = (b: Bucket) => orders.filter((o) => bucketOf(o) === b);
   const isOrders = tab === 'preparing' || tab === 'ready' || tab === 'done';
@@ -71,13 +85,20 @@ export default function ShopInbox() {
         <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, gap: 14 }}>
           <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <View style={{ flex: 1 }}>
-              <T size={13} color="rgba(255,255,255,.65)">{shop.area}، {shop.governorate}، {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</T>
+              <T size={13} color="rgba(255,255,255,.65)">{shop.area}، {shop.governorate} · {shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'}</T>
               <T w="bold" size={26} color="#fff" style={{ lineHeight: 36 }}>{shopPrivate?.name}</T>
             </View>
             <Bell light />
           </Row>
+          {shop.status === 'approved' ? (
+            <Row gap={10} style={{ backgroundColor: 'rgba(255,255,255,.08)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: accepting ? colors.good : colors.faint }} />
+              <T w="semibold" size={14} color="#fff" style={{ flex: 1 }}>{accepting ? 'مستقبل طلبات' : 'مقفول دلوقتي'}</T>
+              <Switch value={accepting} disabled={switching} onValueChange={toggleOpen} trackColor={{ true: colors.good, false: 'rgba(255,255,255,.25)' }} thumbColor="#fff" accessibilityLabel={accepting ? 'مستقبل طلبات' : 'مقفول دلوقتي'} />
+            </Row>
+          ) : null}
           <Row gap={8}>
-            {[[ar(waiting), 'طلبات مستنية ردّك', true], [ar(activeOrders.length), 'أوردرات تجهّزها', false], [money(sales), 'مبيعات ج.م', false]].map(([v, l, hot]) => (
+            {[[ar(waiting), 'طلبات مستنية ردّك', true], [ar(activeOrders.length), 'أوردرات تجهّزها', false], [money(sales), 'مبيعات الشهر (ج.م)', false]].map(([v, l, hot]) => (
               <View key={String(l)} style={{ flex: 1, backgroundColor: hot ? colors.accent : 'rgba(255,255,255,.08)', borderRadius: 18, padding: 12, gap: 2 }}>
                 <T w="bold" size={22} color={hot ? colors.ink : '#fff'}>{String(v)}</T>
                 <T size={12} color={hot ? colors.ink : 'rgba(255,255,255,.7)'}>{String(l)}</T>
@@ -88,15 +109,35 @@ export default function ShopInbox() {
       </View>
     }>
       <View style={{ marginTop: -40, gap: 12 }}>
-      {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا وتقدر تبعت عروض.</T></Notice> : null}
+      {shop.status === 'pending' ? <Notice><T w="semibold" size={14}>محلك تحت المراجعة</T><T size={13}>أول ما نوافق، الطلبات هتظهر هنا.</T></Notice> : null}
+      {shop.status === 'approved' && !accepting ? <Notice icon="moon">مش هتوصلك طلبات جديدة لحد ما تفتح. الأوردرات الشغالة لسه محتاجاك.</Notice> : null}
       {shop.status === 'approved' ? <PushPrompt kind="banner" shop /> : null}
-      {shop.status === 'suspended' ? <Notice>المحل موقوف مؤقتاً. كلّمنا لو فيه سؤال.</Notice> : null}
+      {shop.status === 'suspended' ? (
+        <Press onPress={() => router.push('/shop/performance')} style={{ backgroundColor: colors.badSoft, borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Icon name="pause-circle" size={22} color={colors.bad} /><T w="bold" size={14.5} color={colors.bad} style={{ flex: 1 }}>المحل موقوف مؤقتاً</T>
+          <T w="semibold" size={13.5} color={colors.bad}>اعرف السبب</T>
+        </Press>
+      ) : null}
+      {toConfirm.map((o) => (
+        <Press key={o.id} onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: o.id } })}
+          style={{ backgroundColor: colors.warnSoft, borderRadius: 16, padding: 14, gap: 4 }}>
+          <T w="bold" size={14.5}>عميل حوّللك {money(Number(o.items_total) + Number(o.delivery_fee))} ج.م</T>
+          <Row style={{ justifyContent: 'space-between' }}><Muted size={13}>أكّد خلال {left(o.updated_at, 2)}</Muted><T w="semibold" size={13.5} color={colors.primary}>راجع الإيصال</T></Row>
+        </Press>
+      ))}
+      {toRefund.map((o) => (
+        <Press key={o.id} onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: o.id } })}
+          style={{ backgroundColor: colors.badSoft, borderRadius: 16, padding: 14, gap: 4 }}>
+          <T w="bold" size={14.5} color={colors.bad}>لازم ترجّع {money(Number(o.items_total) + Number(o.delivery_fee))} ج.م لعميل</T>
+          <Row style={{ justifyContent: 'space-between' }}><Muted size={13}>فاضل {left(o.refund_due_at ?? o.updated_at, 48)}</Muted><T w="semibold" size={13.5} color={colors.primary}>سجّل الاسترجاع</T></Row>
+        </Press>
+      ))}
       <StatusTabs<Tab> value={tab} onPick={setTab} items={[
         { v: 'open', label: 'جديد', n: waiting, hot: waiting > 0 },
         { v: 'quoted', label: 'عروضي', n: rows.filter((x) => x.st === 'quoted').length },
-        { v: 'preparing', label: 'بيتجهز', n: inTab('preparing').length, hot: inTab('preparing').length > 0 },
+        { v: 'preparing', label: 'بيتجهّز', n: inTab('preparing').length, hot: inTab('preparing').length > 0 },
         { v: 'ready', label: 'جاهز', n: inTab('ready').length },
-        { v: 'done', label: 'خلصت' },
+        { v: 'done', label: 'السابقة' },
       ]} />
       </View>
       {!isOrders ? <Row gap={8}>
@@ -126,11 +167,11 @@ export default function ShopInbox() {
             {inTab(tab).map((o, i) => {
               const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
               return <OrderRow key={o.id} o={o} first={i === 0} title={ps.length ? partsLabel(ps) : 'أوردر'}
-                flag={o.payment_status === 'review' ? { label: 'راجع الدفع', tone: 'wait' } : undefined}
+                flag={o.payment_status === 'review' ? { label: 'راجع الدفع', tone: 'wait' } : o.payment_status === 'refund_due' ? { label: 'رجّع الفلوس', tone: 'wait' } : undefined}
                 onPress={() => router.push({ pathname: '/shop/order/[id]', params: { id: o.id } })} />;
             })}
           </RowList>
-        ) : <Empty icon="cube-outline" text={tab === 'done' ? 'لسه مفيش أوردرات خلصت.' : tab === 'ready' ? 'مفيش أوردرات جاهزة مستنية تسليم.' : 'مفيش أوردرات تتجهز دلوقتي.\nلما عميل يختار عرضك، الأوردر بيظهر هنا.'} />
+        ) : <Empty icon="cube-outline" text={tab === 'done' ? 'لسه مفيش أوردرات سابقة.' : tab === 'ready' ? 'مفيش أوردرات جاهزة مستنية تسليم.' : 'مفيش أوردرات بتتجهّز. لما عميل يختار عرضك، الأوردر بيظهر هنا.'} />
       ) : loading && !data ? <Loading /> : groups.length ? (
         <RowList>
           {groups.map((g, i) => {
@@ -148,13 +189,15 @@ export default function ShopInbox() {
                     {open ? (
                       <Row gap={3} style={{ backgroundColor: slow ? colors.badSoft : colors.soft, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}>
                         <Icon name="time" size={12} color={slow ? colors.bad : colors.ink} />
-                        <T w="bold" size={12.5} color={slow ? colors.bad : colors.ink}>{elapsed(r.created_at, now)}</T>
+                        <T w="bold" size={12.5} color={slow ? colors.bad : colors.ink}>من {elapsed(r.created_at, now)}</T>
                       </Row>
                     ) : null}
                   </Row>
                   <Row gap={8}>
-                    <Muted size={12.5} numberOfLines={1} style={{ flex: 1 }}>{r.car_make} {r.car_model} {ar(r.car_year)}، {WANTED[r.wanted_condition]}، {r.area}</Muted>
-                    {shop.brands.includes(r.car_make) ? <Pill label="تخصصك" tone="good" /> : null}
+                    <Muted size={12.5} numberOfLines={1} style={{ flex: 1 }}>{r.car_make} {r.car_model} {ar(r.car_year)} · {WANTED[r.wanted_condition]} · {r.area}</Muted>
+                    {g.some((x) => x.r.photo_path) ? <Pill label="فيه صورة" tone="plain" /> : null}
+                    {shop.brands.includes(r.car_make) ? <Pill label="في تخصصك" tone="good" /> : null}
+                    {open && closesIn(r.created_at, now) ? <Pill label={`بيقفل بعد ${closesIn(r.created_at, now)}`} tone="wait" /> : null}
                     {g.length === 1 || !open ? shopPill(g[0].st) : null}
                   </Row>
                 </View>
@@ -162,7 +205,7 @@ export default function ShopInbox() {
             );
           })}
         </RowList>
-      ) : <Empty icon="file-tray-outline" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي.\nأول ما عميل يبعت طلب هيظهر هنا.' : 'لسه مابعتش عروض.'} />}
+      ) : <Empty icon="file-tray-outline" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي. أول ما عميل يبعت طلب هيظهر هنا وهيوصلك إشعار.' : 'لسه مابعتش عروض.'} />}
       {tab === 'open' && waiting ? <Muted center size={12}>العميل بيشوف إنت بترد في قد إيه. المحلات اللي بترد بسرعة بتبيع أكتر.</Muted> : null}
       <InstallCard />
     </Screen>
@@ -177,4 +220,11 @@ function groupShown<X extends { r: Request }>(rows: X[]): X[][] {
     if (at.has(k)) out[at.get(k)!].push(x); else { at.set(k, out.length); out.push([x]); }
   }
   return out.map((g) => g.sort((a, b) => a.r.num - b.r.num));
+}
+
+/** Requests close 7 days after they are sent: in the last day the row says how long is left. */
+function closesIn(created: string, now: number): string | null {
+  const ms = new Date(created).getTime() + 7 * 86400000 - now;
+  if (ms <= 0 || ms > 86400000) return null;
+  return ms >= 3600000 ? `${ar(Math.floor(ms / 3600000))} ساعة` : `${ar(Math.max(1, Math.ceil(ms / 60000)))} دقيقة`;
 }
