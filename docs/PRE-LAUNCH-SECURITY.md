@@ -15,6 +15,11 @@ Agreed on 2026-11-01: do all of these before launch. Based on a Supabase securit
 - [ ] 3. Rotate keys used during development (service_role, Anthropic, Paymob); store only in Bitwarden + Supabase secrets.
 - [ ] 4. Storage buckets: images only, max ~5 MB per file.
 - [ ] 5. Per-user daily cap on new requests (e.g. 20/day) to stop spam.
+- [ ] 5b. AI assistant bill protection (approved with A14, 2026-11-01). Edge function `assistant` today has no login check and no limits:
+  - accept signed-in users only (verify the JWT in the function);
+  - 60 assistant messages per user per day; 1,000 characters per message;
+  - Anthropic console: monthly spending cap of $50.
+  Why: normal use is about $20/month (about 1,200 EGP at 60 EGP/$) for 10,000 conversations (Haiku 5.5: $0.10 per million tokens in, $0.50 out; about $0.002 per conversation). Without limits, a script sending huge messages once a second could cost about $860 (about 52,000 EGP) a day.
 
 ## Accounts and settings
 - [ ] 6. Two-step login (MFA) for every partner on Supabase, GitHub, Apple, Google Play, Cloudflare, Google Workspace, Paymob.
