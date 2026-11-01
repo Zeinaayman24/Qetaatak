@@ -13,7 +13,7 @@ export type Profile = {
   id: string; member_no: number; full_name: string; phone: string; email: string; area: string; governorate: string; country: string;
   street: string; building: string; floor: string; apartment: string; landmark: string; postal_code: string;
   car_make: string | null; car_model: string | null; car_year: number | null; car_vin: string;
-  is_customer: boolean; is_shop: boolean; is_admin: boolean; is_support: boolean; is_blocked: boolean; created_at: string;
+  is_customer: boolean; is_shop: boolean; is_admin: boolean; is_support: boolean; is_blocked: boolean; created_at: string; staff_role?: string | null;
 };
 export type Shop = { id: string; area: string; governorate: string; brands: string[]; specialties: string[]; shop_type: string; offers_delivery: boolean; status: 'pending' | 'approved' | 'suspended'; created_at: string; featured_until?: string | null };
 export type ShopPrivate = { id: string; name: string; owner_name: string; phone: string; phone2: string; street: string; building: string; landmark: string; postal_code: string; commercial_register: string };

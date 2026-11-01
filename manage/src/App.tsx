@@ -8,7 +8,10 @@ import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { ALL_TABLES, loadAll, supabase, useLive, type All, type Profile } from './lib';
 import Customers from './pages/Customers';
 import CustomerDetail from './pages/CustomerDetail';
-import Dashboard from './pages/Dashboard';
+import Tasks from './pages/Tasks';
+import ChangeLog from './pages/ChangeLog';
+import Mfa from './pages/Mfa';
+import { markActive, sessionExpired } from './pages/Login';
 import Login from './pages/Login';
 import OrderDetail from './pages/OrderDetail';
 import Orders from './pages/Orders';
@@ -18,7 +21,11 @@ import Staff from './pages/Staff';
 import TicketDetail from './pages/TicketDetail';
 import Tickets from './pages/Tickets';
 
-type Ctx = { me: Profile; all: All; reload: () => void };
+type Ctx = { me: Profile; role: Role; all: All; reload: () => void };
+export type Role = 'admin' | 'support' | 'review' | 'finance';
+export const ROLE_NAME: Record<Role, string> = { admin: 'أدمن', support: 'خدمة عملاء', review: 'مراجعة المحلات', finance: 'مالية' };
+/** Can this role do a step that needs `need`? Admin can do everything. */
+export const can = (role: Role, need: Role) => role === 'admin' || role === need;
 const DataCtx = createContext<Ctx | null>(null);
 export const useData = () => {
   const v = useContext(DataCtx);
@@ -40,59 +47,74 @@ export default function App() {
 
 function StaffGate({ session }: { session: Session }) {
   const [me, setMe] = useState<Profile | null | undefined>(undefined);
+  const [role, setRole] = useState<Role | null>(null);
+  const [aal2, setAal2] = useState<boolean | null>(null);
   useEffect(() => {
     supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle().then(({ data }) => setMe((data as Profile) ?? null));
-  }, [session.user.id]);
-  if (me === undefined) return <div className="center-screen"><span className="spinner" /></div>;
-  if (!me || !(me.is_admin || me.is_support)) {
+    supabase.rpc('my_staff_role').then(({ data }) => setRole((data as Role) ?? null));
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel().then(({ data }) => setAal2(data?.currentLevel === 'aal2'));
+  }, [session.user.id, session.access_token]);
+  // signed out after 12 hours, or 1 hour without using the app (C01)
+  useEffect(() => {
+    if (sessionExpired()) { supabase.auth.signOut(); return; }
+    const touch = () => markActive();
+    ['click', 'keydown', 'scroll'].forEach((e) => window.addEventListener(e, touch, { passive: true }));
+    const t = setInterval(() => { if (sessionExpired()) supabase.auth.signOut(); }, 60000);
+    return () => { clearInterval(t); ['click', 'keydown', 'scroll'].forEach((e) => window.removeEventListener(e, touch)); };
+  }, []);
+  if (me === undefined || aal2 === null) return <div className="center-screen"><span className="spinner" /></div>;
+  if (!me || !role) {
     return (
       <div className="center-screen">
         <div className="card narrow">
           <Logo as="h1" />
-          <h2>الحساب ده مش من فريق العمل</h2>
-          <p className="muted">نظام الإدارة لفريق ضغطة بس. اطلب من الأدمن يضيف إيميلك ({session.user.email}) كموظف خدمة عملاء.</p>
+          <p className="error">الحساب ده مش من فريق ضغطة.</p>
           <button className="btn" onClick={() => supabase.auth.signOut()}>خروج</button>
         </div>
       </div>
     );
   }
-  return <Shell me={me} />;
+  if (!aal2) return <Mfa onDone={() => setAal2(true)} />;
+  return <Shell me={me} role={role} />;
 }
 
-function Shell({ me }: { me: Profile }) {
+function Shell({ me, role }: { me: Profile; role: Role }) {
   const { data, error, reload } = useLive(loadAll, ALL_TABLES);
   if (error) return <div className="center-screen"><p className="error">مشكلة في تحميل البيانات: {error}</p></div>;
   if (!data) return <div className="center-screen"><span className="spinner" /></div>;
   const openTickets = data.tickets.filter((t) => t.status === 'open').length;
   const pendingShops = Object.values(data.shops).filter((s) => s.status === 'pending').length;
   return (
-    <DataCtx.Provider value={{ me, all: data, reload }}>
+    <DataCtx.Provider value={{ me, role, all: data, reload }}>
       <HashRouter>
         <div className="layout">
           <aside className="sidebar">
             <div className="brand"><Logo dark /><span className="tag">الإدارة</span></div>
             <nav>
-              <Nav to="/" icon="grid" label="لوحة التحكم" end />
+              <Nav to="/" icon="grid" label="المهام" end />
               <Nav to="/tickets" icon="chat" label="خدمة العملاء" badge={openTickets} />
-              <Nav to="/customers" icon="users" label="العملاء" />
               <Nav to="/shops" icon="store" label="المحلات" badge={pendingShops} />
-              <Nav to="/speed" icon="clock" label="سرعة الرد" />
-              <Nav to="/orders" icon="receipt" label="الطلبات" />
-              <Nav to="/payments" icon="card" label="المدفوعات" badge={data.orders.filter((o) => o.payment_status === 'review' || o.payment_status === 'refund_due').length} />
+              <Nav to="/customers" icon="users" label="العملاء" />
+              <Nav to="/orders" icon="receipt" label="الطلبات والأوردرات" />
+              <Nav to="/payments" icon="card" label="الفلوس" badge={data.orders.filter((o) => o.payment_status === 'review' || o.payment_status === 'refund_due').length} />
+              <Nav to="/reports-chat" icon="flag" label="البلاغات" />
               <Nav to="/ads" icon="megaphone" label="الإعلانات" />
-              {me.is_admin ? <Nav to="/staff" icon="shield" label="فريق العمل" /> : null}
+              <Nav to="/reports" icon="chart" label="التقارير" />
+              {role === 'admin' ? <Nav to="/staff" icon="shield" label="فريق العمل" /> : null}
+              {role === 'admin' ? <Nav to="/log" icon="clock" label="سجل التغييرات" /> : null}
             </nav>
             <div className="me">
               <div>
                 <strong>{me.full_name || me.email}</strong>
-                <span className="muted small">{me.is_admin ? 'أدمن' : 'خدمة عملاء'}</span>
+                <span className="muted small">{ROLE_NAME[role]}</span>
               </div>
               <button className="link" onClick={() => supabase.auth.signOut()}>خروج</button>
             </div>
           </aside>
           <main className="main">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/" element={<Tasks />} />
+              <Route path="/log" element={role === 'admin' ? <ChangeLog /> : <Navigate to="/" />} />
               <Route path="/tickets" element={<Tickets />} />
               <Route path="/tickets/:id" element={<TicketDetail />} />
               <Route path="/customers" element={<Customers />} />
@@ -104,7 +126,7 @@ function Shell({ me }: { me: Profile }) {
               <Route path="/payments" element={<Payments />} />
               <Route path="/ads" element={<Ads />} />
               <Route path="/speed" element={<SpeedPage />} />
-              <Route path="/staff" element={me.is_admin ? <Staff /> : <Navigate to="/" />} />
+              <Route path="/staff" element={role === 'admin' ? <Staff /> : <Navigate to="/" />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </main>
@@ -135,6 +157,8 @@ const GLYPHS: Record<string, string> = {
   card: 'M3 6h18v12H3z M3 10h18 M7 15h4',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2',
   megaphone: 'M3 10v4h3l7 5V5L6 10z M16 8.5a5 5 0 0 1 0 7 M18.5 6a8.5 8.5 0 0 1 0 12',
+  flag: 'M5 21V4 M5 4h11l-2 4 2 4H5',
+  chart: 'M4 20V10 M10 20V4 M16 20v-7 M3 20h18',
 };
 export function Glyph({ name }: { name: string }) {
   return (
@@ -165,3 +189,18 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   const empty = children === null || children === undefined || children === '' || children === false;
   return <div className="field"><span>{label}</span><div>{empty ? '—' : children}</div></div>;
 }
+
+/** A confirmation box (replaces browser pop-ups): title, optional text, extra fields, and the action. */
+export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label={title}>
+        <header className="modal-head"><h2>{title}</h2><button className="link" onClick={onClose} aria-label="اقفل">✕</button></header>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Shown when a role can't do a step. */
+export const notAllowed = (need: Role) => `الخطوة دي محتاجة صلاحية ${ROLE_NAME[need]}.`;

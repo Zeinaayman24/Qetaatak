@@ -206,3 +206,14 @@ a.pill { text-decoration: none; color: var(--ink); }
 .timer.bad { background: #FDECEC; color: #C62828; }
 .table tr.late td { background: #FFF6F6; }
 .kpi.hot { border-color: #F3B4B4; }
+
+/* confirmation boxes (Modal) */
+.modal-back { position: fixed; inset: 0; background: rgba(15, 20, 30, .45); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+.modal { background: var(--surface); border-radius: 18px; padding: 20px; width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow: auto; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; }
+.modal-head h2 { margin: 0; font-size: 18px; }
+.modal textarea, .modal input, .modal select { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: inherit; }
+.late { color: var(--bad); font-weight: 600; }
+.strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.strip > div { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.strip strong { display: block; font-size: 20px; }
