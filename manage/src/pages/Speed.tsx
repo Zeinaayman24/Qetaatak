@@ -10,13 +10,15 @@ const SLOW = 15;
 /** Live stopwatch text: 45 ث، 12 د، 1 س 5 د. */
 export function clock(fromMs: number, now: number) {
   const s = Math.max(0, Math.floor((now - fromMs) / 1000));
-  if (s < 60) return `${s} ث`;
+  if (s < 60) return `${s} ثانية`;
   const m = Math.floor(s / 60);
-  if (m < 60) return `${m} د`;
+  if (m < 60) return dq(m);
   const h = Math.floor(m / 60);
-  return h < 24 ? `${h} س ${m % 60 ? (m % 60) + ' د' : ''}` : `${Math.floor(h / 24)} يوم`;
+  return h < 24 ? `${h} ساعة${m % 60 ? ' ' + dq(m % 60) : ''}` : `${Math.floor(h / 24)} يوم`;
 }
-export const mins = (m: number | null | undefined) => (m == null ? '—' : m < 1 ? 'أقل من دقيقة' : m < 60 ? `${m} د` : `${Math.floor(m / 60)} س ${m % 60 ? (m % 60) + ' د' : ''}`);
+/** Minutes written in full (C06): «٥ دقايق»، «١ ساعة ٥ دقايق». */
+const dq = (m: number) => (m === 1 ? 'دقيقة' : m === 2 ? 'دقيقتين' : m <= 10 ? `${m} دقايق` : `${m} دقيقة`);
+export const mins = (m: number | null | undefined) => (m == null ? '—' : m < 1 ? 'أقل من دقيقة' : m < 60 ? dq(m) : `${Math.floor(m / 60)} ساعة${m % 60 ? ' ' + dq(m % 60) : ''}`);
 
 export function useSpeed() {
   return useLive(async () => must(await supabase.rpc('shop_speed')) as Speed[], ['quotes', 'requests'], []);
@@ -34,6 +36,7 @@ export default function SpeedPage() {
   const { data: speed } = useSpeed();
   const { data: waits } = useLive(async () => must(await supabase.rpc('request_waits')) as Wait[], ['quotes', 'requests'], []);
   const w = Object.fromEntries((waits ?? []).map((x) => [x.request_id, x]));
+  const [nudged, setNudged] = useState<Record<string, number>>({});
   const open = all.requests.filter((r) => r.status === 'open' && w[r.id]).sort((a, b) => a.created_at.localeCompare(b.created_at));
   const unanswered = open.filter((r) => !w[r.id].first_answer_at);
   const rows = [...(speed ?? [])].sort((a, b) => (a.median_min ?? 1e9) - (b.median_min ?? 1e9));
@@ -59,7 +62,7 @@ export default function SpeedPage() {
         <div className="panel-head" style={{ padding: '14px 16px 0' }}><h2>الطلبات المفتوحة دلوقتي</h2><span className="muted small">الأقدم الأول</span></div>
         {open.length ? (
           <table className="table">
-            <thead><tr><th>الطلب</th><th>القطعة</th><th>العربية</th><th>مستني من</th><th>أول رد بعد</th><th>ردود</th></tr></thead>
+            <thead><tr><th>الطلب</th><th>القطعة</th><th>العربية</th><th>مستني من</th><th>أول رد بعد</th><th>ردود</th><th /></tr></thead>
             <tbody>
               {open.map((r) => {
                 const x = w[r.id];
@@ -73,6 +76,7 @@ export default function SpeedPage() {
                     <td><span className={'timer' + (!x.first_answer_at ? (waitMin >= SLOW ? ' bad' : ' live') : '')}>{clock(start, now)}</span></td>
                     <td>{x.first_answer_at ? clock(start, new Date(x.first_answer_at).getTime()) : <Pill tone={waitMin >= SLOW ? 'bad' : 'wait'}>لسه</Pill>}</td>
                     <td>{x.answers}</td>
+                    <td>{waitMin >= 30 ? <button className="link" onClick={async () => { const { data } = await supabase.rpc('staff_nudge_shops', { p_request: r.id }); setNudged((v) => ({ ...v, [r.id]: Number(data) || 0 })); }}>{nudged[r.id] != null ? `اتبعت لـ ${nudged[r.id]} محل` : 'نبّه المحلات'}</button> : null}</td>
                   </tr>
                 );
               })}
@@ -85,7 +89,7 @@ export default function SpeedPage() {
         <div className="panel-head" style={{ padding: '14px 16px 0' }}><h2>كل محل بيرد في قد إيه</h2><span className="muted small">آخر ٩٠ يوم، على الطلبات اللي تخص ماركاته</span></div>
         {rows.length ? (
           <table className="table">
-            <thead><tr><th>المحل</th><th>بيرد عادةً في</th><th>المتوسط</th><th>في أقل من {SLOW} د</th><th>رد على</th><th>مستني ردّه دلوقتي</th><th>أقدم طلب مستني</th></tr></thead>
+            <thead><tr><th>المحل</th><th>بيرد عادةً في</th><th>المتوسط</th><th>في أقل من {SLOW} دقيقة</th><th>رد على</th><th>مستني ردّه دلوقتي</th><th>أقدم طلب مستني</th></tr></thead>
             <tbody>
               {rows.map((s) => (
                 <tr key={s.shop_id}>
