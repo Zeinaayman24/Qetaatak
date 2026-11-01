@@ -35,7 +35,9 @@ export type Ticket = {
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; internal: boolean; kind: 'user' | 'bot' | 'system'; created_at: string };
 export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; flagged: boolean; created_at: string };
 export type Order = { id: string; order_no: number; customer_id: string; shop_id: string; delivery_mode: string; status: string; items_total: number; delivery_fee: number; rating: number | null; review: string; created_at: string; received_at: string | null;
-  payment_method: string; payment_status: string; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null; updated_at: string };
+  payment_method: string; payment_status: string; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null; updated_at: string;
+  refused_at?: string | null; refusal_reason?: string; refusal_photo?: string | null; cancel_reason?: string; cancelled_by?: string | null; refund_due_at?: string | null;
+  dispute_note?: string; dispute_at?: string | null; dispute_decision?: string | null; dispute_message?: string; delivery_address?: Record<string, string> | null; returned_at?: string | null };
 export const PAY_METHOD: Record<string, string> = { cash: 'كاش عند الاستلام', shop: 'في المحل', instapay: 'InstaPay / محفظة (للمحل)', card: 'بطاقة (Paymob)' };
 export const PAY_STATE: Record<string, { label: string; tone: 'plain' | 'good' | 'wait' | 'bad' | 'dark' }> = {
   unpaid: { label: 'يدفع عند الاستلام', tone: 'plain' }, awaiting: { label: 'مستني الدفع', tone: 'wait' }, review: { label: 'المحل بيراجع الإيصال', tone: 'dark' },
@@ -54,10 +56,10 @@ export const memberId = (p: Pick<Profile, 'member_no' | 'is_customer' | 'is_shop
 export const ticketId = (n: number) => 'T-' + n;
 export const orderId = (n: number) => '#' + n;
 
-export const REQUEST_STATUS: Record<string, string> = { open: 'مستني عروض', chosen: 'اتأكد', done: 'اتسلّم', cancelled: 'اتلغى' };
+export const REQUEST_STATUS: Record<string, string> = { open: 'مستني عروض', chosen: 'اتأكد', done: 'اتسلّم', cancelled: 'اتلغى', expired: 'انتهى' };
 export const ORDER_STATUS: Record<string, string> = { preparing: 'بيتجهّز', ready: 'جاهز', out_for_delivery: 'جاهز', delivered: 'جاهز' };
 export const SHOP_STATUS: Record<string, string> = { draft: 'لسه بيسجّل', pending: 'مستني مراجعة', changes: 'مستني تعديل', approved: 'شغال', suspended: 'موقوف', closed: 'مقفول' };
-export const TICKET_STATUS: Record<string, string> = { bot: 'مع المساعد الآلي', open: 'مستنية موظف', in_progress: 'مع موظف', resolved: 'انتهت' };
+export const TICKET_STATUS: Record<string, string> = { bot: 'المساعد بيحاول يحلّها', open: 'مستني موظف', in_progress: 'موظف معاك', resolved: 'اتقفلت' };
 export const RESOLVED_BY: Record<string, string> = { bot: 'المساعد حلّها', agent: 'موظف قفلها', customer: 'العميل قفلها' };
 /** Tickets that need a person: escalated by the assistant or already with an agent. */
 export const needsPeople = (t: { status: string }) => t.status === 'open' || t.status === 'in_progress';
@@ -66,7 +68,7 @@ export const CATEGORY: Record<string, string> = { order: 'مشكلة في طلب
 export const CONDITION: Record<string, string> = { used_original: 'مستعمل أصلي', used_clean: 'مستعمل بحالة ممتازة', new_aftermarket: 'جديد تجاري', new_original: 'جديد أصلي' };
 export const WANTED: Record<string, string> = { any: 'جديد أو مستعمل', used: 'مستعمل بس', new: 'جديد بس' };
 export const SHOP_TYPE: Record<string, string> = { used: 'قطع مستعملة', new: 'قطع جديدة', both: 'مستعمل وجديد' };
-export const SIDE: Record<string, string> = { '': '', right: 'يمين', left: 'شمال', front: 'أمامي', rear: 'خلفي' };
+export const SIDE: Record<string, string> = { '': '', right: 'يمين', left: 'شمال', both: 'الاتنين', front: 'أمامي', rear: 'خلفي' };
 export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };
 
 export const money = (n: number) => Math.round(n || 0).toLocaleString('en-US') + ' ج.م';
@@ -114,7 +116,7 @@ export function must<T>(res: { data: T | null; error: any }): T {
 /** Everything the lists need, loaded once and kept live. */
 export async function loadAll() {
   const [profiles, shops, priv, requests, quotes, tickets, orders] = await Promise.all([
-    supabase.from('profiles').select('*').order('member_no', { ascending: false }),
+    supabase.rpc('staff_people'), // phones come masked; «اعرض الرقم» uses staff_show_phone (recorded)
     supabase.from('shops').select('*'),
     supabase.from('shop_private').select('*'),
     supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(1000),

@@ -12,7 +12,7 @@ export default function Customers() {
   const govs = Array.from(new Set(list.map((p) => p.governorate).filter(Boolean))).sort();
   const n = q.trim().toLowerCase();
   const shown = list.filter((p) => (!gov || p.governorate === gov) &&
-    (!n || [memberId(p), p.full_name, p.phone, p.email, p.area].join(' ').toLowerCase().includes(n)));
+    (!n || [memberId(p), p.full_name, p.phone, p.area].join(' ').toLowerCase().includes(n)));
   return (
     <Page title="العملاء" sub={`${list.length} عميل مسجّل`}>
       <div className="toolbar">
@@ -21,7 +21,7 @@ export default function Customers() {
       </div>
       <div className="panel flush">
         <table className="table clickable">
-          <thead><tr><th>رقم العميل</th><th>الاسم</th><th>الموبايل</th><th>الإيميل</th><th>المنطقة</th><th>العربية</th><th>الطلبات</th><th>شكاوى</th><th>من</th><th /></tr></thead>
+          <thead><tr><th>رقم العميل</th><th>الاسم</th><th>الموبايل</th><th>المنطقة</th><th>العربية الأساسية</th><th>الطلبات</th><th>الأوردرات</th><th>شكاوى</th><th>من</th><th /></tr></thead>
           <tbody>
             {shown.map((p) => {
               const reqs = all.requests.filter((r) => r.customer_id === p.id);
@@ -31,10 +31,10 @@ export default function Customers() {
                   <td className="mono strong">{memberId(p)}</td>
                   <td>{p.full_name || '—'}</td>
                   <td className="mono" dir="ltr">{p.phone}</td>
-                  <td className="small" dir="ltr">{p.email}</td>
                   <td>{p.area}{p.governorate ? '، ' + p.governorate : ''}</td>
                   <td className="small">{p.car_make} {p.car_model} {p.car_year}</td>
                   <td>{reqs.length}</td>
+                  <td>{all.orders.filter((o) => o.customer_id === p.id).length}</td>
                   <td>{tickets.length ? <Pill tone={tickets.some((t) => t.status !== 'resolved') ? 'wait' : 'plain'}>{tickets.length}</Pill> : '—'}</td>
                   <td className="small muted">{date(p.created_at)}</td>
                   <td>{p.is_blocked ? <Pill tone="bad">محظور</Pill> : null}</td>

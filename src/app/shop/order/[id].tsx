@@ -23,6 +23,8 @@ export default function ShopOrder() {
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState('');
   const [other, setOther] = useState('');
+  const [disputing, setDisputing] = useState(false);
+  const [disputeText, setDisputeText] = useState('');
   const { data, loading } = useLive(async () => {
     const order = must(await supabase.from('orders').select('*').eq('id', id).maybeSingle()) as Order | null;
     if (!order) return { order: null, parts: [] as Request[], quotes: [] as Quote[], customer: null as Profile | null };
@@ -123,7 +125,8 @@ export default function ShopOrder() {
           <T size={14}>السبب: {o.refusal_reason}</T>
           {(o as Order & { refusal_photo?: string | null }).refusal_photo ? <Photo uri={photoUrl((o as Order & { refusal_photo?: string | null }).refusal_photo!)} size={96} /> : null}
           {o.payment_status === 'refund_due' ? <Muted size={13}>لو العميل كان حوّل، رجّع {money(total + Number(o.delivery_fee))} ج.م خلال {refundLeft}.</Muted> : null}
-          <Row gap={6}><Muted size={13}>لو شايف الرفض مش في محله</Muted><Btn kind="link" title="اعترض" onPress={() => router.push('/support')} /></Row>
+          {(o as Order & { dispute_note?: string }).dispute_note ? <Muted size={13}>اعتراضك: {(o as Order & { dispute_note?: string }).dispute_note}</Muted>
+            : <Row gap={6}><Muted size={13}>لو شايف الرفض مش في محله</Muted><Btn kind="link" title="اعترض" onPress={() => setDisputing(true)} /></Row>}
         </Card>
       ) : null}
 
@@ -192,6 +195,18 @@ export default function ShopOrder() {
         </Card>
       ) : null}
       {o.status === 'preparing' ? <Btn kind="link" title="مش هقدر أسلّم الأوردر" onPress={() => setCancelling(true)} style={{ alignSelf: 'center' }} /> : null}
+      <Sheet open={disputing} onClose={() => setDisputing(false)} title="اعترض">
+        <View style={{ gap: 12 }}>
+          <Field value={disputeText} onChangeText={setDisputeText} multiline placeholder="ليه شايف الرفض مش في محله؟" />
+          <Btn title="ابعت" loading={busy} disabled={!disputeText.trim()} onPress={async () => {
+            setBusy(true);
+            const { error } = await supabase.rpc('shop_dispute', { p_order: o.id, p_note: disputeText.trim() });
+            setBusy(false);
+            if (error) return toast(friendlyError(error));
+            setDisputing(false); toast('اعتراضك وصل لفريق ضغطة.');
+          }} />
+        </View>
+      </Sheet>
       <Sheet open={cancelling} onClose={() => setCancelling(false)} title="مش هقدر أسلّم الأوردر">
         <View style={{ gap: 14 }}>
           <Chips options={['القطعة اتباعت', 'لقيت فيها عيب', 'سبب تاني'].map((v) => ({ v, label: v }))} selected={[reason]} onPick={setReason} />
