@@ -159,8 +159,10 @@ export function PaymentPanel({ order: o, shop }: { order: Order; shop?: { name?:
       {o.payment_status === 'paid' && o.paid_at ? (
         <Row gap={8}><Icon name="verified" size={18} color={colors.good} /><Muted size={13}>اتدفع {money(total)} ج.م يوم {new Date(o.paid_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</Muted></Row>
       ) : null}
-      {o.payment_status === 'refund_due' ? <Muted size={13}>الأوردر اتلغى بعد الدفع. فريقنا هيرجّعلك {money(total)} ج.م خلال {ar(3)} أيام عمل.</Muted> : null}
-      {o.payment_status === 'refunded' ? <Muted size={13}>رجّعنالك {money(total)} ج.م.{o.payment_note ? ` ${o.payment_note}` : ''}</Muted> : null}
+      {o.payment_status === 'refund_due' ? <Muted size={13}>{o.payment_method === 'instapay'
+        ? `الأوردر اتلغى بعد التحويل. المحل هيرجّعلك ${money(total)} ج.م على نفس الحساب اللي حوّلت منه. لو اتأخر كلّمنا من «الدعم».`
+        : `الأوردر اتلغى بعد الدفع. هنرجّعلك ${money(total)} ج.م على البطاقة خلال ${ar(3)} أيام عمل.`}</Muted> : null}
+      {o.payment_status === 'refunded' ? <Muted size={13}>{o.payment_method === 'instapay' ? 'المحل رجّعلك' : 'رجّعنالك'} {money(total)} ج.م.{o.payment_note ? ` ${o.payment_note}` : ''}</Muted> : null}
     </View>
   );
 }

@@ -70,7 +70,7 @@ export function Screen({ children, header, footer, nav, top }: { children: React
       ) : null}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {top ? <View style={{ paddingTop: insets.top }}>{top}</View> : null}
-        <View style={[s.column, s.body, { paddingBottom: nav ? 120 : footer ? 28 : insets.bottom + 40 }]}>{children}</View>
+        <View style={[s.column, s.body, { paddingBottom: nav ? 36 : footer ? 28 : insets.bottom + 40 }]}>{children}</View>
       </ScrollView>
       {footer ? (
         <View style={{ backgroundColor: colors.surface, paddingBottom: insets.bottom + 12, paddingTop: 12, borderTopWidth: 1, borderColor: colors.line }}>
@@ -78,11 +78,12 @@ export function Screen({ children, header, footer, nav, top }: { children: React
         </View>
       ) : null}
       {nav ? (
-        <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom + 12 }}>
-          <View style={[s.column, { paddingHorizontal: 16 }]}>{nav}</View>
+        // Docked under the scroll area, so content stops above the tabs instead of sliding behind them.
+        <View style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.line, paddingBottom: Math.max(insets.bottom, 6), zIndex: 2 }}>
+          <View style={[s.column, { paddingHorizontal: 8 }]}>{nav}</View>
         </View>
       ) : null}
-      <ToastHost bottom={nav ? 110 : footer ? 100 : 16} />
+      <ToastHost bottom={nav ? 96 : footer ? 100 : 16} />
     </View>
   );
 }

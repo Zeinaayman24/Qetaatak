@@ -23,6 +23,14 @@
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
+        overscroll-behavior: none;
+      }
+      /* On phones 100% can be taller than what's visible (browser bars); dvh is the visible height. */
+      @supports (height: 100dvh) {
+        html,
+        body {
+          height: 100dvh;
+        }
       }
       /* These styles make the root element full-height */
       #root {

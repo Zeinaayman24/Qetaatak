@@ -13,7 +13,7 @@ export default function Payments() {
   const total = (o: Order) => Number(o.items_total) + Number(o.delivery_fee);
 
   return (
-    <Page title="المدفوعات" sub={`${review.length} إيصال محتاج مراجعة · ${refunds.length} استرجاع · ${money(paidOnline)} اتدفعوا أونلاين`}>
+    <Page title="المدفوعات" sub={`${review.length} تحويل مستني تأكيد المحل · ${refunds.length} استرجاع · ${money(paidOnline)} اتدفعوا أونلاين`}>
       <div className="kpis four">
         {[
           ['تحويلات مستنية المحل', String(review.length)],
@@ -25,14 +25,14 @@ export default function Payments() {
 
       <section className="panel">
         <div className="panel-head"><h2>تحويلات مستنية تأكيد المحل</h2></div>
-        <p className="muted small">التحويلات بتروح للمحل مباشرة والمحل هو اللي بيأكد. لو المحل اتأخر أو فيه خلاف، تقدر تتدخل وتأكد أو ترفض من هنا.</p>
+        <p className="muted small">التحويلات بتروح لحساب المحل مباشرة، والمحل وحده هو اللي يأكد إن الفلوس وصلته. إحنا مانقدرش نشوف حسابه، فدورنا هنا المتابعة: لو المحل اتأخر ابعتله تذكير.</p>
         {review.length ? review.map((o) => <ReceiptCard key={o.id} o={o} total={total(o)} />) : <p className="empty">مفيش تحويلات مستنية. 👌</p>}
       </section>
 
       {refunds.length ? (
         <section className="panel">
           <div className="panel-head"><h2>أوردرات مدفوعة اتلغت · المبلغ لازم يرجع</h2></div>
-          <p className="muted small">البطاقة: إحنا اللي بنرجّع من Paymob. التحويل: المحل بيرجّع ويسجّل، وتقدر تسجّل نيابة عنه.</p>
+          <p className="muted small">البطاقة: إحنا اللي بنرجّع من Paymob ونسجّل هنا. التحويل: المحل هو اللي يرجّع الفلوس ويسجّل من تطبيقه، وإحنا نفكّره بس.</p>
           {refunds.map((o) => <RefundRow key={o.id} o={o} total={total(o)} />)}
         </section>
       ) : null}
@@ -69,19 +69,18 @@ export default function Payments() {
 }
 
 function ReceiptCard({ o, total }: { o: Order; total: number }) {
-  const { all, reload } = useData();
+  const { all } = useData();
   const [url, setUrl] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
   useEffect(() => { if (o.payment_proof) receiptUrl(o.payment_proof).then(setUrl); }, [o.payment_proof]);
   const c = all.byId[o.customer_id];
-  async function decide(ok: boolean) {
-    if (!ok && !note.trim()) return setMsg('اكتب للعميل سبب الرفض.');
+  const waited = Math.round((Date.now() - new Date(o.updated_at ?? o.created_at).getTime()) / 60000);
+  async function remind() {
     setBusy(true); setMsg('');
-    const { error } = await supabase.rpc('review_payment', { p_order: o.id, p_ok: ok, p_note: note.trim() });
+    const { error } = await supabase.rpc('remind_shop_payment', { p_order: o.id });
     setBusy(false);
-    if (error) setMsg(error.message); else reload();
+    setMsg(error ? error.message : 'اتبعت تذكير للمحل ✓');
   }
   return (
     <div className="receipt">
@@ -89,12 +88,10 @@ function ReceiptCard({ o, total }: { o: Order; total: number }) {
       <div className="receipt-body">
         <h3>أوردر <span className="mono">#{o.order_no}</span> · {money(total)}</h3>
         <p className="muted small">{c?.full_name} ({memberId(c)}) · {all.priv[o.shop_id]?.name ?? 'محل'} · رقم العملية: <span className="mono">{o.payment_ref || 'مش مكتوب'}</span></p>
-        <p className="small">اتأكد إن المبلغ <strong>{money(total)}</strong> وصل الحساب فعلاً قبل التأكيد.</p>
-        <textarea rows={2} placeholder="سبب الرفض (لو هترفض) · بيوصل للعميل" value={note} onChange={(e) => setNote(e.target.value)} />
-        {msg ? <p className="error">{msg}</p> : null}
+        <p className="small">مستني تأكيد المحل من <strong>{waited < 60 ? `${waited} دقيقة` : `${Math.floor(waited / 60)} ساعة`}</strong>. التأكيد أو الرفض من تطبيق المحل بس.</p>
+        {msg ? <p className="muted small">{msg}</p> : null}
         <div className="row-actions">
-          <button className="btn accent" disabled={busy} onClick={() => decide(true)}>الفلوس وصلت · أكّد الدفع</button>
-          <button className="btn danger" disabled={busy} onClick={() => decide(false)}>ارفض الإيصال</button>
+          <button className="btn" disabled={busy} onClick={remind}>فكّر المحل</button>
         </div>
       </div>
     </div>
@@ -105,18 +102,30 @@ function RefundRow({ o, total }: { o: Order; total: number }) {
   const { all, reload } = useData();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
   const c = all.byId[o.customer_id];
+  const card = o.payment_method === 'card';
   async function done() {
     setBusy(true);
     const { error } = await supabase.rpc('mark_refunded', { p_order: o.id, p_note: note.trim() });
     setBusy(false);
     if (error) alert(error.message); else reload();
   }
+  async function remind() {
+    setBusy(true); setMsg('');
+    const { error } = await supabase.rpc('remind_shop_payment', { p_order: o.id });
+    setBusy(false);
+    setMsg(error ? error.message : 'اتبعت تذكير ✓');
+  }
   return (
     <div className="refund">
-      <div><strong className="mono">#{o.order_no}</strong> · {money(total)} · {PAY_METHOD[o.payment_method]}<div className="small muted">{c?.full_name} · {c?.phone} · مرجع الدفع: <span className="mono">{o.payment_ref || '—'}</span></div></div>
-      <input className="search" placeholder="رقم عملية الاسترجاع (اختياري)" value={note} onChange={(e) => setNote(e.target.value)} />
-      <button className="btn" disabled={busy} onClick={done}>رجّعت المبلغ</button>
+      <div><strong className="mono">#{o.order_no}</strong> · {money(total)} · {PAY_METHOD[o.payment_method]}<div className="small muted">{c?.full_name} · {c?.phone} · مرجع الدفع: <span className="mono">{o.payment_ref || '—'}</span>{card ? '' : ` · المحل: ${all.priv[o.shop_id]?.name ?? '—'} هو اللي يرجّع`}</div>{msg ? <div className="small muted">{msg}</div> : null}</div>
+      {card ? (
+        <>
+          <input className="search" placeholder="رقم عملية الاسترجاع في Paymob (اختياري)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <button className="btn" disabled={busy} onClick={done}>رجّعنا المبلغ</button>
+        </>
+      ) : <button className="btn" disabled={busy} onClick={remind}>فكّر المحل</button>}
     </div>
   );
 }
