@@ -1,19 +1,23 @@
+import { AddressPicker, addressProblem, rememberAddress, type AddressChoice } from '@/components/AddressPicker';
+import { ConfirmSheet, GuaranteeSheet } from '@/components/Confirm';
 import { PushPrompt } from '@/components/PushPrompt';
 import { LegalLinks } from '@/components/LegalLinks';
 import { isFeatured } from '@/components/AdBanner';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, Pressable, View } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, View } from 'react-native';
 import { PaymentPicker, RadioCard, payOptions, type Handover } from '@/components/Payment';
 import {
-  BackBar, Btn, Card, Empty, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, SlideToConfirm, T, TabPills, toast,
+  BackBar, Btn, Card, Chips, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Seg, Sheet, SlideToConfirm, T, TabPills, toast,
 } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
-  CONDITIONS, warrantyLabel, ORDER_LABEL, SIDES, WANTED, addressLine, ar, elapsed, friendlyError, money, orderNo, replyLabel, reqNo,
+  CONDITIONS, warrantyLabel, ORDER_LABEL, SIDES, WANTED, ar, elapsed, friendlyError, money, orderNo, replyLabel, reqNo,
   type Order, type PayMethod, type Quote, type Request, type Shop, type ShopCard,
 } from '@/lib/data';
-import { PAY_NAME, cardAvailable, payByCard } from '@/lib/payments';
+import { partIsSided } from '@/lib/assistant';
+import { PAY_NAME, payByCard } from '@/lib/payments';
+import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { must, useLive, useNow } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
@@ -33,9 +37,13 @@ export default function PriceRequest() {
   const [modes, setModes] = useState<Record<string, Mode>>({});
   const [step, setStep] = useState<Step>('offers'); // checkout runs as three pages: handover → payment → review
   const [pay, setPay] = useState<PayMethod>('cash');
-  const [card, setCard] = useState(false);
+  const card = false; // card payment stays hidden until it is switched on (A19)
   const [busy, setBusy] = useState(false);
-  useEffect(() => { cardAvailable().then(setCard); }, []);
+  const [addr, setAddr] = useState<AddressChoice | null>(null);
+  const [askCancel, setAskCancel] = useState(false);
+  const [guarantee, setGuarantee] = useState(false);
+  const [editing, setEditing] = useState<Request | null>(null);
+  const now = useNow(60000);
 
   // while any part is still waiting for offers, also check every 12 seconds in case the live connection dropped
   const waitingRef = useRef(true);
@@ -80,18 +88,25 @@ export default function PriceRequest() {
   waitingRef.current = !!d.req && d.parts.some((p) => p.status === 'open');
   const r = d?.req;
   if (!r) return <Screen><BackBar title="الطلب" onBack={back} /><Empty text="الطلب ده مش موجود." /></Screen>;
+  const expiredQ = (q: Quote) => new Date(q.expires_at).getTime() <= now;
   // a single part that already became an order lives on the order page
   if (d.parts.length === 1 && r.order_id) return <Redirect href={{ pathname: '/order/[id]', params: { id: r.order_id } }} />;
 
   const first = d.parts[0];
-  // featured shops (paid visibility) are listed first; the rest keep the cheapest-first order
-  const quotesOf = (p: Request) => d.quotes.filter((q) => q.request_id === p.id)
-    .sort((a, b) => Number(isFeatured(d.shops[b.shop_id])) - Number(isFeatured(d.shops[a.shop_id])));
+  // cheapest total first (price × qty + delivery); at most one featured offer goes on top, marked; ended offers last
+  const totalOf = (q: Quote, p: Request) => q.price * (p.qty || 1) + (d.fees[q.id] ?? 0);
+  const quotesOf = (p: Request) => {
+    const all = d.quotes.filter((q) => q.request_id === p.id);
+    const live = all.filter((q) => !expiredQ(q)).sort((a, b) => totalOf(a, p) - totalOf(b, p));
+    const feat = live.find((q) => isFeatured(d.shops[q.shop_id]));
+    return [...(feat ? [feat] : []), ...live.filter((q) => q !== feat), ...all.filter(expiredQ)];
+  };
+  const featuredOf = (p: Request) => { const f = quotesOf(p)[0]; return f && !expiredQ(f) && isFeatured(d.shops[f.shop_id]) ? f.id : null; };
   const open = d.parts.filter((p) => p.status === 'open');
   const current = d.parts.find((p) => p.id === tab) ?? open.find((p) => quotesOf(p).length) ?? open[0] ?? d.parts[0];
   const chosen = Object.entries(sel)
     .map(([pid, qid]) => ({ part: d.parts.find((p) => p.id === pid)!, quote: d.quotes.find((q) => q.id === qid)! }))
-    .filter((x) => x.part && x.quote && x.part.status === 'open');
+    .filter((x) => x.part && x.quote && x.part.status === 'open' && !expiredQ(x.quote));
   const byShop = Object.values(chosen.reduce<Record<string, typeof chosen>>((acc, c) => ({ ...acc, [c.quote.shop_id]: [...(acc[c.quote.shop_id] ?? []), c] }), {}));
   // one delivery per shop: possible only if every chosen part from that shop can be delivered; its fee is the highest of them
   const groupOf = (sid: string) => chosen.filter((c) => c.quote.shop_id === sid);
@@ -102,15 +117,16 @@ export default function PriceRequest() {
   const deliveryTotal = byShop.filter((g) => modeOf(g[0].quote.shop_id) === 'delivery').reduce((s, g) => s + feeOf(g[0].quote.shop_id), 0);
   const bundle = open.length > 1
     ? [...new Set(d.quotes.map((q) => q.shop_id))]
-        .filter((sid) => open.every((p) => quotesOf(p).some((q) => q.shop_id === sid)))
-        .map((sid) => ({ sid, qs: open.map((p) => quotesOf(p).find((q) => q.shop_id === sid)!), total: open.reduce((s, p) => s + quotesOf(p).find((q) => q.shop_id === sid)!.price * (p.qty || 1), 0) }))
+        .filter((sid) => open.every((p) => quotesOf(p).some((q) => q.shop_id === sid && !expiredQ(q))))
+        .map((sid) => ({ sid, qs: open.map((p) => quotesOf(p).find((q) => q.shop_id === sid && !expiredQ(q))!), total: open.reduce((s, p) => s + quotesOf(p).find((q) => q.shop_id === sid && !expiredQ(q))!.price * (p.qty || 1), 0) }))
         .sort((a, b) => a.total - b.total)[0]
     : undefined;
 
   function pick(p: Request, q: Quote) {
+    if (expiredQ(q)) return toast('العرض ده انتهى.');
     setSel((s) => (s[p.id] === q.id ? Object.fromEntries(Object.entries(s).filter(([k]) => k !== p.id)) : { ...s, [p.id]: q.id }));
     // move on to the next part still without a choice
-    const nextPart = open.find((x) => x.id !== p.id && !sel[x.id] && quotesOf(x).length);
+    const nextPart = open.find((x) => x.id !== p.id && !sel[x.id] && quotesOf(x).some((y) => !expiredQ(y)));
     if (sel[p.id] !== q.id && nextPart) setTimeout(() => setTab(nextPart.id), 350);
   }
 
@@ -126,8 +142,15 @@ export default function PriceRequest() {
     setBusy(true);
     const { data: made, error } = await supabase.rpc('place_order', {
       p_choices: chosen.map((c) => ({ request: c.part.id, quote: c.quote.id, mode: modeOf(c.quote.shop_id) })), p_payment: method,
+      p_address: !allPickup && addr ? addr.address : null,
     });
-    if (error) { setBusy(false); return toast(friendlyError(error)); }
+    if (error) {
+      setBusy(false);
+      const m = friendlyError(error);
+      if (/offer expired|cannot choose/i.test(String(error.message))) { setStep('offers'); setSel({}); }
+      return toast(m === 'حصلت مشكلة. جرّب تاني.' ? 'الأوردر مااتأكدش. اتأكد من النت وجرّب تاني.' : m);
+    }
+    if (!allPickup && addr && profile) rememberAddress(addr, profile.id).catch(() => {});
     const ids = (made ?? []) as string[];
     setStep('offers'); setSel({});
     if (method === 'card' && ids.length === 1) {
@@ -137,19 +160,19 @@ export default function PriceRequest() {
       return;
     }
     setBusy(false);
-    toast(method === 'instapay' ? 'الأوردر اتسجّل، فاضل تحوّل وترفع الإيصال' : method === 'card' ? `اتعمل ${ar(ids.length)} أوردرات، ادفع كل واحد من صفحته` : ids.length > 1 ? `اتعمل ${ar(ids.length)} أوردرات` : 'الأوردر اتأكد مع المحل');
+    toast(method === 'instapay' ? 'الأوردر اتسجّل. فاضل تحوّل وترفع صورة الإيصال.' : method === 'card' ? `اتعمل ${ar(ids.length)} أوردرات، ادفع كل واحد من صفحته` : ids.length > 1 ? `اتعمل ${ar(ids.length)} أوردرات.` : 'الأوردر اتأكد. المحل بدأ يجهّزه.');
     if (ids.length === 1) router.push({ pathname: '/order/[id]', params: { id: ids[0], done: '1' } });
     else router.push('/customer/requests');
   }
   async function cancelOpen() {
     setBusy(true);
     for (const p of open) await supabase.rpc('cancel_request', { p_request: p.id });
-    setBusy(false); toast('الطلب اتلغى');
+    setBusy(false); setAskCancel(false); toast('الطلب اتلغى.');
   }
 
   const partMark = (p: Request) => {
     if (p.order_id) return { icon: 'checkmark-circle', color: colors.good };
-    if (p.status === 'cancelled') return { icon: 'close-circle', color: colors.faint };
+    if (p.status === 'cancelled' || p.status === 'expired') return { icon: 'close-circle', color: colors.faint };
     if (sel[p.id]) return { icon: 'checkmark-circle', color: colors.accentDeep };
     const n = quotesOf(p).length;
     if (n) return { count: n };
@@ -162,17 +185,21 @@ export default function PriceRequest() {
     const qs = quotesOf(p);
     const dec = d.declines[p.id];
     const order = p.order_id ? d.orders[p.order_id] : undefined;
-    const extras = [WANTED[p.wanted_condition], p.side ? SIDES[p.side] : '', p.qty > 1 ? `العدد ${ar(p.qty)}` : '', p.budget ? `ميزانية ${money(p.budget)} ج` : ''].filter(Boolean);
-    const low = Math.min(...qs.map((y) => y.price));
+    const extras = [WANTED[p.wanted_condition], p.side ? SIDES[p.side] : '', p.qty > 1 ? `العدد ${ar(p.qty)}` : '', p.notes ? `«${p.notes}»` : ''].filter(Boolean);
+    const liveQs = qs.filter((q) => !expiredQ(q));
+    const low = Math.min(...liveQs.map((y) => totalOf(y, p)));
+    const feat = featuredOf(p);
+    const editLink = p.status === 'open' ? <Btn kind="link" title="عدّل الطلب" onPress={() => setEditing(p)} style={{ alignSelf: 'flex-start' }} /> : null;
+    const longWait = Date.now() - new Date(p.created_at).getTime() > 2 * 3600000;
     return (
       <View style={{ gap: 12 }}>
         <Row gap={12}>
           <Photo uri={photoUrl(p.photo_path)} size={52} />
           <View style={{ flex: 1 }}>
             <T w="bold" size={18}>{p.part}</T>
-            <Muted size={12.5}>{extras.join('، ')}{p.notes ? `، «${p.notes}»` : ''}</Muted>
+            <Muted size={12.5}>{extras.join(' · ')}</Muted>
           </View>
-          {qs.length && !order ? <Pill label={`${ar(qs.length)} ${qs.length > 1 ? 'عروض' : 'عرض'}`} tone="new" /> : null}
+          {liveQs.length && !order ? <Pill label={liveQs.length > 1 ? `${ar(liveQs.length)} عروض` : 'عرض'} tone="new" /> : null}
         </Row>
 
         {order ? (
@@ -180,36 +207,47 @@ export default function PriceRequest() {
             style={[{ backgroundColor: colors.goodSoft, borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
             <Icon name={ORDER_LABEL[order.status].icon} size={26} color={colors.good} />
             <View style={{ flex: 1 }}>
-              <T w="bold" size={15}>القطعة دي في أوردر {orderNo(order.order_no)}</T>
-              <Muted size={12.5}>{ORDER_LABEL[order.status].short}، اضغط تتابع الأوردر</Muted>
+              <T w="bold" size={15}>القطعة دي في أوردر {orderNo(order.order_no)} · {ORDER_LABEL[order.status].short}</T>
+              <Muted size={12.5}>اضغط لمتابعة الأوردر.</Muted>
             </View>
             <Icon name="chevron-back" size={18} color={colors.good} />
           </Press>
         ) : p.status === 'cancelled' ? (
           <Empty icon="close-circle-outline" text="القطعة دي اتلغت من الطلب." />
+        ) : p.status === 'expired' ? (
+          <Empty icon="time-outline" text="الطلب ده انتهى من غير أوردر." action={{ label: 'اطلب تاني', onPress: () => router.push({ pathname: '/customer/new', params: { part: p.part, cond: p.wanted_condition, notes: p.notes, side: p.side } }) }} />
         ) : qs.length ? (
           <>
             <View style={[{ backgroundColor: colors.surface, borderRadius: 18, overflow: 'hidden' }, lift]}>
               {qs.map((q, i) => (
                 <OfferRow key={q.id} q={q} shop={d.shops[q.shop_id]} card={d.cards[q.shop_id]} fee={d.fees[q.id]} on={sel[p.id] === q.id} first={i === 0}
-                  cheapest={qs.length > 1 && qs.findIndex((x) => x.price === low) === i} qty={p.qty || 1}
+                  cheapest={liveQs.length > 1 && !expiredQ(q) && liveQs.findIndex((x) => totalOf(x, p) === low) === liveQs.indexOf(q)} featured={q.id === feat}
+                  expired={expiredQ(q)} now={now} qty={p.qty || 1} onGuarantee={() => setGuarantee(true)}
                   onPick={() => pick(p, q)} onChat={() => router.push(`/chat/${p.id}/${q.shop_id}`)} />
               ))}
             </View>
-            {dec?.n ? <Muted size={12.5}>{ar(dec.n)} {dec.n > 1 ? 'محلات قالوا' : 'محل قال'} إنها مش متوفرة عندهم.</Muted> : null}
+            {dec?.n ? <Muted size={12.5}>{dec.n > 1 ? `${ar(dec.n)} محلات قالوا إنها مش عندهم.` : 'محل قال إنها مش عنده.'}</Muted> : null}
           </>
         ) : dec?.n && dec.n >= d.shopCount ? (
           <View style={{ backgroundColor: colors.badSoft, borderRadius: 20, padding: 16, gap: 6 }}>
             <Row gap={8}><Icon name="alert-circle" size={22} color={colors.bad} /><T w="bold" size={15} color={colors.bad}>مش متوفرة دلوقتي</T></Row>
-            <Muted size={13}>كل المحلات اللي شافت الطلب قالت إنها مش عندها.{dec.reasons.length ? ` السبب: «${dec.reasons[0]}»` : ''} جرّب تختار «جديد أو مستعمل» أو تضيف صورة.</Muted>
+            <Muted size={13}>كل المحلات اللي شافت الطلب قالت إنها مش عندها. جرّب تختار «جديد أو مستعمل» أو تضيف صورة.</Muted>
+            {editLink}
           </View>
         ) : (
           <>
             <Searching since={p.created_at} make={p.car_make} />
+            {longWait ? (
+              <View style={{ backgroundColor: colors.warnSoft, borderRadius: 16, padding: 14, gap: 4 }}>
+                <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="bulb" size={18} color={colors.warn} />
+                  <T size={13.5} style={{ flex: 1 }}>لسه مفيش عروض. صورة القطعة أو اختيار «جديد أو مستعمل» بتجيب عروض أكتر.</T></Row>
+                {editLink}
+              </View>
+            ) : null}
             {dec?.n ? (
               <Row gap={8} style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 12 }}>
                 <Icon name="information-circle" size={18} color={colors.muted} />
-                <Muted size={13} style={{ flex: 1 }}>محل قال إنها مش متوفرة عنده{dec.reasons.length ? ` («${dec.reasons[0]}»)` : ''}. لسه مستنيين باقي المحلات.</Muted>
+                <Muted size={13} style={{ flex: 1 }}>محل قال إنها مش عنده{dec.reasons.length ? ` («${dec.reasons[0]}»)` : ''}. لسه مستنيين باقي المحلات.</Muted>
               </Row>
             ) : null}
           </>
@@ -230,10 +268,14 @@ export default function PriceRequest() {
         <T w="bold" size={20} color={colors.primary}>{money(grand)} ج.م</T>
       </Row>
     );
+    const goNext = () => {
+      if (step === 'handover' && !allPickup) { const bad = addressProblem(addr); if (bad) return toast(bad); }
+      setStep(STEPS[at + 1].v);
+    };
     const footer = step === 'review' ? (
       <>{totalRow}<SlideToConfirm label={method === 'card' ? 'اسحب وكمّل للدفع' : 'اسحب لتأكيد الأوردر'} busy={busy} onConfirm={accept} /></>
     ) : (
-      <>{totalRow}<Btn title={step === 'handover' ? 'التالي: الدفع' : 'التالي: مراجعة الأوردر'} icon="arrow-back" onPress={() => setStep(STEPS[at + 1].v)} /></>
+      <>{totalRow}<Btn title={step === 'handover' ? 'التالي: الدفع' : 'التالي: مراجعة الأوردر'} icon="arrow-back" onPress={goNext} /></>
     );
     return (
       <Screen footer={footer}>
@@ -248,24 +290,16 @@ export default function PriceRequest() {
               const shop = d.shops[sid];
               return (
                 <Card key={sid}>
-                  <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={`${ar(g.length)} ${g.length > 1 ? 'قطع' : 'قطعة'}، ${shop?.area ?? ''}`} />
-                  <RadioCard title="توصيل للبيت" icon="bicycle" right={canDeliver(sid) ? `+${money(feeOf(sid))} ج.م` : undefined}
-                    sub={canDeliver(sid) ? 'سعر التوصيل من المحل حسب منطقتك' : !shop?.offers_delivery ? 'المحل ده مش بيوصّل' : g.length > 1 ? 'قطعة من دول استلام من المحل بس' : 'القطعة دي استلام من المحل بس (أو المحل مش بيوصّل لمنطقتك)'}
+                  <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={[`${ar(g.length)} ${g.length > 1 ? 'قطع' : 'قطعة'}`, shop?.area].filter(Boolean).join(' · ')} />
+                  <RadioCard title="توصيل لعنوانك" icon="bicycle" right={canDeliver(sid) ? `+${money(feeOf(sid))} ج.م` : undefined}
+                    sub={canDeliver(sid) ? 'سعر التوصيل من المحل حسب منطقتك' : !shop?.offers_delivery ? 'المحل ده مش بيوصّل' : g.length > 1 && g.some((c) => d.fees[c.quote.id] != null) ? 'قطعة من دول استلام من المحل بس' : 'المحل مش بيوصّل لمنطقتك'}
                     on={modeOf(sid) === 'delivery'} disabled={!canDeliver(sid)} onPress={() => setModes((m) => ({ ...m, [sid]: 'delivery' }))} />
-                  <RadioCard title="استلام من المحل" sub="روح استلمها بنفسك" icon="walk" right="مجاناً"
+                  <RadioCard title="استلام من المحل" sub="العنوان ومواعيد المحل هتظهر بعد التأكيد" icon="walk" right="مجاناً"
                     on={modeOf(sid) === 'pickup'} onPress={() => setModes((m) => ({ ...m, [sid]: 'pickup' }))} />
                 </Card>
               );
             })}
-            {!allPickup && profile ? (
-              <Card>
-                <Row gap={10} style={{ alignItems: 'flex-start' }}>
-                  <Icon name="location" size={20} color={colors.primary} />
-                  <View style={{ flex: 1 }}><T w="semibold" size={14}>التوصيل على</T><Muted size={13}>{addressLine(profile)}</Muted></View>
-                  <Btn kind="link" title="تغيير" onPress={() => router.push('/profile')} />
-                </Row>
-              </Card>
-            ) : null}
+            {!allPickup && profile ? <AddressPicker profile={profile} value={addr} onChange={setAddr} /> : null}
           </>
         ) : step === 'payment' ? (
           <>
@@ -282,12 +316,12 @@ export default function PriceRequest() {
                 const mode = modeOf(sid);
                 return (
                   <View key={sid} style={{ padding: 16, gap: 10, borderTopWidth: gi ? 1 : 0, borderColor: colors.line }}>
-                    <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={mode === 'delivery' ? `توصيل للبيت، ${money(feeOf(sid))} ج.م` : 'استلام من المحل'} />
+                    <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={mode === 'delivery' ? `توصيل ${money(feeOf(sid))} ج.م` : 'استلام من المحل'} />
                     {g.map((c) => (
                       <Row key={c.part.id} gap={10}>
                         <View style={{ flex: 1 }}>
                           <T w="semibold" size={14}>{c.part.part}{c.quote.brand ? ` (${c.quote.brand})` : ''}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
-                          <Muted size={12}>{CONDITIONS[c.quote.condition]}، {warrantyLabel(c.quote.warranty_days)}</Muted>
+                          <Muted size={12}>{CONDITIONS[c.quote.condition]} · {warrantyLabel(c.quote.warranty_days)}</Muted>
                         </View>
                         <T w="semibold" size={14}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
                       </Row>
@@ -302,9 +336,10 @@ export default function PriceRequest() {
             </View>
             <Row gap={8} style={{ backgroundColor: colors.primarySoft, borderRadius: 14, padding: 12 }}>
               <Icon name="document-text" size={18} color={colors.primary} />
-              <Muted size={12.5} style={{ flex: 1 }}>بعد التأكيد هيتعمل لك إيصال PDF تقدر تحمّله من صفحة الأوردر.</Muted>
+              <Muted size={12.5} style={{ flex: 1 }}>بعد التأكيد هيتعملك إيصال PDF فيه الضمان، تقدر تحمّله من صفحة الأوردر.</Muted>
             </Row>
-            {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في طلب الأسعار مستنية عروض.</Muted> : null}
+            {byShop.length > 1 ? <Muted size={12.5}>هيتعمل {ar(byShop.length)} أوردرات، واحد لكل محل.</Muted> : null}
+            {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في الطلب مستنية عروض.</Muted> : null}
             <Muted size={12} center>افحص القطعة قبل ما تدّي الكود أو تدفع. لو مش زي العرض ارفضها. بعد الاستلام، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
             <LegalLinks lead="بتأكيد الأوردر بتوافق على" withCancellation />
           </>
@@ -323,11 +358,12 @@ export default function PriceRequest() {
       <Btn title="كمّل" icon="arrow-back" onPress={() => setStep('handover')} style={{ minWidth: 150 }} />
     </Row>
   ) : undefined;
-  const withOffers = d.parts.filter((p) => quotesOf(p).length && p.status === 'open').length;
+  const withOffers = d.parts.filter((p) => quotesOf(p).some((q) => !expiredQ(q)) && p.status === 'open').length;
+  const liveCount = d.quotes.filter((q) => !expiredQ(q) && open.some((p) => p.id === q.request_id)).length;
 
   return (
     <Screen footer={footer}>
-      <BackBar title={'طلب أسعار ' + reqNo(first.num)} onBack={back} />
+      <BackBar title={'طلب ' + reqNo(first.num)} onBack={back} />
       <View style={{ backgroundColor: colors.ink, borderRadius: 18, padding: 16, gap: 14 }}>
         <Row gap={14}>
           <Plate top={first.car_model || '—'} bottom={ar(first.car_year)} size="sm" />
@@ -337,11 +373,11 @@ export default function PriceRequest() {
           </View>
           <Since iso={first.created_at} />
         </Row>
-        {d.quotes.length ? (
+        {liveCount ? (
           <Row gap={8} style={{ backgroundColor: colors.lime, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}>
             <Icon name="pricetags" size={18} color={colors.ink} />
             <T w="bold" size={14} color={colors.ink} style={{ flex: 1 }}>
-              {ar(d.quotes.filter((q) => open.some((p) => p.id === q.request_id)).length)} عروض وصلتك{d.parts.length > 1 ? ` على ${ar(withOffers)} من ${ar(d.parts.length)} قطع` : ''}، اختار اللي يناسبك
+              {d.parts.length > 1 ? `وصلك ${ar(liveCount)} عروض على ${ar(withOffers)} من ${ar(d.parts.length)} قطع.` : `وصلك ${liveCount > 1 ? ar(liveCount) + ' عروض' : 'عرض'}. اختار اللي يناسبك.`}
             </T>
           </Row>
         ) : null}
@@ -354,7 +390,7 @@ export default function PriceRequest() {
             <Row gap={8}><Icon name="bag-check" size={20} color={colors.accentDeep} /><T w="bold" size={15}>كل القطع من محل واحد</T></Row>
             <T w="bold" size={17}>{money(bundle.total)} ج.م</T>
           </Row>
-          <Muted size={12.5}>{d.cards[bundle.sid]?.name ?? 'محل'} عنده كل القطع اللي لسه مفتوحة. أوردر واحد وتوصيل واحد.</Muted>
+          <Muted size={12.5}>{d.cards[bundle.sid]?.name ?? 'محل موثّق'} عنده كل القطع. أوردر واحد وتوصيل واحد.</Muted>
         </Press>
       ) : null}
 
@@ -367,10 +403,14 @@ export default function PriceRequest() {
 
       {open.length ? (
         <View style={{ gap: 6, alignItems: 'center' }}>
-          <Muted center size={12}>بياناتك مش بتظهر للمحل غير بعد ما تأكد الأوردر. ممنوع تبادل الأرقام في الشات.</Muted>
-          <Btn kind="link" title={open.length > 1 ? 'إلغاء القطع المفتوحة' : 'إلغاء الطلب'} loading={busy} onPress={cancelOpen} style={{ alignSelf: 'center' }} />
+          <Muted center size={12}>رقمك وعنوانك بيظهروا للمحل بس بعد تأكيد الأوردر. ضمان ضغطة بيغطي الأوردرات اللي بتتأكد من التطبيق بس.</Muted>
+          <Btn kind="link" title={open.length > 1 ? 'إلغاء القطع المفتوحة' : 'إلغاء الطلب'} onPress={() => setAskCancel(true)} style={{ alignSelf: 'center' }} />
         </View>
       ) : null}
+
+      <ConfirmSheet open={askCancel} title="تلغي الطلب؟" body="المحلات مش هتقدر تبعت عروض تاني." yes="أيوه، الغي" danger busy={busy} onYes={cancelOpen} onClose={() => setAskCancel(false)} />
+      <GuaranteeSheet open={guarantee} onClose={() => setGuarantee(false)} />
+      {editing ? <EditRequest part={editing} onClose={() => setEditing(null)} /> : null}
 
     </Screen>
   );
@@ -409,13 +449,17 @@ function ShopLine({ name, card, sub }: { name: string; card?: ShopCard; sub?: st
 }
 
 /** One offer as a slim row: radio, price, shop, and the details in one line. */
-function OfferRow({ q, shop, card, fee, on, first, cheapest, qty, onPick, onChat }: {
-  q: Quote; shop?: Shop; card?: ShopCard; fee?: number | null; on: boolean; first: boolean; cheapest: boolean; qty: number; onPick: () => void; onChat: () => void;
+function OfferRow({ q, card, fee, on, first, cheapest, featured, expired, now, qty, onPick, onChat, onGuarantee }: {
+  q: Quote; shop?: Shop; card?: ShopCard; fee?: number | null; on: boolean; first: boolean; cheapest: boolean; featured: boolean; expired: boolean; now: number; qty: number;
+  onPick: () => void; onChat: () => void; onGuarantee: () => void;
 }) {
-  const details = [q.brand, CONDITIONS[q.condition], warrantyLabel(q.warranty_days), fee != null ? `توصيل ${money(fee)} ج.م` : 'استلام من المحل بس'].filter(Boolean).join('، ');
+  const details = [q.brand, CONDITIONS[q.condition], warrantyLabel(q.warranty_days), fee != null ? `توصيل ${money(fee)} ج.م` : 'استلام من المحل بس'].filter(Boolean).join(' · ');
+  const left = new Date(q.expires_at).getTime() - now;
+  const soon = !expired && left < 6 * 3600000;
+  const leftText = left >= 3600000 ? `${ar(Math.floor(left / 3600000))} ساعة` : `${ar(Math.max(1, Math.ceil(left / 60000)))} دقيقة`;
   return (
     <Press onPress={onPick} selected={on} label={`عرض ${money(q.price)} جنيه`}
-      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 14, paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderColor: colors.line, backgroundColor: on ? colors.primarySoft : colors.surface }}>
+      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 14, paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderColor: colors.line, backgroundColor: on ? colors.primarySoft : colors.surface, opacity: expired ? 0.55 : 1 }}>
       <View style={{ width: 22, height: 22, marginTop: 6, borderRadius: 11, borderWidth: 2, borderColor: on ? colors.primary : colors.faint, alignItems: 'center', justifyContent: 'center' }}>
         {on ? <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: colors.primary }} /> : null}
       </View>
@@ -424,7 +468,8 @@ function OfferRow({ q, shop, card, fee, on, first, cheapest, qty, onPick, onChat
           <T w="bold" size={20} style={{ lineHeight: 30 }}>{money(q.price)}</T>
           <T size={12.5} color={colors.muted}>ج.م{qty > 1 ? ' للقطعة' : ''}</T>
           {cheapest ? <Pill label="الأرخص" tone="accent" /> : null}
-          {isFeatured(shop) ? <Pill label="محل مميز" icon="star" tone="wait" /> : null}
+          {featured ? <Pill label="مميّز" icon="star" tone="wait" /> : null}
+          {expired ? <Pill label="العرض ده انتهى" tone="plain" /> : null}
         </Row>
         <Pressable onPress={() => router.push(`/shop-profile/${q.shop_id}`)} hitSlop={4}>
           <Row gap={6} style={{ flexWrap: 'wrap' }}>
@@ -435,6 +480,14 @@ function OfferRow({ q, shop, card, fee, on, first, cheapest, qty, onPick, onChat
         </Pressable>
         <Muted size={12.5}>{details}</Muted>
         {q.note ? <Muted size={12.5}>«{q.note}»</Muted> : null}
+        {!expired ? (
+          <Row gap={10} style={{ flexWrap: 'wrap' }}>
+            <Pressable onPress={onGuarantee} hitSlop={6} accessibilityRole="button">
+              <Row gap={4}><Icon name="shield-checkmark" size={13} color={colors.good} /><T size={12} w="semibold" color={colors.good}>محمي بضمان ضغطة</T></Row>
+            </Pressable>
+            {soon ? <Row gap={4}><Icon name="time" size={13} color={colors.warn} /><T size={12} w="medium" color={colors.warn}>بينتهي بعد {leftText}</T></Row> : null}
+          </Row>
+        ) : null}
       </View>
       <View style={{ alignItems: 'center', gap: 8 }}>
         {q.photo_path ? <Photo uri={photoUrl(q.photo_path)} size={48} /> : null}
@@ -452,7 +505,7 @@ function Since({ iso }: { iso: string }) {
   return (
     <View style={{ alignItems: 'center', backgroundColor: 'rgba(255,255,255,.08)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
       <Row gap={4}><Icon name="time" size={13} color={colors.accent} /><T w="bold" size={13.5} color="#fff">{elapsed(iso, now)}</T></Row>
-      <T size={10.5} color="rgba(255,255,255,.6)">من ساعة الطلب</T>
+      <T size={10.5} color="rgba(255,255,255,.6)">من وقت الطلب</T>
     </View>
   );
 }
@@ -473,7 +526,44 @@ function Searching({ since, make }: { since: string; make: string }) {
       </View>
       <T w="bold" size={16}>طلبك وصل لمحلات {make}</T>
       <Row gap={4}><Icon name="time" size={14} color={colors.muted} /><Muted size={13}>بقاله {elapsed(since, now)}</Muted></Row>
-      <Muted center size={13}>أول ما محل يبعت سعر هيظهر هنا ويوصلك إشعار.</Muted>
+      <Muted center size={13}>أول ما محل يبعت عرض هيظهر هنا وهيوصلك إشعار.</Muted>
     </View>
+  );
+}
+
+/** «عدّل الطلب»: change the condition, side, note or photo while the request is open (A17). */
+function EditRequest({ part, onClose }: { part: Request; onClose: () => void }) {
+  const [cond, setCond] = useState(part.wanted_condition);
+  const [side, setSide] = useState<string>(part.side);
+  const [notes, setNotes] = useState(part.notes);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    try {
+      const path = photo ? await uploadPhoto(photo, part.customer_id) : null;
+      const { error } = await supabase.rpc('edit_request', { p_request: part.id, p_condition: cond, p_side: side, p_notes: notes, p_photo: path });
+      if (error) throw error;
+      toast('الطلب اتعدّل.'); onClose();
+    } catch (e) { toast(friendlyError(e)); }
+    setBusy(false);
+  }
+  return (
+    <Sheet open onClose={onClose} title="عدّل الطلب">
+      <View style={{ gap: 14 }}>
+        <T w="bold" size={16}>{part.part}</T>
+        <Seg options={[{ v: 'any', label: 'جديد أو مستعمل' }, { v: 'used', label: 'مستعمل بس' }, { v: 'new', label: 'جديد بس' }]} value={cond} onPick={(v) => setCond(v as Request['wanted_condition'])} />
+        {partIsSided(part.part) ? <Chips options={[{ v: 'right', label: 'يمين' }, { v: 'left', label: 'شمال' }, { v: 'both', label: 'الاتنين' }]} selected={[side]} onPick={(v) => setSide(side === v ? '' : v)} /> : null}
+        <Press onPress={async () => { try { const u = await pickPhoto(); if (u) setPhoto(u); } catch { toast('الصورة دي مش مدعومة. اختار صورة JPG أو PNG.'); } }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: photo || part.photo_path ? colors.good : colors.line }}>
+          {photo ? <Image source={{ uri: photo }} style={{ width: 44, height: 44, borderRadius: 10 }} /> : part.photo_path ? <Photo uri={photoUrl(part.photo_path)} size={44} /> : (
+            <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={20} color={colors.accentDeep} /></View>
+          )}
+          <T size={13.5} w="medium" style={{ flex: 1 }}>{photo || part.photo_path ? 'الصورة اتضافت · تغيير' : 'صوّر القطعة القديمة (اختياري)'}</T>
+        </Press>
+        <Field value={notes} onChangeText={setNotes} placeholder="ملاحظة للمحل (اختياري)" />
+        <Btn title="احفظ" loading={busy} onPress={save} />
+      </View>
+    </Sheet>
   );
 }

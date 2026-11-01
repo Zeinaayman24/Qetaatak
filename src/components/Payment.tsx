@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
-import { ar, friendlyError, money, type Order, type PayMethod } from '@/lib/data';
+import { useNow } from '@/lib/live';
+import { ar, friendlyError, money, orderNo, type Order, type PayMethod } from '@/lib/data';
 import { PAY_METHODS, PAY_NAME, PAY_STATUS, payByCard } from '@/lib/payments';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { supabase } from '@/lib/supabase';
@@ -48,7 +49,7 @@ export function PaymentPicker({ value, onPick, card, instapay, handover }: {
 }) {
   return (
     <View style={{ gap: 10 }}>
-      {payOptions(handover).map((v) => {
+      {payOptions(handover).filter((v) => v !== 'card' || card).map((v) => { // card stays hidden until switched on
         const m = PAY_METHODS.find((x) => x.v === v)!;
         const off = (v === 'card' && !card) || (v === 'instapay' && !instapay);
         const title = v === 'cash' && handover === 'mixed' ? 'كاش عند الاستلام' : v === 'shop' ? 'كاش في المحل' : m.title;
@@ -74,6 +75,10 @@ export function PaymentPanel({ order: o, shop }: { order: Order; shop?: { name?:
   const st = PAY_STATUS[o.payment_status];
   const transferOpen = o.payment_method === 'instapay' && ['awaiting', 'failed'].includes(o.payment_status) && o.status !== 'cancelled';
   const cardOpen = o.payment_method === 'card' && ['awaiting', 'failed'].includes(o.payment_status) && o.status !== 'cancelled';
+  const now = useNow(transferOpen ? 30000 : 0);
+  const left = Math.max(0, new Date(o.created_at).getTime() + 2 * 3600000 - now);
+  const leftText = left >= 3600000 ? `ساعة و${ar(Math.floor((left - 3600000) / 60000))} دقيقة` : `${ar(Math.ceil(left / 60000))} دقيقة`;
+  const fmtDay = (iso: string) => new Date(iso).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
 
   async function sendReceipt() {
     if (!photo || !session) return;
@@ -82,7 +87,7 @@ export function PaymentPanel({ order: o, shop }: { order: Order; shop?: { name?:
       const path = await uploadPhoto(photo, session.user.id, 'receipts');
       const { error } = await supabase.rpc('submit_payment_proof', { p_order: o.id, p_path: path, p_ref: ref.trim() });
       if (error) throw error;
-      setPhoto(null); toast('الإيصال وصل، هنأكد الدفع في أسرع وقت');
+      setPhoto(null); toast('الإيصال وصل للمحل. أول ما يأكّد هيوصلك إشعار.');
     } catch (e) { toast(friendlyError(e)); }
     setBusy(false);
   }
@@ -106,12 +111,13 @@ export function PaymentPanel({ order: o, shop }: { order: Order; shop?: { name?:
         <Pill label={st.label} tone={st.tone} />
       </Row>
 
-      {o.payment_status === 'failed' && o.payment_note ? (
+      {o.payment_status === 'failed' && o.payment_note && o.status !== 'cancelled' ? (
         <Row gap={8} style={{ backgroundColor: colors.badSoft, borderRadius: radius.md, padding: 12, alignItems: 'flex-start' }}>
           <Icon name="alert-circle" size={18} color={colors.bad} />
-          <T size={13.5} color={colors.bad} style={{ flex: 1 }}>{o.payment_note}</T>
+          <T size={13.5} color={colors.bad} style={{ flex: 1 }}>المحل قال إن الفلوس ماوصلتش: «{o.payment_note}». ارفع إيصال تاني أو كلّمنا من «عندك مشكلة في الأوردر؟».</T>
         </Row>
       ) : null}
+      {o.status === 'cancelled' && o.cancel_reason === 'unpaid' ? <Muted size={13}>ماحوّلتش خلال ساعتين، فالأوردر اتلغى والقطع رجعت للطلب.</Muted> : null}
 
       {cardOpen ? (
         <>
@@ -123,22 +129,25 @@ export function PaymentPanel({ order: o, shop }: { order: Order; shop?: { name?:
 
       {transferOpen ? (
         <>
-          <T size={13.5}>حوّل <T w="bold" size={13.5}>{money(total)} ج.م</T> للمحل مباشرة، وبعدين ارفع صورة الإيصال والمحل يأكّد:</T>
+          <T size={13.5}>حوّل <T w="bold" size={13.5}>{money(total)} ج.م</T> للمحل مباشرة خلال ساعتين، وبعدين ارفع صورة الإيصال.</T>
+          <Row gap={6} style={{ backgroundColor: colors.warnSoft, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' }}>
+            <Icon name="time" size={15} color={colors.warn} /><T w="semibold" size={13} color={colors.warn}>فاضل {leftText} على الدفع</T>
+          </Row>
           {shop && (shop.instapay_address || shop.wallet_number) ? (
             <View style={{ gap: 8 }}>
               {shop.instapay_address ? <View style={{ gap: 4 }}><Muted size={12}>عنوان InstaPay</Muted><CopyBox text={shop.instapay_address} /></View> : null}
               {shop.wallet_number ? <View style={{ gap: 4 }}><Muted size={12}>رقم المحفظة (فودافون كاش وغيرها)</Muted><CopyBox text={shop.wallet_number} /></View> : null}
-              {shop.name ? <Muted size={12.5}>باسم المحل: {shop.name}، اكتب رقم الأوردر في ملاحظة التحويل</Muted> : null}
+              {shop.name ? <Muted size={12.5}>اتأكد إن الاسم اللي بيظهرلك هو {shop.name}، واكتب رقم الأوردر {orderNo(o.order_no)} في ملاحظة التحويل.</Muted> : null}
             </View>
           ) : <Muted size={13}>بنحمّل بيانات تحويل المحل…</Muted>}
-          <Press onPress={async () => { try { const u = await pickPhoto(); if (u) setPhoto(u); } catch { toast('الصورة دي مش مدعومة.'); } }}
+          <Press onPress={async () => { try { const u = await pickPhoto(); if (u) setPhoto(u); } catch { toast('الصورة دي مش مدعومة. اختار صورة JPG أو PNG.'); } }}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: radius.md, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#C9DDF2', backgroundColor: colors.surface }}>
             {photo ? <Image source={{ uri: photo }} style={{ width: 52, height: 52, borderRadius: 10 }} /> : (
               <View style={{ width: 52, height: 52, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="image-up" size={24} color={colors.primary} /></View>
             )}
             <View style={{ flex: 1 }}>
               <T w="semibold" size={14}>{photo ? 'صورة الإيصال جاهزة' : 'ارفع صورة الإيصال'}</T>
-              <Muted size={12}>{photo ? 'اضغط لو عايز تغيّرها' : 'سكرين شوت من InstaPay أو المحفظة'}</Muted>
+              <Muted size={12}>{photo ? 'اضغط للتغيير' : 'صورة الشاشة من InstaPay أو المحفظة'}</Muted>
             </View>
           </Press>
           <Field value={ref} onChangeText={setRef} placeholder="رقم العملية (اختياري)" ltr icon="receipt" />
@@ -149,18 +158,19 @@ export function PaymentPanel({ order: o, shop }: { order: Order; shop?: { name?:
       {o.payment_method === 'instapay' && o.payment_status === 'review' ? (
         <Row gap={8} style={{ backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: 12 }}>
           <Icon name="hourglass" size={18} color={colors.primary} />
-          <T size={13.5} style={{ flex: 1 }}>الإيصال وصل للمحل{o.payment_ref ? ` (عملية ${o.payment_ref})` : ''}. أول ما يأكد إن الفلوس وصلته هيوصلك إشعار ويبدأ يجهّز.</T>
+          <T size={13.5} style={{ flex: 1 }}>الإيصال عند المحل{o.payment_ref ? ` (عملية ${o.payment_ref})` : ''}. أول ما يأكّد إن الفلوس وصلته هيبدأ يجهّز. لو اتأخر أكتر من ساعتين هنتابع معاه.</T>
         </Row>
       ) : null}
 
       {(o.payment_method === 'cash' || o.payment_method === 'shop') && o.payment_status === 'unpaid' && o.status !== 'cancelled' ? (
-        <Muted size={13}>{o.payment_method === 'shop' ? 'هتدفع' : 'هتدفع للمندوب'} {money(total)} ج.م {o.payment_method === 'shop' ? 'في المحل وانت بتستلم.' : 'لما الأوردر يوصلك. اتأكد من القطع الأول.'}</Muted>
+        <Muted size={13}>هتدفع {money(total)} ج.م {o.payment_method === 'shop' ? 'في المحل وانت بتستلم' : 'للمندوب لما الأوردر يوصلك'}، بعد ما تفحص القطع.</Muted>
       ) : null}
       {o.payment_status === 'paid' && o.paid_at ? (
-        <Row gap={8}><Icon name="verified" size={18} color={colors.good} /><Muted size={13}>اتدفع {money(total)} ج.م يوم {new Date(o.paid_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</Muted></Row>
+        <Row gap={8}><Icon name="verified" size={18} color={colors.good} /><Muted size={13}>اتدفع {money(total)} ج.م يوم {fmtDay(o.paid_at)}.</Muted></Row>
       ) : null}
       {o.payment_status === 'refund_due' ? <Muted size={13}>{o.payment_method === 'instapay'
-        ? `الأوردر اتلغى بعد التحويل. المحل هيرجّعلك ${money(total)} ج.م على نفس الحساب اللي حوّلت منه. لو اتأخر كلّمنا من «الدعم».`
+        ? (o.refused_at ? `اتسجّل إنك رفضت القطعة. المحل لازم يرجّعلك ${money(total)} ج.م، وهنتابع معاه.`
+          : `الأوردر اتلغى بعد التحويل. المحل لازم يرجّعلك ${money(total)} ج.م على نفس الحساب خلال ${ar(48)} ساعة، وهنتابع معاه.`)
         : `الأوردر اتلغى بعد الدفع. هنرجّعلك ${money(total)} ج.م على البطاقة خلال ${ar(3)} أيام عمل.`}</Muted> : null}
       {o.payment_status === 'refunded' ? <Muted size={13}>{o.payment_method === 'instapay' ? 'المحل رجّعلك' : 'رجّعنالك'} {money(total)} ج.م.{o.payment_note ? ` ${o.payment_note}` : ''}</Muted> : null}
     </View>

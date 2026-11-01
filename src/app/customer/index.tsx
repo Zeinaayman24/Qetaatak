@@ -108,7 +108,7 @@ export default function CustomerHome() {
         <View style={{ height: 1, backgroundColor: colors.line }} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
           {CATEGORIES.map((c) => (
-            <Press key={c.label} onPress={() => newReq(c.part)} label={c.label} style={{ width: '25%', alignItems: 'center', gap: 6 }}>
+            <Press key={c.label} onPress={() => router.push({ pathname: '/customer/new', params: { cat: c.label } })} label={c.label} style={{ width: '25%', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 58, height: 58, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon set="mci" name={c.icon} size={27} color={colors.primary} />
               </View>

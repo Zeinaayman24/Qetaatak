@@ -18,7 +18,7 @@ export const PAY_STATUS: Record<PayStatus, { label: string; tone: 'good' | 'wait
   review: { label: 'المحل بيراجع الإيصال', tone: 'new' },
   paid: { label: 'مدفوع', tone: 'good' },
   failed: { label: 'الدفع ماتمّش', tone: 'bad' },
-  refund_due: { label: 'هيترجعلك المبلغ', tone: 'wait' },
+  refund_due: { label: 'هيترجّعلك المبلغ', tone: 'wait' },
   refunded: { label: 'المبلغ رجع', tone: 'plain' },
 };
 

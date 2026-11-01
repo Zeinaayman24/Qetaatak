@@ -1,9 +1,10 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Linking, Platform, View } from 'react-native';
+import { Animated, Easing, Image, Linking, Platform, View } from 'react-native';
+import { ConfirmSheet } from '@/components/Confirm';
 import { PaymentPanel } from '@/components/Payment';
 import { ReceiptButton } from '@/components/ReceiptButton';
-import { BackBar, Btn, Card, Empty, Field, Icon, Lines, Loading, Muted, Photo, Press, Row, Screen, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, Chips, Empty, Field, Icon, Lines, Loading, Muted, Photo, Press, Row, Screen, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, warrantyLabel, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
+import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
 
@@ -23,6 +25,10 @@ export default function OrderPage() {
   const [busy, setBusy] = useState(false);
   const [stars, setStars] = useState(0);
   const [review, setReview] = useState('');
+  const [ask, setAsk] = useState<'received' | 'cancel' | 'refuse' | null>(null);
+  const [reason, setReason] = useState('');
+  const [other, setOther] = useState('');
+  const [refPhoto, setRefPhoto] = useState<string | null>(null);
   const { data, loading } = useLive<Data>(async () => {
     const order = must(await supabase.from('orders').select('*').eq('id', id).maybeSingle()) as Order | null;
     if (!order) return { order: null, parts: [], quotes: [], shop: null, priv: null, code: null };
@@ -57,15 +63,35 @@ export default function OrderPage() {
     const { error } = await supabase.rpc(fn, args);
     setBusy(false);
     if (error) { toast(friendlyError(error)); return false; }
-    toast(ok); return true;
+    setAsk(null); toast(ok); return true;
+  }
+  const isReady = ['ready', 'out_for_delivery', 'delivered'].includes(o.status);
+  const total = Number(o.items_total) + Number(o.delivery_fee);
+  async function refuse() {
+    const why = reason === 'سبب تاني' ? other.trim() : reason;
+    if (!why) return toast('اختار سبب الرفض.');
+    setBusy(true);
+    try {
+      const path = refPhoto && session ? await uploadPhoto(refPhoto, session.user.id) : null;
+      const { error } = await supabase.rpc('refuse_order', { p_order: o!.id, p_reason: why, p_photo: path });
+      if (error) throw error;
+      setAsk(null);
+      toast(o!.payment_status === 'paid' ? `اتسجّل إنك رفضت القطعة. المحل لازم يرجّعلك ${money(total)} ج.م، وهنتابع معاه.` : 'اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.');
+    } catch (e) { toast(friendlyError(e)); }
+    setBusy(false);
   }
 
   const footer = o.status === 'cancelled' || unpaid ? undefined
-    : o.status !== 'received'
-      ? <Btn kind={o.status === 'preparing' ? 'secondary' : 'primary'} icon="checkmark-done" loading={busy}
-          title="استلمت الأوردر" onPress={() => rpc('receive_order', { p_order: o.id }, 'تمام! قيّم المحل لو سمحت')} />
+    : isReady
+      ? (
+        <Row gap={10}>
+          <Btn icon="checkmark-done" title="استلمت الأوردر" onPress={() => setAsk('received')} style={{ flex: 1 }} />
+          <Btn kind="secondary" title="رفضت القطعة" onPress={() => setAsk('refuse')} style={{ minWidth: 120 }} />
+        </Row>
+      )
+      : o.status === 'preparing' ? undefined
       : !o.rating
-        ? <Btn title="ابعت التقييم" icon="star" disabled={!stars} loading={busy} onPress={() => rpc('rate_order', { p_order: o.id, p_rating: stars, p_review: review.trim() }, 'شكراً على تقييمك')} />
+        ? <Btn title="ابعت التقييم" icon="star" disabled={!stars} loading={busy} onPress={() => rpc('rate_order', { p_order: o.id, p_rating: stars, p_review: review.trim() }, 'شكراً على تقييمك.')} />
         : undefined;
 
   return (
@@ -79,7 +105,7 @@ export default function OrderPage() {
           <View style={{ flex: 1 }}>
             <T w="bold" size={20} color={o.status === 'received' || o.status === 'cancelled' ? colors.ink : '#fff'}>{unpaid ? 'فاضل خطوة الدفع' : orderTitle(o)}</T>
             <T size={13} color={o.status === 'received' || o.status === 'cancelled' ? colors.muted : 'rgba(255,255,255,.7)'}>
-              {o.delivery_mode === 'delivery' ? 'توصيل للبيت' : 'استلام من المحل'}، آخر تحديث {ago(o.updated_at)}
+              {o.delivery_mode === 'delivery' ? 'توصيل لعنوانك' : 'استلام من المحل'} · آخر تحديث {ago(o.updated_at)}
             </T>
           </View>
         </Row>
@@ -102,7 +128,7 @@ export default function OrderPage() {
       {done && o.status !== 'cancelled' ? (
         <Row gap={10} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 14 }}>
           <Icon name="checkmark-circle" size={24} color={colors.good} />
-          <View style={{ flex: 1 }}><T w="bold" size={15}>الأوردر اتأكد مع المحل</T><Muted size={12.5}>إيصالك جاهز، حمّله من تحت.</Muted></View>
+          <View style={{ flex: 1 }}><T w="bold" size={15}>الأوردر اتأكد.</T><Muted size={12.5}>إيصالك جاهز، حمّله من تحت.</Muted></View>
         </Row>
       ) : null}
       {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
@@ -111,10 +137,20 @@ export default function OrderPage() {
         <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.primary, padding: 16, gap: 8, alignItems: 'center' }}>
           <Row gap={6}><Icon name="lock-closed" size={16} color={colors.primary} /><T w="semibold" size={13.5} color={colors.primary}>كود الاستلام</T></Row>
           <T w="bold" size={40} style={{ letterSpacing: 10, lineHeight: 52, writingDirection: 'ltr' }} selectable>{ar(data!.code)}</T>
-          <Muted size={12.5} center>اديه للمحل أو المندوب بعد ما تستلم القطع وتتأكد إنها زي الوصف. الكود ده بيقفل الأوردر، فماتديهوش قبل كده.</Muted>
+          <Muted size={12.5} center>افحص القطعة كويس الأول. لو زي العرض، ادّي الكود للمحل أو المندوب. بعد الكود، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
+          <Muted size={12} center>اتأكد من: الموديل · الجهة · الحالة · زي صورة العرض</Muted>
         </View>
       ) : null}
 
+      {o.refused_at ? (
+        <Row gap={10} style={{ backgroundColor: colors.soft, borderRadius: 16, padding: 14, alignItems: 'flex-start' }}>
+          <Icon name="hand-left" size={20} color={colors.muted} />
+          <View style={{ flex: 1 }}>
+            <T w="semibold" size={14}>رفضت القطعة: {o.refusal_reason}</T>
+            {o.payment_status === 'unpaid' ? <Muted size={12.5}>اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.</Muted> : null}
+          </View>
+        </Row>
+      ) : null}
       <PaymentPanel order={o} shop={priv} />
 
       {/* the shop */}
@@ -134,7 +170,11 @@ export default function OrderPage() {
           </Row>
           {o.delivery_mode === 'pickup' && priv ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
-              <Muted size={13} style={{ flex: 1 }}>{addressLine({ street: priv.street, building: priv.building, area: shop?.area, governorate: shop?.governorate })}{priv.landmark ? ` (${priv.landmark})` : ''}، قول للمحل رقم الأوردر {orderNo(o.order_no)}</Muted></Row>
+              <Muted size={13} style={{ flex: 1 }}>{addressLine({ street: priv.street, building: priv.building, area: shop?.area, governorate: shop?.governorate })}{priv.landmark ? ` (${priv.landmark})` : ''} · قول للمحل رقم الأوردر {orderNo(o.order_no)}</Muted></Row>
+          ) : null}
+          {o.delivery_mode === 'delivery' && o.delivery_address ? (
+            <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
+              <Muted size={13} style={{ flex: 1 }}>التوصيل على: {addressLine(o.delivery_address)}{o.delivery_address.landmark ? ` (${o.delivery_address.landmark})` : ''}</Muted></Row>
           ) : null}
         </Card>
       ) : null}
@@ -149,7 +189,7 @@ export default function OrderPage() {
               <Photo uri={photoUrl(q?.photo_path ?? p.photo_path)} size={48} />
               <View style={{ flex: 1 }}>
                 <T w="semibold" size={14.5}>{p.part}{q?.brand ? ` (${q.brand})` : ''}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
-                <Muted size={12}>{q ? `${CONDITIONS[q.condition]}، ${warrantyLabel(q.warranty_days)}` : ''}</Muted>
+                <Muted size={12}>{q ? `${CONDITIONS[q.condition]} · ${warrantyLabel(q.warranty_days)}` : ''}</Muted>
               </View>
               {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))} ج.م</T> : null}
             </Row>
@@ -182,11 +222,11 @@ export default function OrderPage() {
         o.rating ? (
           <Card>
             <Row gap={4}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={22} color={o.rating! >= n ? colors.accent : colors.line} />)}</Row>
-            {o.review ? <T size={14}>«{o.review}»</T> : <Muted>قيّمت المحل. شكراً!</Muted>}
+            {o.review ? <T size={14}>«{o.review}»</T> : <Muted>شكراً على تقييمك.</Muted>}
           </Card>
         ) : (
           <Card>
-            <T w="bold" size={17}>القطع ركبت تمام؟ قيّم المحل</T>
+            <T w="bold" size={17}>إيه رأيك في المحل؟</T>
             <Row gap={8} style={{ justifyContent: 'center' }}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <Press key={n} onPress={() => setStars(n)} label={ar(n) + ' نجوم'} hitSlop={4}>
@@ -201,8 +241,27 @@ export default function OrderPage() {
 
       <View style={{ gap: 4, alignItems: 'center' }}>
         {firstPart ? <Btn kind="link" title="عندك مشكلة في الأوردر؟" onPress={() => router.push({ pathname: '/assistant', params: { mode: 'complaint', request: firstPart.id } })} /> : null}
-        {o.status === 'preparing' ? <Btn kind="link" title="إلغاء الأوردر (والرجوع للعروض)" loading={busy} onPress={() => rpc('cancel_order', { p_order: o.id }, 'الأوردر اتلغى؛ تقدر تختار عرض تاني')} /> : null}
+        {o.status === 'preparing' ? <Btn kind="link" title="إلغاء الأوردر" onPress={() => setAsk('cancel')} /> : null}
       </View>
+
+      <ConfirmSheet open={ask === 'received'} title="اتأكدت إن القطعة زي العرض؟" body="بعد التأكيد، الاسترجاع بيكون مع المحل حسب القانون." yes="أيوه، استلمت" busy={busy}
+        onYes={() => rpc('receive_order', { p_order: o.id }, 'تمام. إيه رأيك في المحل؟')} onClose={() => setAsk(null)} />
+      <ConfirmSheet open={ask === 'cancel'} title="تلغي الأوردر؟" body="القطع هترجع للطلب وتقدر تختار عرض تاني." yes="أيوه، الغي" danger busy={busy}
+        onYes={() => rpc('cancel_order', { p_order: o.id }, 'الأوردر اتلغى. تقدر تختار عرض تاني.')} onClose={() => setAsk(null)} />
+      <Sheet open={ask === 'refuse'} onClose={() => setAsk(null)} title="ليه رفضتها؟">
+        <View style={{ gap: 14 }}>
+          <Chips options={['موديل غلط', 'جهة غلط', 'حالتها مش زي العرض', 'مش زي الصورة', 'سبب تاني'].map((v) => ({ v, label: v }))} selected={[reason]} onPick={setReason} />
+          {reason === 'سبب تاني' ? <Field value={other} onChangeText={setOther} placeholder="اكتب السبب" /> : null}
+          <Press onPress={async () => { try { const u = await pickPhoto(); if (u) setRefPhoto(u); } catch { toast('الصورة دي مش مدعومة. اختار صورة JPG أو PNG.'); } }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: refPhoto ? colors.good : colors.line }}>
+            {refPhoto ? <Image source={{ uri: refPhoto }} style={{ width: 44, height: 44, borderRadius: 10 }} /> : (
+              <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={20} /></View>
+            )}
+            <T size={13.5} w="medium" style={{ flex: 1 }}>{refPhoto ? 'الصورة اتضافت · تغيير' : 'أضف صورة (اختياري)'}</T>
+          </Press>
+          <Btn kind="danger" title="تأكيد الرفض" loading={busy} disabled={!reason} onPress={refuse} />
+        </View>
+      </Sheet>
     </Screen>
   );
 }

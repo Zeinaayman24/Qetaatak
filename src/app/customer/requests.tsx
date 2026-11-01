@@ -1,8 +1,9 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { View } from 'react-native';
 import { BottomNav } from '@/components/AppHeader';
 import { OrderRow, RowList, StatusTabs, bucketOf, type Bucket } from '@/components/OrderRows';
-import { Empty, Icon, Loading, Muted, Press, Row, Screen, T } from '@/components/ui';
+import { Btn, Empty, Icon, Loading, Muted, Press, Row, Screen, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { ar, elapsed, groupRequests, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive, useNow } from '@/lib/live';
@@ -42,6 +43,21 @@ export default function MyRequests() {
   const tab: Tab = picked ?? (withOffers ? 'quotes' : inTab('ready').length ? 'ready' : inTab('preparing').length ? 'preparing' : openGroups.length ? 'quotes' : 'done');
   const partsOf = (o: Order) => reqs.filter((r) => r.order_id === o.id);
   const list = tab === 'quotes' ? [] : inTab(tab);
+  // requests that closed after 7 days with no order (A16)
+  const expired = tab === 'done' ? groupRequests(reqs).filter((g) => g.items.some((r) => r.status === 'expired') && g.items.every((r) => r.status === 'expired' || r.status === 'cancelled')) : [];
+  const expiredList = expired.length ? (
+    <RowList>
+      {expired.map((g, i) => (
+        <Row key={g.key} gap={8} style={{ paddingHorizontal: 14, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <T w="semibold" size={14.5} numberOfLines={1}>طلب {reqNo(g.first.num)} · {partsLabel(g.items)}</T>
+            <Muted size={12.5}>انتهى من غير أوردر</Muted>
+          </View>
+          <Btn kind="small" title="اطلب تاني" onPress={() => router.push({ pathname: '/customer/new', params: { part: g.first.part, cond: g.first.wanted_condition } })} />
+        </Row>
+      ))}
+    </RowList>
+  ) : null;
 
   return (
     <Screen nav={<BottomNav role="customer" />}>
@@ -81,6 +97,7 @@ export default function MyRequests() {
           </RowList>
         ) : <Empty icon="pricetags-outline" text="مفيش طلبات أسعار مفتوحة." action={{ label: 'اطلب قطعة', onPress: () => router.push('/customer/new') }} />
       ) : list.length ? (
+        <>
         <RowList>
           {list.map((o, i) => {
             const ps = partsOf(o);
@@ -91,7 +108,9 @@ export default function MyRequests() {
             );
           })}
         </RowList>
-      ) : (
+        {expiredList}
+        </>
+      ) : expiredList ? expiredList : (
         <Empty icon={tab === 'done' ? 'time-outline' : 'cube-outline'}
           text={tab === 'done' ? 'لسه مفيش أوردرات خلصت.' : tab === 'ready' ? 'مفيش أوردرات جاهزة دلوقتي.' : 'مفيش أوردرات بتتجهز دلوقتي.\nلما تختار عرض، الأوردر بيظهر هنا.'} />
       )}

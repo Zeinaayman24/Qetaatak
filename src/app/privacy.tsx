@@ -39,7 +39,7 @@ export default function Privacy() {
             <T w="semibold" size={15}>ابعتولي عروض وخصومات من ضغطة</T>
             <Muted size={12.5}>تقدر تقفلها في أي وقت.</Muted>
           </View>
-          <Switch value={on} onValueChange={toggle} disabled={busy} trackColor={{ true: colors.primary, false: colors.line }} accessibilityLabel="ابعتولي عروض وخصومات من ضغطة" />
+          <Switch value={on} onValueChange={toggle} disabled={busy} trackColor={{ true: colors.primary, false: colors.line }} thumbColor="#fff" accessibilityLabel="ابعتولي عروض وخصومات من ضغطة" />
         </Row>
       </Card>
       <Card>

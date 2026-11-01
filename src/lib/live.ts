@@ -75,6 +75,6 @@ export function must<T>(res: { data: T | null; error: any }): T {
 /** Re-renders every `ms` so stopwatches tick. */
 export function useNow(ms = 1000) {
   const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
+  useEffect(() => { if (ms <= 0) return; const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]); // 0 = no ticking
   return now;
 }

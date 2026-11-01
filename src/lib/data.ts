@@ -95,9 +95,9 @@ export const addressLine = (a: { street?: string; building?: string; floor?: str
 export type Request = {
   id: string; num: number; customer_id: string; part: string; car_make: string; car_model: string; car_year: number;
   wanted_condition: 'used' | 'new' | 'any'; area: string; notes: string; photo_path: string | null;
-  status: 'open' | 'chosen' | 'done' | 'cancelled'; chosen_quote_id: string | null; delivery_mode: 'delivery' | 'pickup' | null;
+  status: 'open' | 'chosen' | 'done' | 'cancelled' | 'expired'; chosen_quote_id: string | null; delivery_mode: 'delivery' | 'pickup' | null;
   rating: number | null; created_at: string;
-  vin: string; side: '' | 'right' | 'left' | 'front' | 'rear'; urgency: 'normal' | 'today' | 'urgent'; budget: number | null;
+  vin: string; side: '' | 'right' | 'left' | 'both' | 'front' | 'rear'; urgency: 'normal' | 'today' | 'urgent'; budget: number | null;
   order_status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | null; review: string; done_at?: string | null;
   batch_id: string | null; qty: number; order_id: string | null;
 };
@@ -108,7 +108,7 @@ export type Report = { id: string; ticket_no: number; reporter_id: string; reque
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; kind: 'user' | 'bot' | 'system'; internal?: boolean; created_at: string };
 export const TICKET_STATUS: Record<string, string> = { bot: 'مع المساعد', open: 'مستنية موظف', in_progress: 'بنحلّها', resolved: 'اتحلّت' };
 
-export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', front: 'أمامي', rear: 'خلفي' };
+export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', both: 'الاتنين', front: 'أمامي', rear: 'خلفي' };
 export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };
 export const ORDER_STEPS: { key: string; label: string; pickupLabel?: string }[] = [
   { key: 'preparing', label: 'المحل بيجهّز' },
@@ -122,6 +122,7 @@ export type Quote = {
   photo_path: string | null; created_at: string; brand: string; note: string;
   /** can THIS part be delivered, and an optional fee for it (heavy parts) instead of the shop's distance fees */
   can_deliver: boolean; delivery_fee: number | null;
+  expires_at: string;
 };
 /** A shop can send up to this many offers for one part (different brands / prices). */
 export const MAX_OFFERS = 5;
@@ -135,7 +136,13 @@ export function friendlyError(e: any): string {
   if (/rate limit/i.test(msg)) return 'محاولات كتير. استنى شوية وجرّب تاني.';
   if (/profiles_one_role/i.test(msg)) return 'الحساب ده متسجل بدور تاني. كل حساب يا عميل يا محل.';
   if (/does not deliver/i.test(msg)) return 'المحل ده مش بيوصّل. اختار الاستلام من المحل.';
-  if (/request is closed|cannot choose/i.test(msg)) return 'الطلب ده اتقفل.';
+  if (/request is closed/i.test(msg)) return 'الطلب ده اتقفل.';
+  if (/daily limit/i.test(msg)) return 'وصلت لأقصى عدد طلبات النهارده (٢٠). جرّب بكرة.';
+  if (/offer expired|cannot choose/i.test(msg)) return 'العرض ده انتهى أو المحل سحبه. اختار عرض تاني.';
+  if (/address needed/i.test(msg)) return 'اكتب عنوان التوصيل كامل.';
+  if (/max addresses/i.test(msg)) return 'تقدر تحفظ ٥ عناوين بس. امسح عنوان قديم الأول.';
+  if (/not ready yet/i.test(msg)) return 'الأوردر لسه بيتجهّز.';
+  if (/reason needed/i.test(msg)) return 'اختار سبب الرفض.';
   if (/postal_code/i.test(msg)) return 'الرقم البريدي لازم يكون ٥ أرقام.';
   if (/too many offers/i.test(msg)) return 'وصلت لأقصى عدد عروض (٥) على القطعة دي.';
   if (/balance due/i.test(msg)) return 'عليك عمولة وصلت للحد. سدّد من «حسابك مع ضغطة» عشان تبعت عروض جديدة.';
@@ -184,8 +191,11 @@ export type Order = {
   status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'received' | 'cancelled';
   items_total: number; delivery_fee: number; rating: number | null; review: string;
   created_at: string; updated_at: string; received_at: string | null;
+  delivery_address?: DeliveryAddress | null; refused_at?: string | null; refusal_reason?: string; cancel_reason?: string;
   payment_method: PayMethod; payment_status: PayStatus; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null;
 };
+export type DeliveryAddress = { governorate: string; area: string; street: string; building: string; floor: string; apartment: string; landmark: string; contact_phone: string };
+export type SavedAddress = DeliveryAddress & { id: string; label: string; used_at: string };
 export type PayMethod = 'cash' | 'shop' | 'instapay' | 'card';
 export type PayStatus = 'unpaid' | 'awaiting' | 'review' | 'paid' | 'failed' | 'refund_due' | 'refunded';
 export const orderNo = (n: number) => '#' + ar(n);
@@ -202,7 +212,7 @@ export const ORDER_LABEL: Record<Order['status'], { title: string; short: string
 /** The order's headline, worded for delivery or pickup. */
 export const orderTitle = (o: Pick<Order, 'status' | 'delivery_mode'>) =>
   ['ready', 'out_for_delivery', 'delivered'].includes(o.status)
-    ? (o.delivery_mode === 'delivery' ? 'أوردرك جاهز وخارج ليك' : 'أوردرك جاهز للاستلام من المحل')
+    ? (o.delivery_mode === 'delivery' ? 'أوردرك جاهز وخارج لك' : 'أوردرك جاهز للاستلام من المحل')
     : ORDER_LABEL[o.status].title;
 /** Every order goes through the same three steps: the shop prepares it, it is ready, the customer receives it. */
 export const orderSteps = (_mode?: Order['delivery_mode']): Order['status'][] => ['preparing', 'ready', 'received'];
