@@ -112,7 +112,7 @@ export type Message = { id: string; request_id: string; shop_id: string; sender_
 export type Notification = { id: string; title: string; body: string; link: string; read_at: string | null; created_at: string };
 export type Report = { id: string; ticket_no: number; reporter_id: string; request_id: string | null; category: string; body: string; status: 'bot' | 'open' | 'in_progress' | 'resolved'; admin_reply: string; created_at: string; updated_at: string };
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; kind: 'user' | 'bot' | 'system'; internal?: boolean; created_at: string };
-export const TICKET_STATUS: Record<string, string> = { bot: 'مع المساعد', open: 'مستنية موظف', in_progress: 'بنحلّها', resolved: 'اتحلّت' };
+export const TICKET_STATUS: Record<string, string> = { bot: 'المساعد بيحاول يحلّها', open: 'مستني موظف', in_progress: 'موظف معاك', resolved: 'اتقفلت' };
 
 export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', both: 'الاتنين', front: 'أمامي', rear: 'خلفي' };
 export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };
@@ -147,6 +147,7 @@ export function friendlyError(e: any): string {
   if (/offer expired|cannot choose/i.test(msg)) return 'العرض ده انتهى أو المحل سحبه. اختار عرض تاني.';
   if (/address needed/i.test(msg)) return 'اكتب عنوان التوصيل كامل.';
   if (/max addresses/i.test(msg)) return 'تقدر تحفظ ٥ عناوين بس. امسح عنوان قديم الأول.';
+  if (/shop has open items/i.test(msg)) return 'لازم تكمّل الأوردرات الشغالة، وترجّع أي فلوس لعملاء، وتسدّد العمولة الأول.';
   if (/not ready yet/i.test(msg)) return 'الأوردر لسه بيتجهّز.';
   if (/reason needed/i.test(msg)) return 'اختار سبب الرفض.';
   if (/postal_code/i.test(msg)) return 'الرقم البريدي لازم يكون ٥ أرقام.';

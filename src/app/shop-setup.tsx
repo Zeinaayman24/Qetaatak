@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Image, Linking, Pressable, Text, View } from 'react-native';
 import {
@@ -32,7 +32,8 @@ const NEED: Record<string, [string, number]> = {
 
 export default function ShopSetup() {
   const { ready, session, profile, shop, shopPrivate, refresh } = useAuth();
-  const [step, setStep] = useState(0);
+  const params = useLocalSearchParams<{ step?: string }>();
+  const [step, setStep] = useState(() => Math.min(4, Math.max(0, parseInt(String(params.step ?? '0'), 10) || 0)));
   const [f, setF] = useState({
     name: '', owner: '', phone2: '', photo: null as string | null, photoPath: null as string | null,
     governorate: 'القاهرة', area: '', street: '', building: '', landmark: '', lat: null as number | null, lng: null as number | null,
