@@ -877,4 +877,5 @@ export const EN: Record<string, string> = {
   "أكصدام": "Bumper",
   "اللغة دلوقتي: العربية": "Current language: English",
   "طلب {0} · {1}": "Request {0} · {1}",
+  "صورة المحل": "Shop photo",
 };

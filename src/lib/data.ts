@@ -70,7 +70,7 @@ export const replyLabel = (min: number | null | undefined) =>
   min == null ? t('محل جديد') : min <= 1 ? t('بيرد في دقيقة') : min < 60 ? t('بيرد في {0} د', ar(min)) : t('بيرد في {0} س', ar(Math.round(min / 60)));
 
 /** What the customer sees about a shop that sent an offer. */
-export type ShopCard = { id: string; name: string; area: string; rating: number | null; ratings: number; sales: number; reply_min: number | null };
+export type ShopCard = { id: string; name: string; area: string; rating: number | null; ratings: number; sales: number; reply_min: number | null; photo_path?: string | null };
 
 export const validPhone = (p: string) => /^01\d{9}$/.test(p.replace(/\s/g, ''));
 export const validPostal = (p: string) => p.trim() === '' || /^\d{5}$/.test(toLatin(p.trim()));

@@ -1,6 +1,6 @@
 import { isFeatured } from '@/components/AdBanner';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { Pressable, View, Image } from 'react-native';
 import { BackBar, Chips, Empty, Icon, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { SHOP_TYPES, ago, ar, friendlyError, replyLabel, sinceShort } from '@/lib/data';
@@ -8,9 +8,10 @@ import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { t } from '@/lib/i18n';
+import { photoUrl } from '@/lib/supabase';
 
 type Profile = {
-  shop: { id: string; area: string; governorate: string; shop_type: string; specialties: string[]; brands: string[]; offers_delivery: boolean; since: string; name?: string; reply_min?: number | null } | null;
+  shop: { id: string; area: string; governorate: string; shop_type: string; specialties: string[]; brands: string[]; offers_delivery: boolean; since: string; name?: string; reply_min?: number | null; photo_path?: string | null } | null;
   sales: number; rating: number | null; ratings: number;
   reviews: { rating: number; review: string; part: string; at: string; first_name: string }[];
 };
@@ -45,8 +46,9 @@ export default function ShopProfile() {
     <Screen>
       <BackBar title={t('المحل')} onBack={back} />
       <Row gap={14} style={{ alignItems: 'flex-start' }}>
-        <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="storefront" size={30} />
+        <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {s.photo_path ? <Image source={{ uri: photoUrl(s.photo_path)! }} style={{ width: 64, height: 64 }} accessibilityLabel={t('صورة المحل')} />
+            : <Icon name="storefront" size={30} />}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <T w="bold" size={20}>{s.name ?? t('محل في ') + s.area}</T>

@@ -442,6 +442,7 @@ function OfferRow({ q, card, fee, on, cheapest, featured, expired, now, qty, onP
       style={{ gap: 12, padding: 16, borderRadius: 16, backgroundColor: colors.surface, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.line, opacity: expired ? 0.55 : 1 }}>
       <Row gap={12} style={{ alignItems: 'flex-start' }}>
         <View style={{ width: 24, height: 24, marginTop: 2, borderRadius: 12, borderWidth: on ? 7 : 2, borderColor: on ? colors.primary : '#C9D0DA' }} />
+        {card?.photo_path ? <Image source={{ uri: photoUrl(card.photo_path)! }} style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.soft }} accessibilityLabel={t('صورة المحل')} /> : null}
         <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
           <Pressable onPress={() => router.push(`/shop-profile/${q.shop_id}`)} hitSlop={4} accessibilityRole="link">
             <T w="semibold" size={16} numberOfLines={1}>{card?.name ?? t('محل موثّق')}</T>

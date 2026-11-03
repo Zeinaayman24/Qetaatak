@@ -1,13 +1,13 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Image, Pressable, View } from 'react-native';
 import { ConfirmSheet } from '@/components/Confirm';
 import { BottomNav } from '@/components/AppHeader';
 import { Icon, Loading, Muted, Pill, Row, Screen, T, toast } from '@/components/ui';
 import { InstallCard } from '@/components/InstallCard';
 import { useAuth } from '@/lib/auth';
 import { SHOP_TYPES, addressLine, ar, friendlyError } from '@/lib/data';
-import { supabase } from '@/lib/supabase';
+import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { t, dir, isEn, setLang, startAlign } from '@/lib/i18n';
 
@@ -109,9 +109,10 @@ function ShopAccount() {
   return (
     <Screen nav={<BottomNav role="shop" />}>
       <Row gap={14}>
-        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="storefront" size={26} color="#fff" />
-        </View>
+        <Pressable onPress={() => setup(0)} accessibilityRole="button" accessibilityLabel={t('صورة المحل')}
+          style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          {shop?.photo_path ? <Image source={{ uri: photoUrl(shop.photo_path)! }} style={{ width: 60, height: 60 }} /> : <Icon name="storefront" size={26} color="#fff" />}
+        </Pressable>
         <View style={{ flex: 1, gap: 2 }}>
           <T w="bold" size={20}>{shopPrivate?.name}</T>
           <Muted size={13}><T size={13} color={colors.muted} style={{ writingDirection: 'ltr' }}>{profile.phone || session?.user.email}</T> {t('· صاحب المحل')}</Muted>
