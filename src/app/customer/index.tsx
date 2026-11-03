@@ -5,7 +5,7 @@ import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { Logo } from '@/components/Brand';
 import { MakeLogo } from '@/components/MakeLogo';
-import { carLabel, usePreloadModels, homeMakes, isElectrified, makeByName, makeName, ptShort, useMakes } from '@/lib/catalogue';
+import { carLabel, usePreloadModels, isElectrified, makeByName, ptShort, useMakes } from '@/lib/catalogue';
 import { Btn, Icon, Loading, Muted, Pill, Press, Row, Screen, Section, T } from '@/components/ui';
 import { OrderRow, RowList } from '@/components/OrderRows';
 import { AdBanner } from '@/components/AdBanner';
@@ -122,18 +122,6 @@ export default function CustomerHome() {
         </Press>
       ) : null}
 
-      {makes?.length ? (
-        <Section title={t('الماركات')} action={{ label: t('كل الماركات'), onPress: () => router.push('/brands') }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
-            {homeMakes(makes).slice(0, 8).map((m) => (
-              <Press key={m.id} onPress={() => router.push({ pathname: '/cars', params: { make: m.id } })} label={m.name_ar} style={{ width: '25%', alignItems: 'center', gap: 6 }}>
-                <MakeLogo make={m} size={60} />
-                <T size={12.5} w="medium" numberOfLines={1}>{makeName(m)}</T>
-              </Press>
-            ))}
-          </View>
-        </Section>
-      ) : null}
 
       <View style={{ gap: 14 }}>
         <T w="bold" size={17}>{t('اختار من الأقسام')}</T>
