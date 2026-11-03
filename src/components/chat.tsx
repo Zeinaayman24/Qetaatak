@@ -4,6 +4,7 @@ import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, Sc
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, Muted, T, ToastHost } from '@/components/ui';
 import { colors, fonts } from '@/lib/theme';
+import { t, dir, startAlign } from '@/lib/i18n';
 
 /* Shared pieces of the assistant / customer-service chat. */
 
@@ -26,7 +27,7 @@ export function ChatFrame({ subtitle, live, onBack, right, messages, typing, chi
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.ground }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={{ paddingTop: insets.top, borderBottomWidth: 1, borderColor: colors.line }}>
         <View style={[W, { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 }]}>
-          <Pressable onPress={onBack} hitSlop={10} accessibilityRole="button" accessibilityLabel="رجوع"
+          <Pressable onPress={onBack} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('رجوع')}
             style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="chevron-forward" size={20} />
           </Pressable>
@@ -34,10 +35,10 @@ export function ChatFrame({ subtitle, live, onBack, right, messages, typing, chi
             <Icon name={avatar === 'agent' ? 'headset' : 'sparkles'} size={19} color={avatar === 'agent' ? colors.ink : colors.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <T w="bold" size={16}>{avatar === 'agent' ? 'خدمة العملاء' : 'مساعد ضغطة'}</T>
+            <T w="bold" size={16}>{avatar === 'agent' ? t('خدمة العملاء') : t('مساعد ضغطة')}</T>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: live === false ? colors.faint : colors.good }} />
-              <Muted size={12} numberOfLines={1}>{typing ? 'بيكتب…' : subtitle}</Muted>
+              <Muted size={12} numberOfLines={1}>{typing ? t('بيكتب…') : subtitle}</Muted>
             </View>
           </View>
           {right}
@@ -79,11 +80,11 @@ export function ChatFrame({ subtitle, live, onBack, right, messages, typing, chi
                 onSubmitEditing={() => canSend && composer.onSend()} submitBehavior="submit" returnKeyType="send"
                 style={{
                   flex: 1, minHeight: 46, maxHeight: 120, borderRadius: 23, backgroundColor: colors.card, paddingHorizontal: 16, paddingVertical: 11,
-                  fontFamily: fonts.regular, fontSize: 15, color: colors.ink, textAlign: 'right', writingDirection: 'rtl',
+                  fontFamily: fonts.regular, fontSize: 15, color: colors.ink, textAlign: startAlign(), writingDirection: dir(),
                   ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : {}),
                 }}
               />
-              <Pressable onPress={composer.onSend} disabled={!canSend} accessibilityRole="button" accessibilityLabel="ابعت"
+              <Pressable onPress={composer.onSend} disabled={!canSend} accessibilityRole="button" accessibilityLabel={t('ابعت')}
                 style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: canSend ? colors.ink : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="arrow-up" size={20} color={canSend ? '#fff' : colors.faint} />
               </Pressable>

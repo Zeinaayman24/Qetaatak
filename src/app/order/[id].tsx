@@ -15,6 +15,7 @@ import { needsPayment } from '@/lib/payments';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 type Data = { order: Order | null; parts: Request[]; quotes: Quote[]; shop: Shop | null; priv: ShopPrivate | null; code: string | null };
 
@@ -47,7 +48,7 @@ export default function OrderPage() {
   const back = () => (router.canGoBack() ? router.back() : router.replace('/customer/requests'));
   if (loading && !data) return <Screen><Loading /></Screen>;
   const o = data?.order;
-  if (!o) return <Screen><BackBar title="الأوردر" onBack={back} /><Empty text="الأوردر ده مش موجود." /></Screen>;
+  if (!o) return <Screen><BackBar title={t('الأوردر')} onBack={back} /><Empty text={t('الأوردر ده مش موجود.')} /></Screen>;
   const { parts, quotes, shop, priv } = data!;
   const steps = orderSteps(o.delivery_mode);
   const at = orderStep(o);
@@ -68,15 +69,15 @@ export default function OrderPage() {
   const isReady = ['ready', 'out_for_delivery', 'delivered'].includes(o.status);
   const total = Number(o.items_total) + Number(o.delivery_fee);
   async function refuse() {
-    const why = reason === 'سبب تاني' ? other.trim() : reason;
-    if (!why) return toast('اختار سبب الرفض.');
+    const why = reason === t('سبب تاني') ? other.trim() : reason;
+    if (!why) return toast(t('اختار سبب الرفض.'));
     setBusy(true);
     try {
       const path = refPhoto && session ? await uploadPhoto(refPhoto, session.user.id) : null;
       const { error } = await supabase.rpc('refuse_order', { p_order: o!.id, p_reason: why, p_photo: path });
       if (error) throw error;
       setAsk(null);
-      toast(o!.payment_status === 'paid' ? `اتسجّل إنك رفضت القطعة. المحل لازم يرجّعلك ${money(total)} ج.م، وهنتابع معاه.` : 'اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.');
+      toast(o!.payment_status === 'paid' ? t('اتسجّل إنك رفضت القطعة. المحل لازم يرجّعلك {0} ج.م، وهنتابع معاه.', money(total)) : t('اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.'));
     } catch (e) { toast(friendlyError(e)); }
     setBusy(false);
   }
@@ -85,24 +86,24 @@ export default function OrderPage() {
     : isReady
       ? (
         <>
-          <Btn title="استلمت الأوردر" onPress={() => setAsk('received')} />
-          <Btn kind="danger" title="القطعة مش زي العرض؟ ارفضها" onPress={() => setAsk('refuse')} style={{ minHeight: 40 }} />
+          <Btn title={t('استلمت الأوردر')} onPress={() => setAsk('received')} />
+          <Btn kind="danger" title={t('القطعة مش زي العرض؟ ارفضها')} onPress={() => setAsk('refuse')} style={{ minHeight: 40 }} />
         </>
       )
       : o.status === 'preparing' ? undefined
       : !o.rating
-        ? <Btn title="ابعت التقييم" icon="star" disabled={!stars} loading={busy} onPress={() => rpc('rate_order', { p_order: o.id, p_rating: stars, p_review: review.trim() }, 'شكراً على تقييمك.')} />
+        ? <Btn title={t('ابعت التقييم')} icon="star" disabled={!stars} loading={busy} onPress={() => rpc('rate_order', { p_order: o.id, p_rating: stars, p_review: review.trim() }, t('شكراً على تقييمك.'))} />
         : undefined;
 
   return (
     <Screen footer={footer}>
-      <BackBar title={'أوردر ' + orderNo(o.order_no)} onBack={back} />
+      <BackBar title={t('أوردر ') + orderNo(o.order_no)} onBack={back} />
 
       {/* live status: light, one line of what is happening, a simple progress bar */}
       <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 18, gap: 16 }}>
         <View style={{ gap: 2 }}>
-          <T w="bold" size={22} style={{ lineHeight: 32 }} color={o.status === 'cancelled' ? colors.bad : colors.ink}>{unpaid ? 'فاضل خطوة الدفع' : orderTitle(o)}</T>
-          <Muted size={14}>{o.delivery_mode === 'delivery' ? 'توصيل لعنوانك' : 'استلام من المحل'} · آخر تحديث {ago(o.updated_at)}</Muted>
+          <T w="bold" size={22} style={{ lineHeight: 32 }} color={o.status === 'cancelled' ? colors.bad : colors.ink}>{unpaid ? t('فاضل خطوة الدفع') : orderTitle(o)}</T>
+          <Muted size={14}>{o.delivery_mode === 'delivery' ? t('توصيل لعنوانك') : t('استلام من المحل')} {t('· آخر تحديث')}{' '}{ago(o.updated_at)}</Muted>
         </View>
         {o.status !== 'cancelled' ? (
           <Row gap={6}>
@@ -122,15 +123,15 @@ export default function OrderPage() {
       {done && o.status !== 'cancelled' ? (
         <Row gap={10} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 14 }}>
           <Icon name="checkmark-circle" size={24} color={colors.good} />
-          <View style={{ flex: 1 }}><T w="bold" size={15}>الأوردر اتأكد.</T><Muted size={12.5}>إيصالك جاهز، حمّله من تحت.</Muted></View>
+          <View style={{ flex: 1 }}><T w="bold" size={15}>{t('الأوردر اتأكد.')}</T><Muted size={12.5}>{t('إيصالك جاهز، حمّله من تحت.')}</Muted></View>
         </Row>
       ) : null}
 
       {data!.code && o.status !== 'received' && o.status !== 'cancelled' ? (
         <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 20, gap: 8, alignItems: 'center' }}>
-          <Muted size={14}>كود الاستلام</Muted>
+          <Muted size={14}>{t('كود الاستلام')}</Muted>
           <T w="bold" size={44} style={{ letterSpacing: 10, lineHeight: 56, writingDirection: 'ltr' }} selectable>{ar(data!.code)}</T>
-          <Muted size={13.5} center>افحص القطعة الأول: الموديل، الجهة، الحالة، وإنها زي صورة العرض. لو زي العرض، ادّي الكود للمحل أو المندوب. بعد الكود، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
+          <Muted size={13.5} center>{t('افحص القطعة الأول: الموديل، الجهة، الحالة، وإنها زي صورة العرض. لو زي العرض، ادّي الكود للمحل أو المندوب. بعد الكود، الاسترجاع بيكون مع المحل حسب القانون.')}</Muted>
         </View>
       ) : null}
 
@@ -138,8 +139,8 @@ export default function OrderPage() {
         <Row gap={10} style={{ backgroundColor: colors.soft, borderRadius: 16, padding: 14, alignItems: 'flex-start' }}>
           <Icon name="hand-left" size={20} color={colors.muted} />
           <View style={{ flex: 1 }}>
-            <T w="semibold" size={14}>رفضت القطعة: {o.refusal_reason}</T>
-            {o.payment_status === 'unpaid' ? <Muted size={12.5}>اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.</Muted> : null}
+            <T w="semibold" size={14}>{t('رفضت القطعة:')}{' '}{o.refusal_reason}</T>
+            {o.payment_status === 'unpaid' ? <Muted size={12.5}>{t('اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.')}</Muted> : null}
           </View>
         </Row>
       ) : null}
@@ -149,42 +150,42 @@ export default function OrderPage() {
       {o.status !== 'cancelled' ? (
         <Card>
           <Row gap={10}>
-            <Press onPress={() => router.push(`/shop-profile/${o.shop_id}`)} label="صفحة المحل" role="link" style={{ flex: 1 }}>
-              <T w="semibold" size={16}>{priv?.name ?? 'المحل'}</T>
-              <Muted size={13}>{shop?.area}، {shop?.governorate}</Muted>
+            <Press onPress={() => router.push(`/shop-profile/${o.shop_id}`)} label={t('صفحة المحل')} role="link" style={{ flex: 1 }}>
+              <T w="semibold" size={16}>{priv?.name ?? t('المحل')}</T>
+              <Muted size={13}>{shop?.area}{t('،')}{' '}{shop?.governorate}</Muted>
             </Press>
-            {firstPart ? <IconButton name="chatbubble-ellipses" label="رسالة للمحل" size={44} onPress={() => router.push(`/chat/${firstPart.id}/${o.shop_id}`)} /> : null}
-            {priv?.phone ? <IconButton name="call" label="اتصل بالمحل" size={44} onPress={() => Linking.openURL('tel:' + priv.phone)} /> : null}
+            {firstPart ? <IconButton name="chatbubble-ellipses" label={t('رسالة للمحل')} size={44} onPress={() => router.push(`/chat/${firstPart.id}/${o.shop_id}`)} /> : null}
+            {priv?.phone ? <IconButton name="call" label={t('اتصل بالمحل')} size={44} onPress={() => Linking.openURL('tel:' + priv.phone)} /> : null}
           </Row>
           {o.delivery_mode === 'pickup' && priv ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
-              <Muted size={13} style={{ flex: 1 }}>{addressLine({ street: priv.street, building: priv.building, area: shop?.area, governorate: shop?.governorate })}{priv.landmark ? ` (${priv.landmark})` : ''} · قول للمحل رقم الأوردر {orderNo(o.order_no)}</Muted></Row>
+              <Muted size={13} style={{ flex: 1 }}>{addressLine({ street: priv.street, building: priv.building, area: shop?.area, governorate: shop?.governorate })}{priv.landmark ? ` (${priv.landmark})` : ''} {t('· قول للمحل رقم الأوردر')}{' '}{orderNo(o.order_no)}</Muted></Row>
           ) : null}
           {o.delivery_mode === 'delivery' && o.delivery_address ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
-              <Muted size={13} style={{ flex: 1 }}>التوصيل على: {addressLine(o.delivery_address)}{o.delivery_address.landmark ? ` (${o.delivery_address.landmark})` : ''}</Muted></Row>
+              <Muted size={13} style={{ flex: 1 }}>{t('التوصيل على:')}{' '}{addressLine(o.delivery_address)}{o.delivery_address.landmark ? ` (${o.delivery_address.landmark})` : ''}</Muted></Row>
           ) : null}
         </Card>
       ) : null}
 
       {/* parts + receipt */}
       <Card>
-        <T w="bold" size={16}>القطع ({ar(parts.length)})</T>
+        <T w="bold" size={16}>{t('القطع (')}{ar(parts.length)})</T>
         {parts.map((p) => {
           const q = quoteOf(p);
           return (
             <Row key={p.id} gap={12}>
               <Photo uri={photoUrl(q?.photo_path ?? p.photo_path)} size={48} />
               <View style={{ flex: 1 }}>
-                <T w="semibold" size={14.5}>{p.part}{q?.brand ? ` (${q.brand})` : ''}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
+                <T w="semibold" size={14.5}>{t(p.part)}{q?.brand ? ` (${q.brand})` : ''}{p.qty > 1 ? ` × ${ar(p.qty)}` : ''}</T>
                 <Muted size={12}>{q ? `${CONDITIONS[q.condition]} · ${warrantyLabel(q.warranty_days)}` : ''}</Muted>
               </View>
-              {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))} ج.م</T> : null}
+              {q ? <T w="semibold" size={14}>{money(q.price * (p.qty || 1))} {t('ج.م')}</T> : null}
             </Row>
           );
         })}
         <View style={{ height: 1, backgroundColor: colors.line }} />
-        <Lines rows={[['القطع', money(o.items_total) + ' ج.م'], ['التوصيل', o.delivery_fee ? money(o.delivery_fee) + ' ج.م' : 'مجاناً']]} total={['الإجمالي', money(Number(o.items_total) + Number(o.delivery_fee)) + ' ج.م']} />
+        <Lines rows={[[t('القطع'), money(o.items_total) + t(' ج.م')], [t('التوصيل'), o.delivery_fee ? money(o.delivery_fee) + t(' ج.م') : t('مجاناً')]]} total={[t('الإجمالي'), money(Number(o.items_total) + Number(o.delivery_fee)) + t(' ج.م')]} />
       </Card>
 
       {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
@@ -193,8 +194,8 @@ export default function OrderPage() {
         <Row gap={12} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 16 }}>
           <Icon name="shield-checkmark" size={26} color={colors.good} />
           <View style={{ flex: 1 }}>
-            <T w="bold" size={14.5}>ضمان المحل لحد {warrantyEnd.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</T>
-            <Muted size={12.5}>لو ظهر عيب في القطعة خلال المدة دي، كلّم المحل. ولو مردّش، بلّغنا وهنوصّل شكوتك للمحل.</Muted>
+            <T w="bold" size={14.5}>{t('ضمان المحل لحد')}{' '}{warrantyEnd.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</T>
+            <Muted size={12.5}>{t('لو ظهر عيب في القطعة خلال المدة دي، كلّم المحل. ولو مردّش، بلّغنا وهنوصّل شكوتك للمحل.')}</Muted>
           </View>
         </Row>
       ) : null}
@@ -203,44 +204,44 @@ export default function OrderPage() {
         o.rating ? (
           <Card>
             <Row gap={4}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={22} color={o.rating! >= n ? '#E8A317' : colors.line} />)}</Row>
-            {o.review ? <T size={14}>«{o.review}»</T> : <Muted>شكراً على تقييمك.</Muted>}
+            {o.review ? <T size={14}>«{o.review}»</T> : <Muted>{t('شكراً على تقييمك.')}</Muted>}
           </Card>
         ) : (
           <Card>
-            <T w="bold" size={17}>إيه رأيك في المحل؟</T>
+            <T w="bold" size={17}>{t('إيه رأيك في المحل؟')}</T>
             <Row gap={8} style={{ justifyContent: 'center' }}>
               {[1, 2, 3, 4, 5].map((n) => (
-                <Press key={n} onPress={() => setStars(n)} label={ar(n) + ' نجوم'} hitSlop={4}>
+                <Press key={n} onPress={() => setStars(n)} label={ar(n) + t(' نجوم')} hitSlop={4}>
                   <Icon name={stars >= n ? 'star' : 'star-outline'} size={40} color={stars >= n ? '#E8A317' : colors.faint} />
                 </Press>
               ))}
             </Row>
-            <Field value={review} onChangeText={setReview} multiline placeholder="اكتب رأيك في المحل والقطع (اختياري)" />
+            <Field value={review} onChangeText={setReview} multiline placeholder={t('اكتب رأيك في المحل والقطع (اختياري)')} />
           </Card>
         )
       ) : null}
 
       <View style={{ gap: 4, alignItems: 'center' }}>
-        {firstPart ? <Btn kind="link" title="عندك مشكلة في الأوردر؟" onPress={() => router.push({ pathname: '/assistant', params: { mode: 'complaint', request: firstPart.id } })} /> : null}
-        {o.status === 'preparing' ? <Btn kind="link" title="إلغاء الأوردر" onPress={() => setAsk('cancel')} /> : null}
+        {firstPart ? <Btn kind="link" title={t('عندك مشكلة في الأوردر؟')} onPress={() => router.push({ pathname: '/assistant', params: { mode: 'complaint', request: firstPart.id } })} /> : null}
+        {o.status === 'preparing' ? <Btn kind="link" title={t('إلغاء الأوردر')} onPress={() => setAsk('cancel')} /> : null}
       </View>
 
-      <ConfirmSheet open={ask === 'received'} title="اتأكدت إن القطعة زي العرض؟" body="بعد التأكيد، الاسترجاع بيكون مع المحل حسب القانون." yes="أيوه، استلمت" busy={busy}
-        onYes={() => rpc('receive_order', { p_order: o.id }, 'تمام. إيه رأيك في المحل؟')} onClose={() => setAsk(null)} />
-      <ConfirmSheet open={ask === 'cancel'} title="تلغي الأوردر؟" body="القطع هترجع للطلب وتقدر تختار عرض تاني." yes="أيوه، الغي" danger busy={busy}
-        onYes={() => rpc('cancel_order', { p_order: o.id }, 'الأوردر اتلغى. تقدر تختار عرض تاني.')} onClose={() => setAsk(null)} />
-      <Sheet open={ask === 'refuse'} onClose={() => setAsk(null)} title="ليه رفضتها؟">
+      <ConfirmSheet open={ask === 'received'} title={t('اتأكدت إن القطعة زي العرض؟')} body={t('بعد التأكيد، الاسترجاع بيكون مع المحل حسب القانون.')} yes={t('أيوه، استلمت')} busy={busy}
+        onYes={() => rpc('receive_order', { p_order: o.id }, t('تمام. إيه رأيك في المحل؟'))} onClose={() => setAsk(null)} />
+      <ConfirmSheet open={ask === 'cancel'} title={t('تلغي الأوردر؟')} body={t('القطع هترجع للطلب وتقدر تختار عرض تاني.')} yes={t('أيوه، الغي')} danger busy={busy}
+        onYes={() => rpc('cancel_order', { p_order: o.id }, t('الأوردر اتلغى. تقدر تختار عرض تاني.'))} onClose={() => setAsk(null)} />
+      <Sheet open={ask === 'refuse'} onClose={() => setAsk(null)} title={t('ليه رفضتها؟')}>
         <View style={{ gap: 14 }}>
-          <Chips options={['موديل غلط', 'جهة غلط', 'حالتها مش زي العرض', 'مش زي الصورة', 'سبب تاني'].map((v) => ({ v, label: v }))} selected={[reason]} onPick={setReason} />
-          {reason === 'سبب تاني' ? <Field value={other} onChangeText={setOther} placeholder="اكتب السبب" /> : null}
-          <Press onPress={async () => { try { const u = await pickPhoto(); if (u) setRefPhoto(u); } catch { toast('الصورة دي مش مدعومة. اختار صورة JPG أو PNG.'); } }}
+          <Chips options={[t('موديل غلط'), t('جهة غلط'), t('حالتها مش زي العرض'), t('مش زي الصورة'), t('سبب تاني')].map((v) => ({ v, label: v }))} selected={[reason]} onPick={setReason} />
+          {reason === t('سبب تاني') ? <Field value={other} onChangeText={setOther} placeholder={t('اكتب السبب')} /> : null}
+          <Press onPress={async () => { try { const u = await pickPhoto(); if (u) setRefPhoto(u); } catch { toast(t('الصورة دي مش مدعومة. اختار صورة JPG أو PNG.')); } }}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: refPhoto ? colors.good : colors.line }}>
             {refPhoto ? <Image source={{ uri: refPhoto }} style={{ width: 44, height: 44, borderRadius: 10 }} /> : (
               <View style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={20} /></View>
             )}
-            <T size={13.5} w="medium" style={{ flex: 1 }}>{refPhoto ? 'الصورة اتضافت · تغيير' : 'أضف صورة (اختياري)'}</T>
+            <T size={13.5} w="medium" style={{ flex: 1 }}>{refPhoto ? t('الصورة اتضافت · تغيير') : t('أضف صورة (اختياري)')}</T>
           </Press>
-          <Btn kind="danger" title="تأكيد الرفض" loading={busy} disabled={!reason} onPress={refuse} />
+          <Btn kind="danger" title={t('تأكيد الرفض')} loading={busy} disabled={!reason} onPress={refuse} />
         </View>
       </Sheet>
     </Screen>

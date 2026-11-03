@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { BackBar, Empty, Muted, Press, Row, Screen, T } from '@/components/ui';
 import { LEGAL, LEGAL_LINKS, LEGAL_VERSION, type LegalKey } from '@/lib/legal';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 /** Splits "a **b** c" into plain and bold runs. */
 function Rich({ text, size = 14.5 }: { text: string; size?: number }) {
@@ -19,11 +20,11 @@ export default function LegalPage() {
   const { doc } = useLocalSearchParams<{ doc: string }>();
   const d = LEGAL[doc as LegalKey];
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
-  if (!d) return <Screen><BackBar title="الشروط" onBack={back} /><Empty text="الصفحة دي مش موجودة." /></Screen>;
+  if (!d) return <Screen><BackBar title={t('الشروط')} onBack={back} /><Empty text={t('الصفحة دي مش موجودة.')} /></Screen>;
   return (
     <Screen>
       <BackBar title={d.title} onBack={back} />
-      <Muted size={12.5}>آخر تحديث: {d.updated} · نسخة {LEGAL_VERSION}</Muted>
+      <Muted size={12.5}>{t('آخر تحديث:')}{' '}{d.updated} {t('· نسخة')}{' '}{LEGAL_VERSION}</Muted>
       <View style={{ gap: 12 }}>
         {d.blocks.map((b, i) => {
           if ('h' in b) return <T key={i} w="bold" size={17} style={{ marginTop: 8 }}>{b.h}</T>;

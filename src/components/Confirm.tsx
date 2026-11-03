@@ -1,9 +1,10 @@
 import { View } from 'react-native';
 import { colors } from '@/lib/theme';
 import { Btn, Icon, Muted, Row, Sheet, T } from './ui';
+import { t } from '@/lib/i18n';
 
 /** A yes/no question before something that can't be undone (cancel a request, cancel an order, mark received). */
-export function ConfirmSheet({ open, title, body, yes, no = 'لأ', danger, busy, onYes, onClose }: {
+export function ConfirmSheet({ open, title, body, yes, no = t('لأ'), danger, busy, onYes, onClose }: {
   open: boolean; title: string; body?: string; yes: string; no?: string; danger?: boolean; busy?: boolean; onYes: () => void; onClose: () => void;
 }) {
   return (
@@ -22,13 +23,13 @@ export function ConfirmSheet({ open, title, body, yes, no = 'لأ', danger, busy
 /** «ضمان ضغطة»: what the customer gets when the order is confirmed in the app (Product Register A17, term 27). */
 export function GuaranteeSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const lines: [string, string][] = [
-    ['pricetag', 'السعر ثابت، مفيش زيادة عند الاستلام'],
-    ['search', 'افحص القطعة قبل ما تستلم، ولو مش زي العرض ارفضها ومتدفعش'],
-    ['document-text', 'الضمان مكتوب في إيصالك'],
-    ['headset', 'فريق الدعم معاك لو حصلت مشكلة'],
+    ['pricetag', t('السعر ثابت، مفيش زيادة عند الاستلام')],
+    ['search', t('افحص القطعة قبل ما تستلم، ولو مش زي العرض ارفضها ومتدفعش')],
+    ['document-text', t('الضمان مكتوب في إيصالك')],
+    ['headset', t('فريق الدعم معاك لو حصلت مشكلة')],
   ];
   return (
-    <Sheet open={open} onClose={onClose} title="ضمان ضغطة">
+    <Sheet open={open} onClose={onClose} title={t('ضمان ضغطة')}>
       <View style={{ gap: 14 }}>
         {lines.map(([icon, text]) => (
           <Row key={text} gap={12} style={{ alignItems: 'flex-start' }}>
@@ -38,7 +39,7 @@ export function GuaranteeSheet({ open, onClose }: { open: boolean; onClose: () =
             <T size={14.5} style={{ flex: 1, lineHeight: 24 }}>{text}</T>
           </Row>
         ))}
-        <Muted size={12.5}>الضمان ده للأوردرات اللي بتتأكد من ضغطة بس.</Muted>
+        <Muted size={12.5}>{t('الضمان ده للأوردرات اللي بتتأكد من ضغطة بس.')}</Muted>
       </View>
     </Sheet>
   );

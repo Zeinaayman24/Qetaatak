@@ -3,10 +3,11 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { BackBar, Chips, Empty, Icon, Loading, Muted, Pill, Row, Screen, Section, Stats, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { SHOP_TYPES, ago, ar, friendlyError, replyLabel } from '@/lib/data';
+import { SHOP_TYPES, ago, ar, friendlyError, replyLabel, sinceShort } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 type Profile = {
   shop: { id: string; area: string; governorate: string; shop_type: string; specialties: string[]; brands: string[]; offers_delivery: boolean; since: string; name?: string; reply_min?: number | null } | null;
@@ -30,35 +31,35 @@ export default function ShopProfile() {
   const back = () => (router.canGoBack() ? router.back() : router.replace('/'));
   if (loading && !data) return <Screen><Loading /></Screen>;
   const p = data?.p;
-  if (!p?.shop) return <Screen><BackBar title="المحل" onBack={back} /><Empty text="المحل ده مش متاح." /></Screen>;
+  if (!p?.shop) return <Screen><BackBar title={t('المحل')} onBack={back} /><Empty text={t('المحل ده مش متاح.')} /></Screen>;
   const s = p.shop;
 
   async function toggleFav() {
     const { error } = data!.fav
       ? await supabase.from('favorites').delete().eq('customer_id', uid!).eq('shop_id', id)
       : await supabase.from('favorites').insert({ shop_id: id });
-    if (error) toast(friendlyError(error)); else { toast(data!.fav ? 'اتشال من المفضلة' : 'اتضاف للمفضلة'); reload(); }
+    if (error) toast(friendlyError(error)); else { toast(data!.fav ? t('اتشال من المفضلة') : t('اتضاف للمفضلة')); reload(); }
   }
 
   return (
     <Screen>
-      <BackBar title="المحل" onBack={back} />
+      <BackBar title={t('المحل')} onBack={back} />
       <Row gap={14} style={{ alignItems: 'flex-start' }}>
         <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="storefront" size={30} />
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <T w="bold" size={20}>{s.name ?? 'محل في ' + s.area}</T>
-          <Muted size={13}>{s.area}، {replyLabel(s.reply_min)}</Muted>
-          {isFeatured({ featured_until: data?.featured }) ? <Pill label="محل مميز" icon="star" tone="wait" /> : null}
-          <Muted>{s.governorate}، {SHOP_TYPES[s.shop_type]}</Muted>
+          <T w="bold" size={20}>{s.name ?? t('محل في ') + s.area}</T>
+          <Muted size={13}>{s.area}{t('،')}{' '}{replyLabel(s.reply_min)}</Muted>
+          {isFeatured({ featured_until: data?.featured }) ? <Pill label={t('محل مميز')} icon="star" tone="wait" /> : null}
+          <Muted>{s.governorate}{t('،')}{' '}{SHOP_TYPES[s.shop_type]}</Muted>
           <Row gap={6} style={{ marginTop: 4, flexWrap: 'wrap' }}>
-            <Pill label={s.offers_delivery ? 'بيوصّل' : 'استلام من المحل'} />
-            <Pill label="موثّق من ضغطة" tone="good" />
+            <Pill label={s.offers_delivery ? t('بيوصّل') : t('استلام من المحل')} />
+            <Pill label={t('موثّق من ضغطة')} tone="good" />
           </Row>
         </View>
         {profile?.is_customer ? (
-          <Pressable onPress={toggleFav} accessibilityLabel={data!.fav ? 'شيل من المفضلة' : 'أضف للمفضلة'} hitSlop={8}
+          <Pressable onPress={toggleFav} accessibilityLabel={data!.fav ? t('شيل من المفضلة') : t('أضف للمفضلة')} hitSlop={8}
             style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name={data!.fav ? 'heart' : 'heart-outline'} size={22} color={data!.fav ? colors.bad : colors.ink} />
           </Pressable>
@@ -66,29 +67,29 @@ export default function ShopProfile() {
       </Row>
 
       <Stats items={[
-        [p.rating ? ar(p.rating) + ' ★' : '—', p.ratings ? ar(p.ratings) + ' تقييم' : 'لسه مفيش تقييم'],
-        [ar(p.sales), 'قطعة اتباعت'],
-        [ago(s.since).replace('من ', ''), 'على ضغطة'],
+        [p.rating ? ar(p.rating) + ' ★' : '—', p.ratings ? t('{0} تقييم', ar(p.ratings)) : t('لسه مفيش تقييم')],
+        [ar(p.sales), t('قطعة اتباعت')],
+        [t('من {0}', sinceShort(s.since)), t('على ضغطة')],
       ]} />
 
-      <Section title="التخصص">
+      <Section title={t('التخصص')}>
         <View style={{ marginTop: 6 }}><Chips options={s.specialties.map((x) => ({ v: x, label: x }))} selected={[]} onPick={() => {}} /></View>
       </Section>
-      <Section title="الماركات">
+      <Section title={t('الماركات')}>
         <View style={{ marginTop: 6 }}><Chips options={s.brands.map((x) => ({ v: x, label: x }))} selected={[]} onPick={() => {}} /></View>
       </Section>
 
-      <Section title="آراء العملاء">
+      <Section title={t('آراء العملاء')}>
         {p.reviews.length ? p.reviews.map((rv, i) => (
           <View key={i} style={[{ paddingVertical: 14, gap: 4 }, i < p.reviews.length - 1 && { borderBottomWidth: 1, borderColor: colors.line }]}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <T w="semibold" size={14}>{rv.first_name || 'عميل'}</T>
+              <T w="semibold" size={14}>{rv.first_name || t('عميل')}</T>
               <Row gap={2}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={13} color={rv.rating >= n ? colors.accent : colors.line} />)}</Row>
             </Row>
             {rv.review ? <T size={14}>{rv.review}</T> : null}
-            <Muted size={12}>{rv.part}{rv.at ? '، ' + ago(rv.at) : ''}</Muted>
+            <Muted size={12}>{rv.part}{rv.at ? t('، ') + ago(rv.at) : ''}</Muted>
           </View>
-        )) : <Empty text="لسه مفيش آراء." />}
+        )) : <Empty text={t('لسه مفيش آراء.')} />}
       </Section>
     </Screen>
   );

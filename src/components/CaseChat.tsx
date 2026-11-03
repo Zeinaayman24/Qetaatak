@@ -9,6 +9,7 @@ import { ORDER_STEPS, REPORT_CATEGORIES, friendlyError, reqNo, type Report, type
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t as tr } from '@/lib/i18n';
 
 /**
  * One complaint = one conversation. The assistant tries to solve it first; if it can't (or the customer asks),
@@ -61,28 +62,28 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
     const late = /اتاخر|متاخر|تاخير|مجاش|موصلش|لسه|فين/.test(body);
     const bad = /بايظ|عيب|مش مظبوط|غلط|مكسور|خدش|مش شغال|ترجيع|ارجع|استرجاع|مضروب/.test(body);
     if (t.category === 'shop' || t.category === 'customer' || t.category === 'other' || /موظف|خدمه العملاء|فلوسي|نصب/.test(body)) {
-      await botSay('دي محتاجة حد من فريقنا يراجعها بنفسه.');
+      await botSay(tr('دي محتاجة حد من فريقنا يراجعها بنفسه.'));
       return escalate();
     }
     if (t.category === 'app') {
-      await botSay('آسفين على المشكلة. جرّب ده الأول:\n• اقفل التطبيق وافتحه تاني\n• اتأكد إن النت شغال\n• لو على الموقع، اعمل تحديث للصفحة\n• حدّث التطبيق لآخر نسخة آخر نسخة من التطبيق');
+      await botSay(tr('آسفين على المشكلة. جرّب ده الأول:\n• اقفل التطبيق وافتحه تاني\n• اتأكد إن النت شغال\n• لو على الموقع، اعمل تحديث للصفحة\n• حدّث التطبيق لآخر نسخة آخر نسخة من التطبيق'));
     } else if (!r) {
-      await botSay('شوف صفحة «طلباتي»، فيها حالة كل طلب ورقمه. ولو المشكلة في قطعة اشتريتها، المحل عليه ضمان وتقدر تكلّمه من صفحة الطلب.');
+      await botSay(tr('شوف صفحة «طلباتي»، فيها حالة كل طلب ورقمه. ولو المشكلة في قطعة اشتريتها، المحل عليه ضمان وتقدر تكلّمه من صفحة الطلب.'));
     } else if (r.status === 'open') {
-      await botSay(`طلبك ${reqNo(r.num)} (${r.part}) لسه بيستقبل عروض من المحلات. أغلب الطلبات بيوصلها أول عرض خلال ساعة، وهيوصلك إشعار أول ما يوصل.`);
+      await botSay(tr('طلبك {0} ({1}) لسه بيستقبل عروض من المحلات. أغلب الطلبات بيوصلها أول عرض خلال ساعة، وهيوصلك إشعار أول ما يوصل.', reqNo(r.num), r.part));
     } else if (r.status === 'cancelled') {
-      await botSay(`طلبك ${reqNo(r.num)} اتلغى، فمفيش أي مبلغ مطلوب منك عليه. لو عايز القطعة تاني ابعت طلب جديد.`);
+      await botSay(tr('طلبك {0} اتلغى، فمفيش أي مبلغ مطلوب منك عليه. لو عايز القطعة تاني ابعت طلب جديد.', reqNo(r.num)));
     } else if (r.status === 'chosen') {
-      const st = ORDER_STEPS.find((s) => s.key === r.order_status)?.label ?? 'المحل بيجهّز';
-      await botSay(`طلبك ${reqNo(r.num)} (${r.part}) اتأكد مع المحل، وحالته دلوقتي: «${st}».\n` +
-        (late ? 'لو اتأخر عن المعاد، أسرع حل إنك تكلّم المحل مباشرة من الشات في صفحة الطلب، وهو بيرد بسرعة عادةً.' : 'تقدر تكلّم المحل مباشرة من الشات في صفحة الطلب.'));
+      const st = ORDER_STEPS.find((s) => s.key === r.order_status)?.label ?? tr('المحل بيجهّز');
+      await botSay(tr('طلبك {0} ({1}) اتأكد مع المحل، وحالته دلوقتي: «{2}».\n', reqNo(r.num), r.part, st) +
+        (late ? tr('لو اتأخر عن المعاد، أسرع حل إنك تكلّم المحل مباشرة من الشات في صفحة الطلب، وهو بيرد بسرعة عادةً.') : tr('تقدر تكلّم المحل مباشرة من الشات في صفحة الطلب.')));
     } else {
       const w = data.warranty;
-      await botSay((bad ? 'آسفين إن القطعة طلعت فيها مشكلة. ' : '') +
-        (w ? `القطعة دي عليها ضمان ${w} يوم من المحل. لو فيها عيب أو مش مطابقة، كلّم المحل من صفحة الطلب، والمحل ملزم يبدّلها أو يرجّع فلوسها خلال الضمان.`
-           : 'المحل ما اداش ضمان على القطعة دي، بس لو القطعة مش زي الوصف (غلط في الموديل أو الجنب أو الحالة أو مش زي الصورة) من حقك تبدّلها أو ترجّع فلوسها. كلّم المحل من صفحة الطلب، ولو مارضيش أحوّلك لخدمة العملاء.'));
+      await botSay((bad ? tr('آسفين إن القطعة طلعت فيها مشكلة. ') : '') +
+        (w ? tr('القطعة دي عليها ضمان {0} يوم من المحل. لو فيها عيب أو مش مطابقة، كلّم المحل من صفحة الطلب، والمحل ملزم يبدّلها أو يرجّع فلوسها خلال الضمان.', w)
+           : tr('المحل ما اداش ضمان على القطعة دي، بس لو القطعة مش زي الوصف (غلط في الموديل أو الجنب أو الحالة أو مش زي الصورة) من حقك تبدّلها أو ترجّع فلوسها. كلّم المحل من صفحة الطلب، ولو مارضيش أحوّلك لخدمة العملاء.')));
     }
-    await botSay('كده المشكلة اتحلّت؟ لو لأ، أحوّلك لحد من خدمة العملاء.');
+    await botSay(tr('كده المشكلة اتحلّت؟ لو لأ، أحوّلك لحد من خدمة العملاء.'));
   }
 
   useEffect(() => {
@@ -93,13 +94,13 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
 
   async function escalate() {
     if (status !== 'bot') return;
-    await botSay('هحوّلك لحد من خدمة العملاء، وهيرد عليك هنا. مش لازم تفضل فاتح التطبيق، هيوصلك إشعار.');
+    await botSay(tr('هحوّلك لحد من خدمة العملاء، وهيرد عليك هنا. مش لازم تفضل فاتح التطبيق، هيوصلك إشعار.'));
     const { error } = await supabase.rpc('escalate_ticket', { p_report: id });
     if (error) toast(friendlyError(error));
     reload();
   }
   async function resolve() {
-    if (status === 'bot') await botSay('تمام، المحادثة اتقفلت. لو احتجت أي حاجة ابدأ محادثة جديدة.');
+    if (status === 'bot') await botSay(tr('تمام، المحادثة اتقفلت. لو احتجت أي حاجة ابدأ محادثة جديدة.'));
     const { error } = await supabase.rpc('customer_resolve_ticket', { p_report: id });
     if (error) toast(friendlyError(error));
     reload();
@@ -135,49 +136,49 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
     }
     const p = parse(body);
     const n = norm(body);
-    if (p.yes || p.intent === 'thanks' || n.includes('اتحل')) return resolve();
+    if (p.yes || p.intent === 'thanks' || n.includes(tr('اتحل'))) return resolve();
     return escalate(); // the free assistant can't go further than its first answer: hand over to people
   }
 
   /* ---------- render */
   if (!data) return <Screen><Loading /></Screen>;
-  if (!t) return <Screen><Muted center>المحادثة دي مش موجودة.</Muted></Screen>;
+  if (!t) return <Screen><Muted center>{tr('المحادثة دي مش موجودة.')}</Muted></Screen>;
 
   const hasTranscript = data.msgs.some((m) => m.kind === 'bot');
   const messages: ChatMsg[] = [
     ...(hasTranscript ? [] : [{ id: 'first', who: 'me' as const, text: t.body }]),
-    ...(t.admin_reply ? [{ id: 'old', who: 'agent' as const, name: 'خدمة العملاء', text: t.admin_reply }] : []),
+    ...(t.admin_reply ? [{ id: 'old', who: 'agent' as const, name: tr('خدمة العملاء'), text: t.admin_reply }] : []),
     ...data.msgs.map((m): ChatMsg => ({
       id: m.id,
       who: m.kind === 'system' ? 'system' : m.kind === 'bot' ? 'bot' : m.sender_id === uid ? 'me' : 'agent',
-      name: m.kind === 'user' && m.sender_id !== uid ? 'خدمة العملاء' : undefined,
+      name: m.kind === 'user' && m.sender_id !== uid ? tr('خدمة العملاء') : undefined,
       text: m.body,
     })),
   ];
-  const openReq: Chip[] = data.req ? [{ label: 'افتح الطلب', icon: 'receipt-outline', fn: () => router.push(`/customer/${data.req!.id}`) }] : [];
+  const openReq: Chip[] = data.req ? [{ label: tr('افتح الطلب'), icon: 'receipt-outline', fn: () => router.push(`/customer/${data.req!.id}`) }] : [];
 
   let chips: Chip[] = [];
   if (status === 'bot') {
     chips = [
       ...aiChips.map((c) => ({ label: c, fn: () => write(c) })),
-      { label: 'اتحلّت، شكراً', icon: 'checkmark', fn: () => write('اتحلّت، شكراً') },
-      { label: 'لأ، عايز أكلّم موظف', icon: 'headset-outline', fn: () => write('لأ، عايز أكلّم موظف') },
+      { label: tr('اتحلّت، شكراً'), icon: 'checkmark', fn: () => write(tr('اتحلّت، شكراً')) },
+      { label: tr('لأ، عايز أكلّم موظف'), icon: 'headset-outline', fn: () => write(tr('لأ، عايز أكلّم موظف')) },
       ...openReq,
     ];
   } else if (status === 'open' || status === 'in_progress') {
-    chips = [...openReq, { label: 'المشكلة اتحلّت', icon: 'checkmark', fn: resolve }];
+    chips = [...openReq, { label: tr('المشكلة اتحلّت'), icon: 'checkmark', fn: resolve }];
   } else {
-    chips = [{ label: 'محادثة جديدة', main: true, icon: 'add', fn: () => router.replace('/assistant') }, { label: 'شكاويّا', fn: () => router.push('/support') }];
+    chips = [{ label: tr('محادثة جديدة'), main: true, icon: 'add', fn: () => router.replace('/assistant') }, { label: tr('شكاويّا'), fn: () => router.push('/support') }];
   }
 
-  const sub = `T-${t.ticket_no}، ` + (status === 'bot' ? 'المساعد بيحاول يحلّها' : status === 'open' ? 'بنوصّلك بموظف…' : status === 'in_progress' ? 'موظف معاك دلوقتي' : 'المحادثة انتهت');
+  const sub = tr('T-{0}، ', t.ticket_no) + (status === 'bot' ? tr('المساعد بيحاول يحلّها') : status === 'open' ? tr('بنوصّلك بموظف…') : status === 'in_progress' ? tr('موظف معاك دلوقتي') : tr('المحادثة انتهت'));
   const footer = status === 'open' ? (
     <View style={{ backgroundColor: colors.accentSoft, borderRadius: 14, padding: 12 }}>
-      <T size={13.5} w="medium">حوّلناك لخدمة العملاء</T>
-      <Muted size={12.5}>أول موظف فاضي هيرد عليك هنا. تقدر تكتب أي تفاصيل زيادة وهتوصله.</Muted>
+      <T size={13.5} w="medium">{tr('حوّلناك لخدمة العملاء')}</T>
+      <Muted size={12.5}>{tr('أول موظف فاضي هيرد عليك هنا. تقدر تكتب أي تفاصيل زيادة وهتوصله.')}</Muted>
     </View>
   ) : status === 'resolved' ? (
-    <Muted center size={13}>المحادثة دي انتهت. لو عندك مشكلة تانية ابدأ محادثة جديدة.</Muted>
+    <Muted center size={13}>{tr('المحادثة دي انتهت. لو عندك مشكلة تانية ابدأ محادثة جديدة.')}</Muted>
   ) : null;
 
   return (
@@ -186,7 +187,7 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
       live={status !== 'resolved'}
       avatar={status === 'in_progress' ? 'agent' : 'bot'}
       onBack={() => (router.canGoBack() ? router.back() : router.replace('/support'))}
-      right={<Pressable onPress={() => router.push('/support')} hitSlop={8}><Muted size={12.5}>شكاويّا</Muted></Pressable>}
+      right={<Pressable onPress={() => router.push('/support')} hitSlop={8}><Muted size={12.5}>{tr('شكاويّا')}</Muted></Pressable>}
       messages={messages}
       typing={typing}
       busy={busy}
@@ -194,7 +195,7 @@ export function CaseChat({ id, fresh }: { id: string; fresh?: boolean }) {
       footer={footer}
       composer={status === 'resolved' ? null : {
         value: text, onChange: setText, onSend: () => write(text),
-        placeholder: status === 'in_progress' ? 'اكتب لخدمة العملاء…' : 'اكتب رسالتك…',
+        placeholder: status === 'in_progress' ? tr('اكتب لخدمة العملاء…') : tr('اكتب رسالتك…'),
       }}
     />
   );

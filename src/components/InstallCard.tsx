@@ -3,6 +3,7 @@ import { Platform, View } from 'react-native';
 import { colors, radius } from '@/lib/theme';
 import { AppIcon } from './Brand';
 import { Btn, Icon, Muted, Press, Row, T } from './ui';
+import { t } from '@/lib/i18n';
 
 let deferred: any = null; // Chrome's install prompt, kept for when the person taps "install"
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -41,28 +42,28 @@ export function InstallCard() {
       <Row gap={12}>
         <AppIcon size={48} />
         <View style={{ flex: 1 }}>
-          <T w="bold" size={15}>نزّل ضغطة على موبايلك</T>
-          <Muted size={12.5}>أيقونة على الشاشة، تفتح على طول من غير المتصفح</Muted>
+          <T w="bold" size={15}>{t('نزّل ضغطة على موبايلك')}</T>
+          <Muted size={12.5}>{t('أيقونة على الشاشة، تفتح على طول من غير المتصفح')}</Muted>
         </View>
-        <Press onPress={close} label="اقفل" hitSlop={8}><Icon name="close" size={18} color={colors.faint} /></Press>
+        <Press onPress={close} label={t('اقفل')} hitSlop={8}><Icon name="close" size={18} color={colors.faint} /></Press>
       </Row>
       {steps || (ios && !deferred) ? (
         <View style={{ gap: 6, backgroundColor: colors.soft, borderRadius: radius.md, padding: 12 }}>
           {ios ? (
             <>
-              <T size={13.5}>١- افتح الموقع من Safari</T>
-              <T size={13.5}>٢- دوس على زرار المشاركة (المربع اللي فيه سهم لفوق)</T>
-              <T size={13.5}>٣- اختار «Add to Home Screen» أو «إضافة إلى الشاشة الرئيسية»</T>
+              <T size={13.5}>{t('١- افتح الموقع من Safari')}</T>
+              <T size={13.5}>{t('٢- دوس على زرار المشاركة (المربع اللي فيه سهم لفوق)')}</T>
+              <T size={13.5}>{t('٣- اختار «Add to Home Screen» أو «إضافة إلى الشاشة الرئيسية»')}</T>
             </>
           ) : (
             <>
-              <T size={13.5}>١- افتح قائمة المتصفح (⋮ فوق)</T>
-              <T size={13.5}>٢- اختار «Install app» أو «تثبيت التطبيق»</T>
+              <T size={13.5}>{t('١- افتح قائمة المتصفح (⋮ فوق)')}</T>
+              <T size={13.5}>{t('٢- اختار «Install app» أو «تثبيت التطبيق»')}</T>
             </>
           )}
         </View>
       ) : (
-        <Btn icon="arrow-up" title="ثبّت التطبيق" onPress={install} />
+        <Btn icon="arrow-up" title={t('ثبّت التطبيق')} onPress={install} />
       )}
     </View>
   );

@@ -24,6 +24,7 @@ export function AppHeader(_: { role?: Role }) {
 }
 
 import { Logo } from './Brand';
+import { t } from '@/lib/i18n';
 export { Logo };
 
 type Item = { href: string; label: string; icon: string; match: (p: string) => boolean; badge?: number };
@@ -37,16 +38,16 @@ export function BottomNav({ role }: { role: 'customer' | 'shop' }) {
   const { unread } = useInbox();
   const items: Item[] = role === 'customer'
     ? [
-        { href: '/customer', label: 'الرئيسية', icon: 'home', match: (p) => p === '/customer' },
-        { href: '/customer/requests', label: 'طلباتي', icon: 'receipt', match: (p) => (p.startsWith('/customer/') && p !== '/customer/new') || p.startsWith('/order') },
-        { href: '/messages', label: 'الرسائل', icon: 'chatbubbles', match: (p) => p === '/messages' || p.startsWith('/chat') || p === '/assistant', badge: unread },
-        { href: '/account', label: 'حسابي', icon: 'person', match: (p) => ['/account', '/profile', '/cars', '/favorites', '/support', '/notifications'].includes(p) },
+        { href: '/customer', label: t('الرئيسية'), icon: 'home', match: (p) => p === '/customer' },
+        { href: '/customer/requests', label: t('طلباتي'), icon: 'receipt', match: (p) => (p.startsWith('/customer/') && p !== '/customer/new') || p.startsWith('/order') },
+        { href: '/messages', label: t('الرسائل'), icon: 'chatbubbles', match: (p) => p === '/messages' || p.startsWith('/chat') || p === '/assistant', badge: unread },
+        { href: '/account', label: t('حسابي'), icon: 'person', match: (p) => ['/account', '/profile', '/cars', '/favorites', '/support', '/notifications'].includes(p) },
       ]
     : [
-        { href: '/shop', label: 'الطلبات', icon: 'file-tray-full', match: (p) => p.startsWith('/shop') && p !== '/shop-setup' },
-        { href: '/messages', label: 'الرسائل', icon: 'chatbubbles', match: (p) => p === '/messages' || p.startsWith('/chat'), badge: unread },
-        { href: '/notifications', label: 'الإشعارات', icon: 'notifications', match: (p) => p === '/notifications' },
-        { href: '/account', label: 'المحل', icon: 'storefront', match: (p) => ['/account', '/shop-setup', '/support'].includes(p) },
+        { href: '/shop', label: t('الطلبات'), icon: 'file-tray-full', match: (p) => p.startsWith('/shop') && p !== '/shop-setup' },
+        { href: '/messages', label: t('الرسائل'), icon: 'chatbubbles', match: (p) => p === '/messages' || p.startsWith('/chat'), badge: unread },
+        { href: '/notifications', label: t('الإشعارات'), icon: 'notifications', match: (p) => p === '/notifications' },
+        { href: '/account', label: t('المحل'), icon: 'storefront', match: (p) => ['/account', '/shop-setup', '/support'].includes(p) },
       ];
   const tab = (it: Item) => {
     const on = it.match(path);

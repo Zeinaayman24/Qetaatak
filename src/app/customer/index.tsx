@@ -5,7 +5,7 @@ import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { Logo } from '@/components/Brand';
 import { MakeLogo } from '@/components/MakeLogo';
-import { homeMakes, isElectrified, makeByName, ptShort, useMakes } from '@/lib/catalogue';
+import { carLabel, usePreloadModels, homeMakes, isElectrified, makeByName, makeName, ptShort, useMakes } from '@/lib/catalogue';
 import { Btn, Icon, Loading, Muted, Pill, Press, Row, Screen, Section, T } from '@/components/ui';
 import { OrderRow, RowList } from '@/components/OrderRows';
 import { AdBanner } from '@/components/AdBanner';
@@ -15,24 +15,26 @@ import { must, useLive } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
-const CATEGORIES: { label: string; part: string; icon: string }[] = [
-  { label: 'فوانيس', part: 'فانوس أمامي', icon: 'car-light-high' },
-  { label: 'مرايات', part: 'مراية جانبية', icon: 'mirror' },
-  { label: 'رديتر', part: 'رديتر مياه', icon: 'radiator' },
-  { label: 'تكييف', part: 'كمبروسر تكييف', icon: 'air-conditioner' },
-  { label: 'فرامل', part: 'تيل فرامل', icon: 'car-brake-alert' },
-  { label: 'دبرياج', part: 'طقم دبرياج', icon: 'car-clutch' },
-  { label: 'كهرباء', part: 'دينامو', icon: 'car-battery' },
-  { label: 'صاج', part: 'رفرف', icon: 'car-door' },
+const CATEGORIES: { key: string; label: string; part: string; icon: string }[] = [
+  { key: 'فوانيس', label: t('فوانيس'), part: 'فانوس أمامي', icon: 'car-light-high' },
+  { key: 'مرايات', label: t('مرايات'), part: 'مراية جانبية', icon: 'mirror' },
+  { key: 'رديتر', label: t('رديتر'), part: 'رديتر مياه', icon: 'radiator' },
+  { key: 'تكييف', label: t('تكييف'), part: 'كمبروسر تكييف', icon: 'air-conditioner' },
+  { key: 'فرامل', label: t('فرامل'), part: 'تيل فرامل', icon: 'car-brake-alert' },
+  { key: 'دبرياج', label: t('دبرياج'), part: 'طقم دبرياج', icon: 'car-clutch' },
+  { key: 'كهرباء', label: t('كهرباء'), part: 'دينامو', icon: 'car-battery' },
+  { key: 'صاج', label: t('صاج'), part: 'رفرف', icon: 'car-door' },
 ];
 
-const EV_CATEGORY = { label: 'كهربا وهايبرد', part: 'بطارية الجهد العالي', icon: 'car-electric' };
+const EV_CATEGORY = { key: 'كهربا وهايبرد', label: t('كهربا وهايبرد'), part: 'بطارية الجهد العالي', icon: 'car-electric' };
 
 export default function CustomerHome() {
   const { ready, session, profile } = useAuth();
   const uid = session?.user.id;
   const { makes } = useMakes();
+  usePreloadModels([profile?.car_make]);
   useEffect(() => { rememberRole('customer'); }, []);
   const { data } = useLive(async () => {
     if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[], orders: [] as Order[] };
@@ -63,36 +65,36 @@ export default function CustomerHome() {
           <Bell />
         </Row>
         <View style={{ gap: 0 }}>
-          <T size={14} color={colors.muted}>أهلاً يا {first}</T>
-          <T w="bold" size={23} style={{ lineHeight: 34 }}>محتاج قطعة إيه؟</T>
+          <T size={14} color={colors.muted}>{t('أهلاً يا')}{' '}{first}</T>
+          <T w="bold" size={23} style={{ lineHeight: 34 }}>{t('محتاج قطعة إيه؟')}</T>
         </View>
-        <Press onPress={() => router.push('/cars')} label="عربيتي"
+        <Press onPress={() => router.push('/cars')} label={t('عربيتي')}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, paddingEnd: 14, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.ground }}>
           <MakeLogo make={makeByName(makes, profile.car_make) ?? (profile.car_make ? { name_ar: profile.car_make, name_en: profile.car_make, logo_url: '' } : null)} size={44} />
           <View style={{ flex: 1, gap: 1 }}>
-            <Muted size={12}>عربيتي</Muted>
-            {profile.car_make ? <T w="semibold" size={15} numberOfLines={1}>{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')}</T>
-              : <T w="semibold" size={15}>ضيف عربيتك عشان العروض تبقى مظبوطة</T>}
+            <Muted size={12}>{t('عربيتي')}</Muted>
+            {profile.car_make ? <T w="semibold" size={15} numberOfLines={1}>{carLabel(profile.car_make, profile.car_model, profile.car_year)}</T>
+              : <T w="semibold" size={15}>{t('ضيف عربيتك عشان العروض تبقى مظبوطة')}</T>}
           </View>
           {profile.car_powertrain && profile.car_powertrain !== 'petrol' ? <Pill label={ptShort(profile.car_powertrain)} tone={isElectrified(profile.car_powertrain) ? 'good' : 'plain'} /> : null}
-          <T size={14} w="medium" color={colors.primary}>غيّر</T>
+          <T size={14} w="medium" color={colors.primary}>{t('غيّر')}</T>
         </Press>
-        <Press onPress={() => newReq()} label="اكتب اسم القطعة"
+        <Press onPress={() => newReq()} label={t('اكتب اسم القطعة')}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.ink, paddingStart: 16, paddingEnd: 8, height: 58,
             shadowColor: colors.shadow, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}>
           <Icon name="search" size={21} color={colors.ink} stroke={2.2} />
-          <T size={15.5} color={colors.faint} style={{ flex: 1 }} numberOfLines={1}>اكتب اسم القطعة، مثلاً فانوس أمامي</T>
+          <T size={15.5} color={colors.faint} style={{ flex: 1 }} numberOfLines={1}>{t('اكتب اسم القطعة، مثلاً فانوس أمامي')}</T>
           <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="camera" size={20} color={colors.primary} />
           </View>
         </Press>
         <View style={{ gap: 6 }}>
-          <Btn title="اطلب قطعة" icon="add" onPress={() => newReq()} />
-          <Muted size={13} center>ابعت طلبك وقارن عروض أكتر من محل</Muted>
+          <Btn title={t('اطلب قطعة')} icon="add" onPress={() => newReq()} />
+          <Muted size={13} center>{t('ابعت طلبك وقارن عروض أكتر من محل')}</Muted>
         </View>
-        <Press onPress={() => router.push('/assistant')} label="اوصف القطعة للمساعد" role="link" style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 }}>
+        <Press onPress={() => router.push('/assistant')} label={t('اوصف القطعة للمساعد')} role="link" style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 }}>
           <Icon name="sparkles" size={16} color={colors.primary} />
-          <T size={14} w="medium" color={colors.primary}>مش عارف اسمها؟ اوصفها للمساعد</T>
+          <T size={14} w="medium" color={colors.primary}>{t('مش عارف اسمها؟ اوصفها للمساعد')}</T>
         </Press>
       </View>
     </View>
@@ -105,28 +107,28 @@ export default function CustomerHome() {
     <Screen top={hero} nav={<BottomNav role="customer" />}>
       {/* ONE card for the thing that needs the customer most: offers to compare */}
       {top1 ? (
-        <Press onPress={() => router.push(`/customer/${top1.g.first.id}`)} label="قارن العروض"
+        <Press onPress={() => router.push(`/customer/${top1.g.first.id}`)} label={t('قارن العروض')}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.ink, borderRadius: 16, padding: 16 }}>
           <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#123A68', alignItems: 'center', justifyContent: 'center' }}>
             <T w="bold" size={19} color="#fff" style={{ lineHeight: 26 }}>{ar(top1.n)}</T>
           </View>
           <View style={{ flex: 1 }}>
-            <T w="semibold" size={16} color="#fff">{top1.n > 1 ? `وصلك ${ar(top1.n)} عروض على طلبك` : 'وصلك عرض على طلبك'}</T>
-            <T size={13} color="#B7C6DA" numberOfLines={1}>{partsLabel(top1.g.items.filter((r) => r.status === 'open'))}{hot.length > 1 ? ` · و${ar(hot.length - 1)} طلب تاني` : ''}</T>
+            <T w="semibold" size={16} color="#fff">{top1.n > 1 ? t('وصلك {0} عروض على طلبك', ar(top1.n)) : t('وصلك عرض على طلبك')}</T>
+            <T size={13} color="#B7C6DA" numberOfLines={1}>{partsLabel(top1.g.items.filter((r) => r.status === 'open'))}{hot.length > 1 ? t(' · و{0} طلب تاني', ar(hot.length - 1)) : ''}</T>
           </View>
           <View style={{ height: 36, paddingHorizontal: 14, borderRadius: 10, backgroundColor: colors.sky, justifyContent: 'center' }}>
-            <T w="semibold" size={14} color={colors.ink}>قارن</T>
+            <T w="semibold" size={14} color={colors.ink}>{t('قارن')}</T>
           </View>
         </Press>
       ) : null}
 
       {makes?.length ? (
-        <Section title="الماركات" action={{ label: 'كل الماركات', onPress: () => router.push('/brands') }}>
+        <Section title={t('الماركات')} action={{ label: t('كل الماركات'), onPress: () => router.push('/brands') }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
             {homeMakes(makes).slice(0, 8).map((m) => (
               <Press key={m.id} onPress={() => router.push({ pathname: '/cars', params: { make: m.id } })} label={m.name_ar} style={{ width: '25%', alignItems: 'center', gap: 6 }}>
                 <MakeLogo make={m} size={60} />
-                <T size={12.5} w="medium" numberOfLines={1}>{m.name_ar}</T>
+                <T size={12.5} w="medium" numberOfLines={1}>{makeName(m)}</T>
               </Press>
             ))}
           </View>
@@ -134,10 +136,10 @@ export default function CustomerHome() {
       ) : null}
 
       <View style={{ gap: 14 }}>
-        <T w="bold" size={17}>اختار من الأقسام</T>
+        <T w="bold" size={17}>{t('اختار من الأقسام')}</T>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 }}>
           {(isElectrified(profile.car_powertrain) ? [EV_CATEGORY, ...CATEGORIES.slice(0, 7)] : CATEGORIES).map((c) => (
-            <Press key={c.label} onPress={() => router.push({ pathname: '/customer/new', params: { cat: c.label } })} label={c.label} style={{ width: '25%', alignItems: 'center', gap: 8 }}>
+            <Press key={c.label} onPress={() => router.push({ pathname: '/customer/new', params: { cat: c.key } })} label={c.label} style={{ width: '25%', alignItems: 'center', gap: 8 }}>
               <View style={{ width: 60, height: 60, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' }}>
                 <Icon set="mci" name={c.icon} size={27} color={colors.ink} />
               </View>
@@ -148,12 +150,12 @@ export default function CustomerHome() {
       </View>
 
       {orders.length || waiting.length ? (
-        <Section title="طلباتك الحالية" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>
+        <Section title={t('طلباتك الحالية')} action={{ label: t('الكل'), onPress: () => router.push('/customer/requests') }}>
           <RowList>
             {orders.slice(0, 3).map((o, i) => {
               const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
-              return <OrderRow key={o.id} o={o} first={i === 0} title={ps.length ? partsLabel(ps) : 'أوردر'}
-                flag={needsPayment(o) ? { label: 'ادفع', tone: 'wait' } : undefined}
+              return <OrderRow key={o.id} o={o} first={i === 0} title={ps.length ? partsLabel(ps) : t('أوردر')}
+                flag={needsPayment(o) ? { label: t('ادفع'), tone: 'wait' } : undefined}
                 onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })} />;
             })}
             {waiting.slice(0, Math.max(0, 3 - Math.min(orders.length, 3))).map((g, i) => (
@@ -161,9 +163,9 @@ export default function CustomerHome() {
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: i || orders.length ? 1 : 0, borderColor: '#EEF0F3' }}>
                 <View style={{ flex: 1 }}>
                   <T w="semibold" size={15} numberOfLines={1}>{partsLabel(g.items)}</T>
-                  <Muted size={13}>طلب {reqNo(g.first.num)}</Muted>
+                  <Muted size={13}>{t('طلب')}{' '}{reqNo(g.first.num)}</Muted>
                 </View>
-                <Pill label="بندوّر على عروض" tone="plain" />
+                <Pill label={t('بندوّر على عروض')} tone="plain" />
               </Press>
             ))}
           </RowList>
@@ -174,13 +176,13 @@ export default function CustomerHome() {
 
       {/* first visit only: three quiet steps instead of an empty screen */}
       {nothingYet ? (
-        <Section title="إزاي بيشتغل">
+        <Section title={t('إزاي بيشتغل')}>
           <View style={{ gap: 12 }}>
             {[
-              ['car-sport-outline', 'اختار عربيتك'],
-              ['camera-outline', 'اكتب اسم القطعة أو صوّرها'],
-              ['pricetags-outline', 'قارن عروض المحلات'],
-              ['checkmark-circle-outline', 'أكّد الأوردر من التطبيق'],
+              ['car-sport-outline', t('اختار عربيتك')],
+              ['camera-outline', t('اكتب اسم القطعة أو صوّرها')],
+              ['pricetags-outline', t('قارن عروض المحلات')],
+              ['checkmark-circle-outline', t('أكّد الأوردر من التطبيق')],
             ].map(([icon, text], i) => (
               <Row key={text} gap={12}>
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}><T w="bold" size={14} color={colors.primary}>{ar(i + 1)}</T></View>

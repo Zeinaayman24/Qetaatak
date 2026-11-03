@@ -10,6 +10,8 @@ import { must, useLive, useNow } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
+import { carLabel } from '@/lib/catalogue';
 
 type Tab = 'active' | 'done';
 
@@ -70,43 +72,43 @@ export default function MyRequests() {
   return (
     <Screen nav={<BottomNav role="customer" />}>
       <Row style={{ justifyContent: 'space-between' }}>
-        <T w="bold" size={24} style={{ lineHeight: 36 }}>طلباتي</T>
-        <Btn kind="small" icon="add" title="طلب جديد" onPress={() => router.push('/customer/new')} />
+        <T w="bold" size={24} style={{ lineHeight: 36 }}>{t('طلباتي')}</T>
+        <Btn kind="small" icon="add" title={t('طلب جديد')} onPress={() => router.push('/customer/new')} />
       </Row>
-      <Seg options={[{ v: 'active', label: openGroups.length + live.length ? `شغّالة (${ar(openGroups.length + live.length)})` : 'شغّالة' }, { v: 'done', label: 'خلصت' }]} value={tab} onPick={(v) => setTab(v as Tab)} />
+      <Seg options={[{ v: 'active', label: openGroups.length + live.length ? t('شغّالة ({0})', ar(openGroups.length + live.length)) : t('شغّالة') }, { v: 'done', label: t('خلصت') }]} value={tab} onPick={(v) => setTab(v as Tab)} />
 
       {loading && !data ? <Loading /> : tab === 'active' ? (
         groupsSorted.length || live.length ? (
           <View style={{ gap: 10 }}>
             {groupsSorted.filter((g) => offersOf(g) > 0).map((g) => {
               const open = g.items.filter((r) => r.status === 'open'); const n = offersOf(g);
-              return card(g.key, partsLabel(open), `طلب ${reqNo(g.first.num)} · ${g.first.car_make} ${g.first.car_model}`, n > 1 ? `${ar(n)} عروض` : 'عرض', blue, 'من ' + elapsed(g.first.created_at, now), 'قارن العروض', () => router.push(`/customer/${g.first.id}`));
+              return card(g.key, partsLabel(open), t('طلب {0} · {1}', reqNo(g.first.num), carLabel(g.first.car_make, g.first.car_model)), n > 1 ? t('{0} عروض', ar(n)) : t('عرض'), blue, t('من {0}', elapsed(g.first.created_at, now)), t('قارن العروض'), () => router.push(`/customer/${g.first.id}`));
             })}
             {live.map((o) => {
               const ps = partsOf(o); const pay = needsPayment(o); const ready = bucketOf(o) === 'ready';
-              return card(o.id, ps.length ? partsLabel(ps) : 'أوردر', `أوردر ${orderNo(o.order_no)} · ${money(Number(o.items_total) + Number(o.delivery_fee))} ج.م`,
-                pay ? 'ادفع' : ORDER_LABEL[o.status].short, pay ? orange : ready ? green : orange, 'من ' + elapsed(o.created_at, now), pay ? 'ادفع دلوقتي' : 'تابع الأوردر',
+              return card(o.id, ps.length ? partsLabel(ps) : t('أوردر'), t('أوردر {0} · {1} ج.م', orderNo(o.order_no), money(Number(o.items_total) + Number(o.delivery_fee))),
+                pay ? t('ادفع') : ORDER_LABEL[o.status].short, pay ? orange : ready ? green : orange, t('من {0}', elapsed(o.created_at, now)), pay ? t('ادفع دلوقتي') : t('تابع الأوردر'),
                 () => router.push({ pathname: '/order/[id]', params: { id: o.id } }));
             })}
             {groupsSorted.filter((g) => !offersOf(g)).map((g) => {
               const open = g.items.filter((r) => r.status === 'open');
-              return card(g.key, partsLabel(open), `طلب ${reqNo(g.first.num)} · ${g.first.car_make} ${g.first.car_model}`, 'بندوّر', grey, 'من ' + elapsed(g.first.created_at, now), '', () => router.push(`/customer/${g.first.id}`));
+              return card(g.key, partsLabel(open), t('طلب {0} · {1}', reqNo(g.first.num), carLabel(g.first.car_make, g.first.car_model)), t('بندوّر'), grey, t('من {0}', elapsed(g.first.created_at, now)), '', () => router.push(`/customer/${g.first.id}`));
             })}
           </View>
-        ) : <Empty icon="pricetags-outline" text="مفيش طلبات شغّالة دلوقتي." action={{ label: 'اطلب قطعة', onPress: () => router.push('/customer/new') }} />
+        ) : <Empty icon="pricetags-outline" text={t('مفيش طلبات شغّالة دلوقتي.')} action={{ label: t('اطلب قطعة'), onPress: () => router.push('/customer/new') }} />
       ) : finished.length || expired.length ? (
         <View style={{ gap: 10 }}>
           {finished.map((o) => {
             const ps = partsOf(o);
-            return card(o.id, ps.length ? partsLabel(ps) : 'أوردر', `أوردر ${orderNo(o.order_no)} · ${money(Number(o.items_total) + Number(o.delivery_fee))} ج.م`,
+            return card(o.id, ps.length ? partsLabel(ps) : t('أوردر'), t('أوردر {0} · {1} ج.م', orderNo(o.order_no), money(Number(o.items_total) + Number(o.delivery_fee))),
               ORDER_LABEL[o.status].short, o.status === 'cancelled' ? red : grey,
-              new Date(o.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }), o.status === 'received' && !o.rating ? 'قيّم المحل' : '',
+              new Date(o.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }), o.status === 'received' && !o.rating ? t('قيّم المحل') : '',
               () => router.push({ pathname: '/order/[id]', params: { id: o.id } }));
           })}
-          {expired.map((g) => card(g.key, partsLabel(g.items), `طلب ${reqNo(g.first.num)}`, 'انتهى', grey, 'من غير أوردر', 'اطلب تاني',
+          {expired.map((g) => card(g.key, partsLabel(g.items), t('طلب {0}', reqNo(g.first.num)), t('انتهى'), grey, t('من غير أوردر'), t('اطلب تاني'),
             () => router.push({ pathname: '/customer/new', params: { part: g.first.part, cond: g.first.wanted_condition } })))}
         </View>
-      ) : <Empty icon="time-outline" text="لسه مفيش أوردرات خلصت." />}
+      ) : <Empty icon="time-outline" text={t('لسه مفيش أوردرات خلصت.')} />}
     </Screen>
   );
 }

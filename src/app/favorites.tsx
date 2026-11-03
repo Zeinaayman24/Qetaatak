@@ -7,6 +7,7 @@ import { SHOP_TYPES, type Shop } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 export default function Favorites() {
   const { ready, session } = useAuth();
@@ -25,18 +26,18 @@ export default function Favorites() {
   const list = data ?? [];
   return (
     <Screen nav={<BottomNav role="customer" />}>
-      <BackBar title="المحلات المفضلة" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
+      <BackBar title={t('المحلات المفضلة')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
       {loading && !data ? <Loading /> : list.length ? (
         <View>
           {list.map((s, i) => (
             <ListRow key={s.id} last={i === list.length - 1} onPress={() => router.push(`/shop-profile/${s.id}`)}
               leading={<View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront-outline" size={22} /></View>}
-              title={s.name ?? 'محل في ' + s.area}
-              subtitle={`${s.area}، ${s.governorate}، ${SHOP_TYPES[s.shop_type]}`}
-              meta={s.brands.join('، ')} />
+              title={s.name ?? t('محل في ') + s.area}
+              subtitle={t('{0}، {1}، {2}', s.area, s.governorate, SHOP_TYPES[s.shop_type])}
+              meta={s.brands.join(t('، '))} />
           ))}
         </View>
-      ) : <Empty icon="heart-outline" text={'لسه مفيش محلات مفضلة.\nافتح صفحة أي محل من العروض واضغط على القلب.'} />}
+      ) : <Empty icon="heart-outline" text={t('لسه مفيش محلات مفضلة.\nافتح صفحة أي محل من العروض واضغط على القلب.')} />}
     </Screen>
   );
 }

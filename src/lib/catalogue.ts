@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './supabase';
+import { isEn, t } from '@/lib/i18n';
 
 /** Car catalogue: makes and models managed from the management app (migration 42). */
 export type Powertrain = 'petrol' | 'diesel' | 'hev' | 'phev' | 'erev' | 'ev';
@@ -13,12 +14,12 @@ export type Model = {
 };
 
 export const POWERTRAINS: { v: Powertrain; label: string; short: string }[] = [
-  { v: 'petrol', label: 'بنزين', short: 'بنزين' },
-  { v: 'diesel', label: 'ديزل', short: 'ديزل' },
-  { v: 'hev', label: 'هايبرد', short: 'هايبرد' },
-  { v: 'phev', label: 'هايبرد بالشحن (Plug-in)', short: 'Plug-in' },
-  { v: 'erev', label: 'كهربا بمدى ممتد (EREV)', short: 'EREV' },
-  { v: 'ev', label: 'كهربا بالكامل', short: 'كهربا' },
+  { v: 'petrol', label: t('بنزين'), short: t('بنزين') },
+  { v: 'diesel', label: t('ديزل'), short: t('ديزل') },
+  { v: 'hev', label: t('هايبرد'), short: t('هايبرد') },
+  { v: 'phev', label: t('هايبرد بالشحن (Plug-in)'), short: 'Plug-in' },
+  { v: 'erev', label: t('كهربا بمدى ممتد (EREV)'), short: 'EREV' },
+  { v: 'ev', label: t('كهربا بالكامل'), short: t('كهربا') },
 ];
 export const ptLabel = (p?: string | null) => POWERTRAINS.find((x) => x.v === p)?.label ?? '';
 export const ptShort = (p?: string | null) => POWERTRAINS.find((x) => x.v === p)?.short ?? '';
@@ -87,4 +88,29 @@ export function modelYears(m?: Model | null): number[] {
   const out: number[] = [];
   for (let y = to; y >= from; y--) out.push(y);
   return out;
+}
+
+/** A make or model name in the reader's language (English names from the catalogue). */
+export const makeName = (m: Pick<Make, 'name_ar' | 'name_en'>) => (isEn() && m.name_en ? m.name_en : m.name_ar);
+export const modelName = (m: Pick<Model, 'name_ar' | 'name_en'>) => (isEn() && m.name_en ? m.name_en : m.name_ar);
+/** "هيونداي فيرنا ٢٠١٤" or "Hyundai Verna 2014" from the Arabic names stored on a car or request. */
+export function carLabel(make?: string | null, model?: string | null, year?: string | number | null) {
+  const yr = year ? (isEn() ? String(year) : String(year).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)])) : '';
+  if (!isEn()) return [make, model, yr].filter(Boolean).join(' ');
+  const mk = (makesCache ?? []).find((m) => m.name_ar === make);
+  const md = mk ? (modelsCache.get(mk.id) ?? []).find((m) => m.name_ar === model) : undefined;
+  return [mk?.name_en ?? make, md?.name_en || model, yr].filter(Boolean).join(' ');
+}
+
+/** Load the models of these makes (by Arabic name) so carLabel can show English model names. */
+export function usePreloadModels(makeNames: (string | null | undefined)[]) {
+  const { makes } = useMakes();
+  const [, bump] = useState(0);
+  const key = makeNames.filter(Boolean).join('|');
+  useEffect(() => {
+    if (!isEn() || !makes) return;
+    const ids = [...new Set(makeNames.map((n) => makes.find((m) => m.name_ar === n)?.id).filter(Boolean) as string[])].filter((id) => !modelsCache.has(id));
+    if (ids.length) Promise.all(ids.map((id) => loadModels(id).catch(() => []))).then(() => bump((x) => x + 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, makes]);
 }

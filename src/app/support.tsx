@@ -8,6 +8,7 @@ import { REPORT_CATEGORIES, TICKET_STATUS, ago, type Report } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 type Topic = { title: string; open: () => void };
 
@@ -25,25 +26,25 @@ export default function Support() {
   const go = (path: string) => () => router.push(path as never);
   // each topic opens the page that already explains it
   const topics: Topic[] = profile?.is_shop ? [
-    { title: 'إزاي أبعت عرض كويس', open: go('/legal/merchant') },
-    { title: 'التحويلات والاسترجاع', open: go('/legal/cancellation') },
-    { title: 'العمولة والسداد', open: go('/shop/balance') },
-    { title: 'التقييم والأداء', open: go('/shop/performance') },
-    { title: 'فريق المحل', open: go('/legal/merchant') },
-    { title: 'اتفاقية التاجر', open: go('/legal/merchant') },
+    { title: t('إزاي أبعت عرض كويس'), open: go('/legal/merchant') },
+    { title: t('التحويلات والاسترجاع'), open: go('/legal/cancellation') },
+    { title: t('العمولة والسداد'), open: go('/shop/balance') },
+    { title: t('التقييم والأداء'), open: go('/shop/performance') },
+    { title: t('فريق المحل'), open: go('/legal/merchant') },
+    { title: t('اتفاقية التاجر'), open: go('/legal/merchant') },
   ] : [
-    { title: 'إزاي ضغطة بتشتغل؟', open: go('/legal/terms') },
-    { title: 'الدفع والتحويل', open: go('/legal/cancellation') },
-    { title: 'ضمان ضغطة والفحص عند الاستلام', open: () => setGuarantee(true) },
-    { title: 'الإلغاء ورجوع الفلوس', open: go('/legal/cancellation') },
-    { title: 'ضمان المحل', open: go('/legal/cancellation') },
-    { title: 'حسابي وبياناتي', open: go('/privacy') },
+    { title: t('إزاي ضغطة بتشتغل؟'), open: go('/legal/terms') },
+    { title: t('الدفع والتحويل'), open: go('/legal/cancellation') },
+    { title: t('ضمان ضغطة والفحص عند الاستلام'), open: () => setGuarantee(true) },
+    { title: t('الإلغاء ورجوع الفلوس'), open: go('/legal/cancellation') },
+    { title: t('ضمان المحل'), open: go('/legal/cancellation') },
+    { title: t('حسابي وبياناتي'), open: go('/privacy') },
   ];
 
   return (
-    <Screen footer={<Btn title="عندي مشكلة جديدة" onPress={() => router.push({ pathname: '/assistant', params: { mode: 'complaint' } })} />}>
-      <BackBar title="الدعم" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
-      <Muted size={14}>لو عندك سؤال شوف المواضيع دي. ولو عندك مشكلة، فريقنا بيرد عادةً خلال ١٥ دقيقة من ١٠ص لـ١٠م.</Muted>
+    <Screen footer={<Btn title={t('عندي مشكلة جديدة')} onPress={() => router.push({ pathname: '/assistant', params: { mode: 'complaint' } })} />}>
+      <BackBar title={t('الدعم')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
+      <Muted size={14}>{t('لو عندك سؤال شوف المواضيع دي. ولو عندك مشكلة، فريقنا بيرد عادةً خلال ١٥ دقيقة من ١٠ص لـ١٠م.')}</Muted>
       <View style={{ backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 14 }}>
         {topics.map((t, i) => (
           <Press key={t.title} onPress={t.open} label={t.title}
@@ -54,7 +55,7 @@ export default function Support() {
         ))}
       </View>
       {data?.length ? (
-        <Section title="شكاويّ">
+        <Section title={t('شكاويّ')}>
           <View style={{ gap: 10, marginTop: 8 }}>
             {data.map((r) => (
               <Card key={r.id} onPress={() => router.push({ pathname: '/assistant', params: { ticket: r.id } })}>
@@ -63,12 +64,12 @@ export default function Support() {
                   <Pill label={TICKET_STATUS[r.status]} tone={r.status === 'resolved' ? 'good' : r.status === 'in_progress' ? 'new' : 'wait'} />
                 </Row>
                 <T size={14} numberOfLines={2}>{r.body}</T>
-                <Muted size={11.5}>آخر تحديث {ago(r.updated_at)}</Muted>
+                <Muted size={11.5}>{t('آخر تحديث')}{' '}{ago(r.updated_at)}</Muted>
               </Card>
             ))}
           </View>
         </Section>
-      ) : <Empty text="مفيش شكاوى قبل كده." />}
+      ) : <Empty text={t('مفيش شكاوى قبل كده.')} />}
       <GuaranteeSheet open={guarantee} onClose={() => setGuarantee(false)} />
     </Screen>
   );

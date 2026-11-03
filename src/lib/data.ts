@@ -1,3 +1,4 @@
+import { isEn, t } from '@/lib/i18n';
 export const MAKES = ['هيونداي', 'كيا', 'نيسان', 'تويوتا', 'ميتسوبيشي', 'شيفروليه', 'دايو', 'شيري', 'بي واي دي', 'إم جي', 'فيات', 'بيجو', 'رينو', 'سكودا', 'أوبل', 'سوزوكي', 'جيلي', 'أخرى'];
 
 export const AREAS = ['مدينة نصر', 'مصر الجديدة', 'التجمع الخامس', 'المعادي', 'حلوان', 'شبرا', 'شبرا الخيمة', 'وسط البلد', 'حدائق القبة', 'عين شمس', 'المطرية', 'الدقي', 'المهندسين', 'فيصل', 'الهرم', '٦ أكتوبر', 'الشيخ زايد', 'السبتية', 'التوفيقية', 'أخرى'];
@@ -6,7 +7,7 @@ export const GOVERNORATES = ['القاهرة', 'الجيزة', 'الإسكندر
 
 export const COUNTRIES = ['مصر'];
 
-export const SHOP_TYPES: Record<string, string> = { used: 'قطع مستعملة', new: 'قطع جديدة', both: 'مستعمل وجديد' };
+export const SHOP_TYPES: Record<string, string> = { used: t('قطع مستعملة'), new: t('قطع جديدة'), both: t('مستعمل وجديد') };
 
 export const SPECIALTIES = ['ميكانيكا', 'كهرباء', 'صاج وبودي', 'فوانيس ومرايات', 'تكييف وتبريد', 'عفشة ودبرياج', 'فرامل', 'فرش وإكسسوارات', 'إطارات وجنوط', 'زيوت وفلاتر', 'زجاج'];
 
@@ -14,50 +15,59 @@ export const COMMON_PARTS = ['فانوس أمامي', 'مراية جانبية',
 
 export const YEARS = Array.from({ length: 36 }, (_, i) => new Date().getFullYear() - i);
 
-export const WANTED: Record<string, string> = { any: 'جديد أو مستعمل', used: 'مستعمل بس', new: 'جديد بس' };
+export const WANTED: Record<string, string> = { any: t('جديد أو مستعمل'), used: t('مستعمل بس'), new: t('جديد بس') };
 
 export const CONDITIONS: Record<string, string> = {
-  used_original: 'مستعمل أصلي',
-  used_clean: 'مستعمل بحالة ممتازة',
-  new_aftermarket: 'جديد تجاري',
-  new_original: 'جديد أصلي',
+  used_original: t('مستعمل أصلي'),
+  used_clean: t('مستعمل بحالة ممتازة'),
+  new_aftermarket: t('جديد تجاري'),
+  new_original: t('جديد أصلي'),
 };
 
 /** Warranty is optional: most shops sell parts without one. 0 = no warranty; otherwise the shop types the days. */
 export const MAX_WARRANTY_DAYS = 730;
-export const warrantyLabel = (d: number) => (d > 0 ? `ضمان ${ar(d)} يوم` : 'بدون ضمان');
+export const warrantyLabel = (d: number) => (d > 0 ? t('ضمان {0} يوم', ar(d)) : t('بدون ضمان'));
 /** What every order gets, warranty or not: the part must match what was described. */
 export const MATCH_HOURS = 48;
 export const DELIVERY_FEE = 60;
 
 const AD = '٠١٢٣٤٥٦٧٨٩';
-export const ar = (v: string | number) => String(v).replace(/\d/g, (d) => AD[Number(d)]);
-export const money = (n: number) => ar(Math.round(n || 0).toLocaleString('en-US')).replace(/,/g, '٬');
+/** Digits as the reader expects them: Arabic-Indic in Arabic, 0-9 in English. */
+export const ar = (v: string | number) => (isEn() ? String(v) : String(v).replace(/\d/g, (d) => AD[Number(d)]));
+export const money = (n: number) => (isEn() ? Math.round(n || 0).toLocaleString('en-US') : ar(Math.round(n || 0).toLocaleString('en-US')).replace(/,/g, '٬'));
 export const reqNo = (n: number) => '#' + ar(n);
 
+/** "٣ يوم" / "3 days": how long since `iso`, without the "since" word. */
+export const sinceShort = (iso: string) => {
+  const m = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (m < 60) return t('{0} دقيقة', ar(m));
+  const h = Math.round(m / 60);
+  if (h < 24) return t('{0} ساعة', ar(h));
+  return t('{0} يوم', ar(Math.round(h / 24)));
+};
 export const ago = (iso: string) => {
   const m = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (m < 60) return 'من ' + ar(m) + ' دقيقة';
+  if (m < 60) return t('من {0} دقيقة', ar(m));
   const h = Math.round(m / 60);
-  if (h < 24) return 'من ' + ar(h) + ' ساعة';
-  return 'من ' + ar(Math.round(h / 24)) + ' يوم';
+  if (h < 24) return t('من {0} ساعة', ar(h));
+  return t('من {0} يوم', ar(Math.round(h / 24)));
 };
 
 /** A live stopwatch since `iso`: "٤٥ ث"، "١٢ د"، "١ س ٥ د"، "٢ يوم". */
 export const elapsed = (iso: string, now = Date.now()) => {
   const sec = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
-  if (sec < 60) return ar(sec) + ' ث';
+  if (sec < 60) return ar(sec) + t(' ث');
   const m = Math.floor(sec / 60);
-  if (m < 60) return ar(m) + ' د';
+  if (m < 60) return ar(m) + t(' د');
   const h = Math.floor(m / 60);
-  if (h < 24) return ar(h) + ' س' + (m % 60 ? ' ' + ar(m % 60) + ' د' : '');
-  return ar(Math.floor(h / 24)) + ' يوم';
+  if (h < 24) return ar(h) + t(' س') + (m % 60 ? ' ' + ar(m % 60) + t(' د') : '');
+  return ar(Math.floor(h / 24)) + t(' يوم');
 };
 export const minutesSince = (iso: string, now = Date.now()) => (now - new Date(iso).getTime()) / 60000;
 
 /** How fast a shop usually answers, for the customer. */
 export const replyLabel = (min: number | null | undefined) =>
-  min == null ? 'محل جديد' : min <= 1 ? 'بيرد في دقيقة' : min < 60 ? `بيرد في ${ar(min)} د` : `بيرد في ${ar(Math.round(min / 60))} س`;
+  min == null ? t('محل جديد') : min <= 1 ? t('بيرد في دقيقة') : min < 60 ? t('بيرد في {0} د', ar(min)) : t('بيرد في {0} س', ar(Math.round(min / 60)));
 
 /** What the customer sees about a shop that sent an offer. */
 export type ShopCard = { id: string; name: string; area: string; rating: number | null; ratings: number; sales: number; reply_min: number | null };
@@ -97,7 +107,7 @@ export const WEEKDAYS = ['الحد', 'الاتنين', 'التلات', 'الأر
 
 /** One readable line for an address. */
 export const addressLine = (a: { street?: string; building?: string; floor?: string; apartment?: string; area?: string; governorate?: string }) =>
-  [a.street, a.building && 'عمارة ' + a.building, a.floor && 'دور ' + a.floor, a.apartment && 'شقة ' + a.apartment, a.area, a.governorate].filter(Boolean).join('، ');
+  [a.street, a.building && t('عمارة ') + a.building, a.floor && t('دور ') + a.floor, a.apartment && t('شقة ') + a.apartment, a.area, a.governorate].filter(Boolean).join(t('، '));
 export type Request = {
   id: string; num: number; customer_id: string; part: string; car_make: string; car_model: string; car_year: number; powertrain?: string; part_number?: string;
   wanted_condition: 'used' | 'new' | 'any'; area: string; notes: string; photo_path: string | null;
@@ -112,17 +122,17 @@ export type Message = { id: string; request_id: string; shop_id: string; sender_
 export type Notification = { id: string; title: string; body: string; link: string; read_at: string | null; created_at: string };
 export type Report = { id: string; ticket_no: number; reporter_id: string; request_id: string | null; category: string; body: string; status: 'bot' | 'open' | 'in_progress' | 'resolved'; admin_reply: string; created_at: string; updated_at: string };
 export type TicketMessage = { id: string; report_id: string; sender_id: string; body: string; kind: 'user' | 'bot' | 'system'; internal?: boolean; created_at: string };
-export const TICKET_STATUS: Record<string, string> = { bot: 'المساعد بيحاول يحلّها', open: 'مستني موظف', in_progress: 'موظف معاك', resolved: 'اتقفلت' };
+export const TICKET_STATUS: Record<string, string> = { bot: t('المساعد بيحاول يحلّها'), open: t('مستني موظف'), in_progress: t('موظف معاك'), resolved: t('اتقفلت') };
 
-export const SIDES: Record<string, string> = { '': 'مش مهم', right: 'يمين', left: 'شمال', both: 'الاتنين', front: 'أمامي', rear: 'خلفي' };
-export const URGENCY: Record<string, string> = { normal: 'عادي', today: 'النهارده', urgent: 'مستعجل جداً' };
+export const SIDES: Record<string, string> = { '': t('مش مهم'), right: t('يمين'), left: t('شمال'), both: t('الاتنين'), front: t('أمامي'), rear: t('خلفي') };
+export const URGENCY: Record<string, string> = { normal: t('عادي'), today: t('النهارده'), urgent: t('مستعجل جداً') };
 export const ORDER_STEPS: { key: string; label: string; pickupLabel?: string }[] = [
-  { key: 'preparing', label: 'المحل بيجهّز' },
-  { key: 'ready', label: 'جاهزة', pickupLabel: 'جاهزة للاستلام' },
-  { key: 'out_for_delivery', label: 'خرجت للتوصيل' },
-  { key: 'delivered', label: 'اتسلّمت' },
+  { key: 'preparing', label: t('المحل بيجهّز') },
+  { key: 'ready', label: t('جاهزة'), pickupLabel: t('جاهزة للاستلام') },
+  { key: 'out_for_delivery', label: t('خرجت للتوصيل') },
+  { key: 'delivered', label: t('اتسلّمت') },
 ];
-export const REPORT_CATEGORIES: Record<string, string> = { order: 'مشكلة في طلب', shop: 'شكوى من محل', customer: 'شكوى من عميل', app: 'مشكلة في التطبيق', other: 'حاجة تانية' };
+export const REPORT_CATEGORIES: Record<string, string> = { order: t('مشكلة في طلب'), shop: t('شكوى من محل'), customer: t('شكوى من عميل'), app: t('مشكلة في التطبيق'), other: t('حاجة تانية') };
 export type Quote = {
   id: string; request_id: string; shop_id: string; price: number; condition: string; warranty_days: number;
   photo_path: string | null; created_at: string; brand: string; note: string;
@@ -135,29 +145,29 @@ export const MAX_OFFERS = 5;
 
 export function friendlyError(e: any): string {
   const msg = String(e?.message || e || '');
-  if (/Invalid login credentials/i.test(msg)) return 'الإيميل أو كلمة السر غلط.';
-  if (/already registered|already exists/i.test(msg)) return 'الإيميل ده متسجل قبل كده. جرّب تسجّل دخول.';
-  if (/Password should be/i.test(msg)) return 'كلمة السر لازم تكون ٦ حروف أو أكتر.';
-  if (/Email not confirmed/i.test(msg)) return 'لازم تأكد إيميلك الأول من الرسالة اللي وصلتك.';
-  if (/rate limit/i.test(msg)) return 'محاولات كتير. استنى شوية وجرّب تاني.';
-  if (/profiles_one_role/i.test(msg)) return 'الحساب ده متسجل بدور تاني. كل حساب يا عميل يا محل.';
-  if (/does not deliver/i.test(msg)) return 'المحل ده مش بيوصّل. اختار الاستلام من المحل.';
-  if (/request is closed/i.test(msg)) return 'الطلب ده اتقفل.';
-  if (/daily limit/i.test(msg)) return 'وصلت لأقصى عدد طلبات النهارده (٢٠). جرّب بكرة.';
-  if (/offer expired|cannot choose/i.test(msg)) return 'العرض ده انتهى أو المحل سحبه. اختار عرض تاني.';
-  if (/address needed/i.test(msg)) return 'اكتب عنوان التوصيل كامل.';
-  if (/max addresses/i.test(msg)) return 'تقدر تحفظ ٥ عناوين بس. امسح عنوان قديم الأول.';
-  if (/shop has open items/i.test(msg)) return 'لازم تكمّل الأوردرات الشغالة، وترجّع أي فلوس لعملاء، وتسدّد العمولة الأول.';
-  if (/not ready yet/i.test(msg)) return 'الأوردر لسه بيتجهّز.';
-  if (/reason needed/i.test(msg)) return 'اختار سبب الرفض.';
-  if (/postal_code/i.test(msg)) return 'الرقم البريدي لازم يكون ٥ أرقام.';
-  if (/too many offers/i.test(msg)) return 'وصلت لأقصى عدد عروض (٥) على القطعة دي.';
-  if (/balance due/i.test(msg)) return 'عليك عمولة وصلت للحد. سدّد من «حسابك مع ضغطة» عشان تبعت عروض جديدة.';
-  if (/payment pending/i.test(msg)) return 'لسه الدفع ماتأكدش.';
-  if (/no transfer details/i.test(msg)) return 'المحل ده مش مفعّل الدفع بالتحويل.';
-  if (/warranty_days/i.test(msg)) return 'مدة الضمان لازم تكون من ١ لـ ٧٣٠ يوم.';
-  if (/network|fetch/i.test(msg)) return 'مفيش اتصال بالإنترنت. جرّب تاني.';
-  return 'حصلت مشكلة. جرّب تاني.';
+  if (/Invalid login credentials/i.test(msg)) return t('الإيميل أو كلمة السر غلط.');
+  if (/already registered|already exists/i.test(msg)) return t('الإيميل ده متسجل قبل كده. جرّب تسجّل دخول.');
+  if (/Password should be/i.test(msg)) return t('كلمة السر لازم تكون ٦ حروف أو أكتر.');
+  if (/Email not confirmed/i.test(msg)) return t('لازم تأكد إيميلك الأول من الرسالة اللي وصلتك.');
+  if (/rate limit/i.test(msg)) return t('محاولات كتير. استنى شوية وجرّب تاني.');
+  if (/profiles_one_role/i.test(msg)) return t('الحساب ده متسجل بدور تاني. كل حساب يا عميل يا محل.');
+  if (/does not deliver/i.test(msg)) return t('المحل ده مش بيوصّل. اختار الاستلام من المحل.');
+  if (/request is closed/i.test(msg)) return t('الطلب ده اتقفل.');
+  if (/daily limit/i.test(msg)) return t('وصلت لأقصى عدد طلبات النهارده (٢٠). جرّب بكرة.');
+  if (/offer expired|cannot choose/i.test(msg)) return t('العرض ده انتهى أو المحل سحبه. اختار عرض تاني.');
+  if (/address needed/i.test(msg)) return t('اكتب عنوان التوصيل كامل.');
+  if (/max addresses/i.test(msg)) return t('تقدر تحفظ ٥ عناوين بس. امسح عنوان قديم الأول.');
+  if (/shop has open items/i.test(msg)) return t('لازم تكمّل الأوردرات الشغالة، وترجّع أي فلوس لعملاء، وتسدّد العمولة الأول.');
+  if (/not ready yet/i.test(msg)) return t('الأوردر لسه بيتجهّز.');
+  if (/reason needed/i.test(msg)) return t('اختار سبب الرفض.');
+  if (/postal_code/i.test(msg)) return t('الرقم البريدي لازم يكون ٥ أرقام.');
+  if (/too many offers/i.test(msg)) return t('وصلت لأقصى عدد عروض (٥) على القطعة دي.');
+  if (/balance due/i.test(msg)) return t('عليك عمولة وصلت للحد. سدّد من «حسابك مع ضغطة» عشان تبعت عروض جديدة.');
+  if (/payment pending/i.test(msg)) return t('لسه الدفع ماتأكدش.');
+  if (/no transfer details/i.test(msg)) return t('المحل ده مش مفعّل الدفع بالتحويل.');
+  if (/warranty_days/i.test(msg)) return t('مدة الضمان لازم تكون من ١ لـ ٧٣٠ يوم.');
+  if (/network|fetch/i.test(msg)) return t('مفيش اتصال بالإنترنت. جرّب تاني.');
+  return t('حصلت مشكلة. جرّب تاني.');
 }
 
 /** Parts sent together share a batch; the apps show a batch as one request. */
@@ -174,7 +184,7 @@ export function groupRequests(rs: Request[]): Group[] {
   });
 }
 export const partsLabel = (items: { part: string }[]) =>
-  items.length === 1 ? items[0].part : items.length === 2 ? items[0].part + ' و' + items[1].part : `${items[0].part} و${ar(items.length - 1)} قطع تانية`;
+  items.length === 1 ? t(items[0].part) : items.length === 2 ? t(items[0].part) + t(' و') + t(items[1].part) : t('{0} و{1} قطع تانية', t(items[0].part), ar(items.length - 1));
 
 /** A random id for a batch of parts (no crypto needed). */
 export const newId = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -184,12 +194,12 @@ export const newId = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/
 
 /** One step of progress for a group of parts, 0..4, and its label for the customer. */
 export function groupProgress(items: Request[], quoteCount: number): { step: number; label: string } {
-  if (items.every((r) => r.status === 'done')) return { step: 4, label: 'اتسلّم' };
-  if (items.every((r) => r.status === 'cancelled')) return { step: 0, label: 'اتلغى' };
-  if (items.some((r) => r.status === 'chosen' && r.order_status === 'out_for_delivery')) return { step: 3, label: 'في الطريق ليك' };
-  if (items.some((r) => r.status === 'chosen')) return { step: 3, label: 'المحل بيجهّز' };
-  if (quoteCount) return { step: 2, label: `${ar(quoteCount)} عروض مستنياك` };
-  return { step: 1, label: 'بندوّر عند المحلات' };
+  if (items.every((r) => r.status === 'done')) return { step: 4, label: t('اتسلّم') };
+  if (items.every((r) => r.status === 'cancelled')) return { step: 0, label: t('اتلغى') };
+  if (items.some((r) => r.status === 'chosen' && r.order_status === 'out_for_delivery')) return { step: 3, label: t('في الطريق ليك') };
+  if (items.some((r) => r.status === 'chosen')) return { step: 3, label: t('المحل بيجهّز') };
+  if (quoteCount) return { step: 2, label: t('{0} عروض مستنياك', ar(quoteCount)) };
+  return { step: 1, label: t('بندوّر عند المحلات') };
 }
 
 /* ---------------------------------------------------------------- orders */
@@ -208,18 +218,18 @@ export type PayStatus = 'unpaid' | 'awaiting' | 'review' | 'paid' | 'failed' | '
 export const orderNo = (n: number) => '#' + ar(n);
 /** What the customer reads for each order status. */
 export const ORDER_LABEL: Record<Order['status'], { title: string; short: string; icon: string }> = {
-  preparing: { title: 'المحل بيجهّز أوردرك', short: 'بيتجهّز', icon: 'construct' },
-  ready: { title: 'أوردرك جاهز', short: 'جاهز', icon: 'bag-check' },
+  preparing: { title: t('المحل بيجهّز أوردرك'), short: t('بيتجهّز'), icon: 'construct' },
+  ready: { title: t('أوردرك جاهز'), short: t('جاهز'), icon: 'bag-check' },
   // older orders may still carry these two; they read as "ready"
-  out_for_delivery: { title: 'أوردرك جاهز', short: 'جاهز', icon: 'bag-check' },
-  delivered: { title: 'أوردرك جاهز', short: 'جاهز', icon: 'bag-check' },
-  received: { title: 'استلمت الأوردر', short: 'اتسلّم', icon: 'checkmark-circle' },
-  cancelled: { title: 'الأوردر اتلغى', short: 'اتلغى', icon: 'close-circle' },
+  out_for_delivery: { title: t('أوردرك جاهز'), short: t('جاهز'), icon: 'bag-check' },
+  delivered: { title: t('أوردرك جاهز'), short: t('جاهز'), icon: 'bag-check' },
+  received: { title: t('استلمت الأوردر'), short: t('اتسلّم'), icon: 'checkmark-circle' },
+  cancelled: { title: t('الأوردر اتلغى'), short: t('اتلغى'), icon: 'close-circle' },
 };
 /** The order's headline, worded for delivery or pickup. */
 export const orderTitle = (o: Pick<Order, 'status' | 'delivery_mode'>) =>
   ['ready', 'out_for_delivery', 'delivered'].includes(o.status)
-    ? (o.delivery_mode === 'delivery' ? 'أوردرك جاهز وخارج لك' : 'أوردرك جاهز للاستلام من المحل')
+    ? (o.delivery_mode === 'delivery' ? t('أوردرك جاهز وخارج لك') : t('أوردرك جاهز للاستلام من المحل'))
     : ORDER_LABEL[o.status].title;
 /** Every order goes through the same three steps: the shop prepares it, it is ready, the customer receives it. */
 export const orderSteps = (_mode?: Order['delivery_mode']): Order['status'][] => ['preparing', 'ready', 'received'];
@@ -227,6 +237,6 @@ export const orderSteps = (_mode?: Order['delivery_mode']): Order['status'][] =>
 export const orderStep = (o: Pick<Order, 'status'>) =>
   o.status === 'cancelled' ? -1 : o.status === 'received' ? 2 : o.status === 'preparing' ? 0 : 1;
 export const ORDER_STEP_NAME: Record<string, string> = {
-  preparing: 'بيتجهّز', ready: 'جاهز', out_for_delivery: 'جاهز', delivered: 'جاهز', received: 'استلمت',
+  preparing: t('بيتجهّز'), ready: t('جاهز'), out_for_delivery: t('جاهز'), delivered: t('جاهز'), received: t('استلمت'),
 };
 export const orderActive = (o: Pick<Order, 'status'>) => o.status !== 'received' && o.status !== 'cancelled';

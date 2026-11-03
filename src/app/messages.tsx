@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { ago, ar, reqNo } from '@/lib/data';
 import { useInbox, type Thread } from '@/lib/inbox';
 import { brand, colors, radius } from '@/lib/theme';
+import { t as tr } from '@/lib/i18n';
 
 /** The messages tab: every chat with shops (or customers, for a shop), newest first, with unread counts. */
 export default function Messages() {
@@ -22,8 +23,8 @@ export default function Messages() {
 
   return (
     <Screen nav={<BottomNav role={role} />}>
-      <T w="bold" size={28} style={{ lineHeight: 40 }}>الرسائل</T>
-      {threads.length > 4 ? <Field value={q} onChangeText={setQ} placeholder="دوّر بالقطعة أو رقم الطلب" icon="search" /> : null}
+      <T w="bold" size={28} style={{ lineHeight: 40 }}>{tr('الرسائل')}</T>
+      {threads.length > 4 ? <Field value={q} onChangeText={setQ} placeholder={tr('دوّر بالقطعة أو رقم الطلب')} icon="search" /> : null}
 
       {role === 'customer' ? (
         <Press onPress={() => router.push('/assistant')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: radius.lg, backgroundColor: colors.ink }}>
@@ -31,8 +32,8 @@ export default function Messages() {
             <Mark size={40} />
           </View>
           <View style={{ flex: 1 }}>
-            <T w="bold" size={15} color="#fff">مساعد ضغطة</T>
-            <T size={12.5} color="rgba(255,255,255,.7)" numberOfLines={1}>اطلب قطعة بالكلام، أو قدّم شكوى</T>
+            <T w="bold" size={15} color="#fff">{tr('مساعد ضغطة')}</T>
+            <T size={12.5} color="rgba(255,255,255,.7)" numberOfLines={1}>{tr('اطلب قطعة بالكلام، أو قدّم شكوى')}</T>
           </View>
           <Icon name="chevron-back" size={18} color="rgba(255,255,255,.6)" />
         </Press>
@@ -43,14 +44,14 @@ export default function Messages() {
           {shown.map((t, i) => <ThreadRow key={t.request_id + t.shop_id} t={t} last={i === shown.length - 1} />)}
         </View>
       ) : (
-        <Empty icon="chatbubbles-outline" text={role === 'shop' ? 'لما عميل يسألك عن قطعة، المحادثة بتظهر هنا.' : 'لما تكلّم محل عن عرض، المحادثة بتظهر هنا.\nممكن تسأل المحل من صفحة العروض.'} />
+        <Empty icon="chatbubbles-outline" text={role === 'shop' ? tr('لما عميل يسألك عن قطعة، المحادثة بتظهر هنا.') : tr('لما تكلّم محل عن عرض، المحادثة بتظهر هنا.\nممكن تسأل المحل من صفحة العروض.')} />
       )}
     </Screen>
   );
 }
 
 function ThreadRow({ t, last }: { t: Thread; last: boolean }) {
-  const preview = t.last_photo && !t.last_body ? 'صورة' : t.last_body;
+  const preview = t.last_photo && !t.last_body ? tr('صورة') : t.last_body;
   const unread = t.unread > 0;
   return (
     <Press onPress={() => router.push(`/chat/${t.request_id}/${t.shop_id}`)} label={t.other_name}
@@ -61,12 +62,12 @@ function ThreadRow({ t, last }: { t: Thread; last: boolean }) {
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
         <Row style={{ justifyContent: 'space-between' }} gap={8}>
           <T w={unread ? 'bold' : 'semibold'} size={15} numberOfLines={1} style={{ flex: 1 }}>{t.other_name}</T>
-          <Muted size={11.5}>{ago(t.last_at).replace('من ', '')}</Muted>
+          <Muted size={11.5}>{ago(t.last_at).replace(tr('من '), '')}</Muted>
         </Row>
-        <Muted size={12} numberOfLines={1}>{t.part}، طلب {reqNo(t.num)}{t.ordered ? '، أوردر مؤكد' : ''}</Muted>
+        <Muted size={12} numberOfLines={1}>{t.part}{tr('، طلب')}{' '}{reqNo(t.num)}{t.ordered ? tr('، أوردر مؤكد') : ''}</Muted>
         <Row gap={8}>
           <T size={13.5} w={unread ? 'semibold' : 'regular'} color={unread ? colors.ink : colors.muted} numberOfLines={1} style={{ flex: 1 }}>
-            {t.last_mine ? 'انت: ' : ''}{preview}
+            {t.last_mine ? tr('انت: ') : ''}{preview}
           </T>
           {unread ? (
             <View style={{ minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>

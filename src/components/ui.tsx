@@ -9,6 +9,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { FILLED, LINE } from './icons';
 import { colors, fontWeights, fonts, lift, liftStrong, radius } from '@/lib/theme';
+import { dir, flipIcon, startAlign, t as tr } from '@/lib/i18n';
 
 /* ---------------------------------------------------------------- text */
 type W = 'regular' | 'medium' | 'semibold' | 'bold' | 'display';
@@ -18,7 +19,7 @@ export function T({ children, w = 'regular', size = 15, color = colors.ink, cent
 }) {
   return (
     <Text selectable={selectable} numberOfLines={numberOfLines}
-      style={[{ fontFamily: fonts[w], fontWeight: fontWeights[w], fontSize: size, color, lineHeight: Math.round(size * 1.55), writingDirection: 'rtl' }, center && { textAlign: 'center' }, style]}>
+      style={[{ fontFamily: fonts[w], fontWeight: fontWeights[w], fontSize: size, color, lineHeight: Math.round(size * 1.55), writingDirection: dir() }, center && { textAlign: 'center' }, style]}>
       {children}
     </Text>
   );
@@ -94,7 +95,8 @@ type IconSet = 'ion' | 'mci';
  * Icons: clean line icons (Lucide) for the interface, MaterialCommunityIcons for car parts.
  * Screens keep using Ionicons-style names; "-outline" is ignored because every interface icon is a line icon.
  */
-export function Icon({ name, size = 22, color = colors.ink, set = 'ion', stroke }: { name: string; size?: number; color?: string; set?: IconSet; stroke?: number }) {
+export function Icon({ name: raw, size = 22, color = colors.ink, set = 'ion', stroke }: { name: string; size?: number; color?: string; set?: IconSet; stroke?: number }) {
+  const name = flipIcon(raw);
   if (set === 'mci') return <MaterialCommunityIcons name={name as any} size={size} color={color} />;
   const outline = name.endsWith('-outline');
   const base = outline ? name.slice(0, -8) : name;
@@ -163,7 +165,7 @@ export function IconButton({ name, onPress, label, tone = 'white', size = 42, se
 export function BackBar({ title, onBack, right }: { title: string; onBack: () => void; right?: ReactNode }) {
   return (
     <Row style={{ marginBottom: 2, minHeight: 44 }} gap={12}>
-      <IconButton name="chevron-forward" onPress={onBack} label="رجوع" size={40} />
+      <IconButton name="chevron-forward" onPress={onBack} label={tr('رجوع')} size={40} />
       <T w="bold" size={17} center style={{ flex: 1 }} numberOfLines={1}>{title}</T>
       <View style={{ minWidth: 40, alignItems: 'flex-end' }}>{right}</View>
     </Row>
@@ -207,7 +209,7 @@ export function Field({ label, value, onChangeText, placeholder, keyboardType, l
           keyboardType={keyboardType} secureTextEntry={secure} multiline={multiline}
           autoCapitalize="none" autoCorrect={!ltr} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
           style={[s.input, big && { fontSize: 20, fontFamily: fonts.bold }, multiline && { minHeight: 84, textAlignVertical: 'top' },
-            ltr ? { writingDirection: 'ltr', textAlign: 'right' } : { textAlign: 'right' }, { outlineStyle: 'none' } as any]}
+            ltr ? { writingDirection: 'ltr', textAlign: startAlign() } : { textAlign: startAlign() }, { outlineStyle: 'none' } as any]}
         />
       </View>
       {hint ? <Muted size={12}>{hint}</Muted> : null}
@@ -266,7 +268,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
           <View style={s.grabber} />
           <Row style={{ justifyContent: 'space-between', marginBottom: 8 }}>
             <T w="bold" size={19}>{title}</T>
-            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="اقفل"><Icon name="close" size={22} color={colors.muted} /></Pressable>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={tr('اقفل')}><Icon name="close" size={22} color={colors.muted} /></Pressable>
           </Row>
           {children}
         </Pressable>
@@ -354,12 +356,12 @@ export function Photo({ uri, size = 72 }: { uri?: string | null; size?: number }
   if (!uri) return <View style={[s.photo, { width: size, height: size }]}><Icon set="mci" name="car-wrench" size={Math.round(size / 2.4)} color={colors.faint} /></View>;
   return (
     <>
-      <Pressable onPress={() => setBig(true)} accessibilityRole="imagebutton" accessibilityLabel="كبّر الصورة">
-        <Image source={{ uri }} style={[s.photo, { width: size, height: size }]} accessibilityLabel="صورة القطعة" />
+      <Pressable onPress={() => setBig(true)} accessibilityRole="imagebutton" accessibilityLabel={tr('كبّر الصورة')}>
+        <Image source={{ uri }} style={[s.photo, { width: size, height: size }]} accessibilityLabel={tr('صورة القطعة')} />
       </Pressable>
       <Modal visible={big} transparent animationType="fade" onRequestClose={() => setBig(false)}>
         <Pressable style={[s.backdrop, { backgroundColor: 'rgba(10,12,18,.92)' }]} onPress={() => setBig(false)}>
-          <Image source={{ uri }} style={{ width: '94%', height: '80%' }} resizeMode="contain" accessibilityLabel="صورة القطعة" />
+          <Image source={{ uri }} style={{ width: '94%', height: '80%' }} resizeMode="contain" accessibilityLabel={tr('صورة القطعة')} />
         </Pressable>
       </Modal>
     </>
@@ -373,8 +375,8 @@ export function PhotoPicker({ uri, onPick, hint }: { uri: string | null; onPick:
         <View style={[s.photo, { width: 56, height: 56, backgroundColor: colors.primarySoft }]}><Icon name="camera" size={24} color={colors.primary} /></View>
       )}
       <View style={{ flex: 1 }}>
-        <T w="semibold" size={14}>{uri ? 'الصورة اتضافت' : 'ضيف صورة'}</T>
-        <Muted size={12}>{uri ? 'اضغط لو عايز تغيّرها' : hint}</Muted>
+        <T w="semibold" size={14}>{uri ? tr('الصورة اتضافت') : tr('ضيف صورة')}</T>
+        <Muted size={12}>{uri ? tr('اضغط لو عايز تغيّرها') : hint}</Muted>
       </View>
     </Press>
   );
@@ -396,7 +398,7 @@ export function Skeleton({ h = 16, w = '100%', r = 10, style }: { h?: number; w?
 
 export function Loading() {
   return (
-    <View style={{ gap: 14, paddingTop: 8 }} accessibilityLabel="بيحمّل">
+    <View style={{ gap: 14, paddingTop: 8 }} accessibilityLabel={tr('بيحمّل')}>
       <Skeleton h={28} w="55%" />
       <Skeleton h={120} r={20} />
       <Skeleton h={84} r={20} />
@@ -415,7 +417,7 @@ export function Steps({ items, current = -1 }: { items: string[]; current?: numb
           <Row key={i} style={{ alignItems: 'flex-start' }} gap={12}>
             <View style={{ alignItems: 'center', width: 26 }}>
               <View style={[s.stepNum, (done || current < 0) && { backgroundColor: colors.ink }, now && { backgroundColor: colors.primary }]}>
-                {done ? <Icon name="checkmark" size={14} color="#fff" /> : <T w="bold" size={12} color={now || current < 0 ? '#fff' : colors.faint}>{['١', '٢', '٣', '٤', '٥', '٦'][i]}</T>}
+                {done ? <Icon name="checkmark" size={14} color="#fff" /> : <T w="bold" size={12} color={now || current < 0 ? '#fff' : colors.faint}>{[tr('١'), tr('٢'), tr('٣'), tr('٤'), tr('٥'), tr('٦')][i]}</T>}
               </View>
               {i < items.length - 1 ? <View style={{ width: 2, height: 22, backgroundColor: done ? colors.ink : colors.line }} /> : null}
             </View>
@@ -435,7 +437,7 @@ export function Plate({ top, bottom, size = 'md' }: { top: string; bottom: strin
   const k = { sm: { w: 92, f: 12, b: 7 }, md: { w: 118, f: 14, b: 8 }, lg: { w: 150, f: 18, b: 9 } }[size];
   return (
     <View style={[s.plate, { width: k.w }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <View style={s.plateTop}><T size={k.b} w="bold" color={colors.ink} style={{ lineHeight: k.b + 5 }}>مصر</T><T size={k.b} w="bold" color={colors.ink} style={{ lineHeight: k.b + 5 }}>EGYPT</T></View>
+      <View style={s.plateTop}><T size={k.b} w="bold" color={colors.ink} style={{ lineHeight: k.b + 5 }}>{tr('مصر')}</T><T size={k.b} w="bold" color={colors.ink} style={{ lineHeight: k.b + 5 }}>EGYPT</T></View>
       <View style={{ flexDirection: 'row', paddingVertical: 1 }}>
         <View style={{ flex: 1, alignItems: 'center' }}><T w="bold" size={k.f} numberOfLines={1}>{top}</T></View>
         <View style={{ flex: 1, alignItems: 'center', borderStartWidth: 1.5, borderColor: colors.ink }}><T w="bold" size={k.f} numberOfLines={1}>{bottom}</T></View>
@@ -457,7 +459,7 @@ export function Lines({ rows, total }: { rows: [string, string][]; total?: [stri
 export function CopyBox({ text }: { text: string }) {
   return (
     <View style={{ backgroundColor: colors.soft, borderRadius: radius.sm, paddingHorizontal: 12, paddingVertical: 10 }}>
-      <T selectable w="semibold" size={16} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{text}</T>
+      <T selectable w="semibold" size={16} style={{ writingDirection: 'ltr', textAlign: startAlign() }}>{text}</T>
     </View>
   );
 }
@@ -556,7 +558,7 @@ export function SlideToConfirm({ label, onConfirm, busy }: { label: string; onCo
       accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={() => onConfirm()}
       style={{ height: 60, borderRadius: 16, backgroundColor: colors.ink, justifyContent: 'center', overflow: 'hidden' }}>
       <Animated.View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: fill, backgroundColor: colors.primary, borderRadius: 16 }} />
-      <T w="semibold" size={15.5} color="#fff" center style={{ paddingHorizontal: knob + 16 }}>{busy ? 'بنأكد…' : label}</T>
+      <T w="semibold" size={15.5} color="#fff" center style={{ paddingHorizontal: knob + 16 }}>{busy ? tr('بنأكد…') : label}</T>
       <Animated.View {...pan.panHandlers}
         style={{ position: 'absolute', right: 4, width: knob, height: knob, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', transform: [{ translateX: Animated.multiply(x, -1) }], ...(Platform.OS === 'web' ? ({ cursor: 'grab' } as object) : {}) }}>
         {busy ? <ActivityIndicator color={colors.ink} /> : <Icon name="chevron-back" size={26} color={colors.ink} />}

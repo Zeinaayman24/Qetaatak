@@ -4,6 +4,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Icon, Muted, Press, Row, Screen, T, Title } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { colors, lift } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 export default function Welcome() {
   const { session, ready, signOut } = useAuth();
@@ -25,14 +26,14 @@ export default function Welcome() {
   );
   return (
     <Screen header={<AppHeader />}>
-      <Title sub="الاختيار ده مرة واحدة لكل رقم. لو عندك عربية ومحل، استخدم رقم مختلف لكل واحد.">هتستخدم ضغطة إزاي؟</Title>
-      {option('car-side', 'عندي عربية', 'اطلب أي قطعة وقارن أسعار أكتر من محل', '/profile', true)}
-      {option('store', 'عندي محل', 'استقبل طلبات العملاء وابعت عروضك', '/shop-setup', false)}
-      <Muted center size={12.5}>بنراجع بيانات كل محل قبل ما يبدأ يستقبل طلبات.</Muted>
-      <Press onPress={signOut} label="مش رقمك؟ سجّل خروج" style={{ alignSelf: 'center', paddingVertical: 6 }}>
-        <T size={13.5} w="semibold" color={colors.primary}>مش رقمك؟ سجّل خروج</T>
+      <Title sub={t('الاختيار ده مرة واحدة لكل رقم. لو عندك عربية ومحل، استخدم رقم مختلف لكل واحد.')}>{t('هتستخدم ضغطة إزاي؟')}</Title>
+      {option('car-side', t('عندي عربية'), t('اطلب أي قطعة وقارن أسعار أكتر من محل'), '/profile', true)}
+      {option('store', t('عندي محل'), t('استقبل طلبات العملاء وابعت عروضك'), '/shop-setup', false)}
+      <Muted center size={12.5}>{t('بنراجع بيانات كل محل قبل ما يبدأ يستقبل طلبات.')}</Muted>
+      <Press onPress={signOut} label={t('مش رقمك؟ سجّل خروج')} style={{ alignSelf: 'center', paddingVertical: 6 }}>
+        <T size={13.5} w="semibold" color={colors.primary}>{t('مش رقمك؟ سجّل خروج')}</T>
       </Press>
-      <Muted center size={12}>اخترت غلط؟ كلّم الدعم وهنغيّرهالك.</Muted>
+      <Muted center size={12}>{t('اخترت غلط؟ كلّم الدعم وهنغيّرهالك.')}</Muted>
     </Screen>
   );
 }

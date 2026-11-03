@@ -5,6 +5,7 @@ import { Icon, Press, Row, T } from '@/components/ui';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 export type Ad = {
   id: string; title: string; subtitle: string; image_path: string | null; link: string; advertiser: string;
@@ -77,12 +78,12 @@ export function AdBanner() {
       style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, overflow: 'hidden' }}>
       <Animated.View style={{ opacity: fade }}>
         {/* one quiet row: the ad is clearly labelled and never louder than the customer's own orders */}
-        <Press onPress={open} label={a.title || 'إعلان'} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 72 }}>
+        <Press onPress={open} label={a.title || t('إعلان')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 72 }}>
           {img ? <Image source={{ uri: img }} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: colors.soft }} resizeMode="cover" /> : null}
           <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
             <Row gap={6}>
               <View style={{ borderWidth: 1, borderColor: '#D5DAE1', borderRadius: 6, paddingHorizontal: 6 }}>
-                <T size={11} w="semibold" color={colors.muted} style={{ lineHeight: 17 }}>إعلان</T>
+                <T size={11} w="semibold" color={colors.muted} style={{ lineHeight: 17 }}>{t('إعلان')}</T>
               </View>
               {a.advertiser ? <T size={12.5} color={colors.muted} numberOfLines={1} style={{ flexShrink: 1 }}>{a.advertiser}</T> : null}
             </Row>

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { friendlyError } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 /** A29 privacy page (Product Register change 1.19). */
 export default function Privacy() {
@@ -27,38 +28,38 @@ export default function Privacy() {
     const { error } = await supabase.rpc('request_data_copy');
     setBusy(false);
     if (error && !/already/.test(error.message)) return toast(friendlyError(error));
-    setAsked(true); toast('وصلنا طلبك.');
+    setAsked(true); toast(t('وصلنا طلبك.'));
   }
 
   return (
     <Screen>
-      <BackBar title="الخصوصية والشروط" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
+      <BackBar title={t('الخصوصية والشروط')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
       <Card>
         <Row gap={12} style={{ alignItems: 'center' }}>
           <View style={{ flex: 1, gap: 2 }}>
-            <T w="semibold" size={15}>ابعتولي عروض وخصومات من ضغطة</T>
-            <Muted size={12.5}>تقدر تقفلها في أي وقت.</Muted>
+            <T w="semibold" size={15}>{t('ابعتولي عروض وخصومات من ضغطة')}</T>
+            <Muted size={12.5}>{t('تقدر تقفلها في أي وقت.')}</Muted>
           </View>
-          <Switch value={on} onValueChange={toggle} disabled={busy} trackColor={{ true: colors.primary, false: colors.line }} thumbColor="#fff" accessibilityLabel="ابعتولي عروض وخصومات من ضغطة" />
+          <Switch value={on} onValueChange={toggle} disabled={busy} trackColor={{ true: colors.primary, false: colors.line }} thumbColor="#fff" accessibilityLabel={t('ابعتولي عروض وخصومات من ضغطة')} />
         </Row>
       </Card>
       <Card>
-        <T w="semibold" size={15}>مين بيشوف بياناتك</T>
-        <Muted size={13.5}>رقمك وعنوانك بيظهروا بس للمحل اللي بتشتري منه، بعد تأكيد الأوردر. المحلات التانية بتشوف القطعة والعربية ومنطقتك بس.</Muted>
-        <Muted size={13.5}>محادثاتك مع المساعد بيعالجها ذكاء اصطناعي وبنحتفظ بيها عشان الدعم.</Muted>
+        <T w="semibold" size={15}>{t('مين بيشوف بياناتك')}</T>
+        <Muted size={13.5}>{t('رقمك وعنوانك بيظهروا بس للمحل اللي بتشتري منه، بعد تأكيد الأوردر. المحلات التانية بتشوف القطعة والعربية ومنطقتك بس.')}</Muted>
+        <Muted size={13.5}>{t('محادثاتك مع المساعد بيعالجها ذكاء اصطناعي وبنحتفظ بيها عشان الدعم.')}</Muted>
       </Card>
       <Card>
-        <T w="semibold" size={15}>الشروط والسياسات</T>
-        <Btn kind="link" title="الشروط والأحكام" onPress={() => router.push('/legal/terms')} style={{ alignSelf: 'flex-start' }} />
-        <Btn kind="link" title="سياسة الخصوصية" onPress={() => router.push('/legal/privacy')} style={{ alignSelf: 'flex-start' }} />
-        <Btn kind="link" title="سياسة الإلغاء" onPress={() => router.push('/legal/cancellation')} style={{ alignSelf: 'flex-start' }} />
+        <T w="semibold" size={15}>{t('الشروط والسياسات')}</T>
+        <Btn kind="link" title={t('الشروط والأحكام')} onPress={() => router.push('/legal/terms')} style={{ alignSelf: 'flex-start' }} />
+        <Btn kind="link" title={t('سياسة الخصوصية')} onPress={() => router.push('/legal/privacy')} style={{ alignSelf: 'flex-start' }} />
+        <Btn kind="link" title={t('سياسة الإلغاء')} onPress={() => router.push('/legal/cancellation')} style={{ alignSelf: 'flex-start' }} />
       </Card>
       <Card>
-        <T w="semibold" size={15}>اطلب نسخة من بياناتك</T>
-        <Muted size={13.5}>هنبعتلك ملف ببياناتك خلال ٣٠ يوم.</Muted>
-        <Btn kind="secondary" title={asked ? 'وصلنا طلبك' : 'اطلب نسخة من بياناتك'} disabled={asked} loading={busy} onPress={copy} />
+        <T w="semibold" size={15}>{t('اطلب نسخة من بياناتك')}</T>
+        <Muted size={13.5}>{t('هنبعتلك ملف ببياناتك خلال ٣٠ يوم.')}</Muted>
+        <Btn kind="secondary" title={asked ? t('وصلنا طلبك') : t('اطلب نسخة من بياناتك')} disabled={asked} loading={busy} onPress={copy} />
       </Card>
-      <Btn kind="link" title="امسح حسابي" onPress={() => router.push('/delete-account')} style={{ alignSelf: 'center' }} />
+      <Btn kind="link" title={t('امسح حسابي')} onPress={() => router.push('/delete-account')} style={{ alignSelf: 'center' }} />
     </Screen>
   );
 }

@@ -4,6 +4,7 @@ import { Muted, Press, T } from '@/components/ui';
 import { ORDER_LABEL, ar, elapsed, money, orderNo, type Order } from '@/lib/data';
 import { useNow } from '@/lib/live';
 import { colors, lift } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 /** Which tab an order sits in. Old "out for delivery / delivered" orders count as ready. */
 export type Bucket = 'preparing' | 'ready' | 'done';
@@ -47,12 +48,12 @@ export function OrderRow({ o, title, first, onPress, flag }: { o: Order; title: 
   const flagColor = flag ? (flag.tone === 'bad' ? colors.bad : flag.tone === 'good' ? colors.good : colors.warn) : undefined;
   const tone = o.status === 'preparing' ? [colors.warnSoft, colors.warn] : o.status === 'received' ? [colors.soft, colors.muted] : o.status === 'cancelled' ? [colors.badSoft, colors.bad] : [colors.goodSoft, colors.good];
   return (
-    <Press onPress={onPress} label={`أوردر ${orderNo(o.order_no)}`}
+    <Press onPress={onPress} label={t('أوردر {0}', orderNo(o.order_no))}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderColor: '#EEF0F3' }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         <T w="semibold" size={15} numberOfLines={1}>{title}</T>
         <Muted size={13} numberOfLines={1}>
-          أوردر {orderNo(o.order_no)} · {money(Number(o.items_total) + Number(o.delivery_fee))} ج.م · {live ? elapsed(o.created_at, now) : new Date(o.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
+          {t('أوردر')}{' '}{orderNo(o.order_no)} · {money(Number(o.items_total) + Number(o.delivery_fee))} {t('ج.م ·')}{' '}{live ? elapsed(o.created_at, now) : new Date(o.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}
         </Muted>
       </View>
       {flag ? <T size={13} w="semibold" color={flagColor}>{flag.label}</T> : null}

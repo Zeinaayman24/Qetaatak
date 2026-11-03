@@ -8,6 +8,7 @@ import { ago, type Notification } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 export default function Notifications() {
   const { ready, session } = useAuth();
@@ -28,7 +29,7 @@ export default function Notifications() {
   const list = data ?? [];
   return (
     <Screen>
-      <BackBar title="الإشعارات" onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <BackBar title={t('الإشعارات')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       <PushPrompt kind="banner" />
       {loading && !data ? <Loading /> : list.length ? (
         <View>
@@ -46,10 +47,10 @@ export default function Notifications() {
               {!n.read_at ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent, marginTop: 8 }} /> : null}
             </Pressable>
           ))}
-          <Btn kind="link" title="امسح الكل" style={{ alignSelf: 'center', marginTop: 12 }}
+          <Btn kind="link" title={t('امسح الكل')} style={{ alignSelf: 'center', marginTop: 12 }}
             onPress={async () => { await supabase.from('notifications').delete().eq('user_id', uid!); }} />
         </View>
-      ) : <Empty icon="notifications-outline" text="مفيش إشعارات لسه." />}
+      ) : <Empty icon="notifications-outline" text={t('مفيش إشعارات لسه.')} />}
     </Screen>
   );
 }

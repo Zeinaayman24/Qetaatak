@@ -3,9 +3,10 @@ import { Modal, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Btn, Chips, Field, Icon, IconButton, Loading, Muted, Press, Row, T } from './ui';
 import { MakeLogo } from './MakeLogo';
-import { POWERTRAINS, isElectrified, loadModels, matches, modelYears, useMakes, type Make, type Model, type Powertrain } from '@/lib/catalogue';
+import { POWERTRAINS, makeName, modelName, isElectrified, loadModels, matches, modelYears, useMakes, type Make, type Model, type Powertrain } from '@/lib/catalogue';
 import { ar } from '@/lib/data';
 import { colors } from '@/lib/theme';
+import { isEn, t } from '@/lib/i18n';
 
 export type PickedCar = { make: string; makeId: string | null; model: string; year: number; powertrain: Powertrain | '' };
 type Step = 'make' | 'model' | 'year' | 'pt';
@@ -58,7 +59,7 @@ export function CarPicker({ open, onClose, onDone, startMake }: {
     onDone({ make: make.name_ar, makeId: make.id, model: model?.name_ar ?? typed.trim(), year: y, powertrain: p });
   }
   const back = () => (step === 'pt' ? setStep('year') : step === 'year' ? setStep('model') : step === 'model' && !startMake ? setStep('make') : onClose());
-  const title = step === 'make' ? 'اختار ماركة عربيتك' : step === 'model' ? `موديل ${make?.name_ar ?? ''}` : step === 'year' ? 'سنة الصنع' : 'نوع المحرك';
+  const title = step === 'make' ? t('اختار ماركة عربيتك') : step === 'model' ? t('موديل {0}', make ? makeName(make) : '') : step === 'year' ? t('سنة الصنع') : t('نوع المحرك');
 
   const list = (makes ?? []).filter((m) => matches(q, m.name_ar, m.name_en) && (filter === 'all' || m.powertrains.some(isElectrified)));
   const modelList = (models ?? []).filter((m) => matches(q, m.name_ar, m.name_en) && (pt === 'all' || m.powertrains.includes(pt)));
@@ -70,23 +71,23 @@ export function CarPicker({ open, onClose, onDone, startMake }: {
         <View style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.line }}>
           <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 12 }}>
             <Row gap={10}>
-              <IconButton name={step === 'make' || (step === 'model' && startMake) ? 'close' : 'chevron-forward'} label={step === 'make' ? 'اقفل' : 'رجوع'} onPress={back} size={40} />
+              <IconButton name={step === 'make' || (step === 'model' && startMake) ? 'close' : 'chevron-forward'} label={step === 'make' ? t('اقفل') : t('رجوع')} onPress={back} size={40} />
               <View style={{ flex: 1 }}>
                 <T w="bold" size={18}>{title}</T>
-                {make && step !== 'make' ? <Muted size={13}>{[make.name_ar, model?.name_ar ?? typed, year ? ar(year) : ''].filter(Boolean).join(' · ')}</Muted> : null}
+                {make && step !== 'make' ? <Muted size={13}>{[makeName(make), model ? modelName(model) : typed, year ? ar(year) : ''].filter(Boolean).join(' · ')}</Muted> : null}
               </View>
               {make && step !== 'make' ? <MakeLogo make={make} size={40} /> : null}
             </Row>
             {step === 'make' || step === 'model' ? (
-              <Field value={q} onChangeText={setQ} icon="search" placeholder={step === 'make' ? 'دوّر على الماركة' : 'دوّر على الموديل'} />
+              <Field value={q} onChangeText={setQ} icon="search" placeholder={step === 'make' ? t('دوّر على الماركة') : t('دوّر على الموديل')} />
             ) : null}
             {step === 'make' ? (
-              <Chips options={[{ v: 'all' as Filter, label: 'كل العربيات' }, { v: 'electric' as Filter, label: 'كهربا وهايبرد', icon: 'flash-outline' }]}
+              <Chips options={[{ v: 'all' as Filter, label: t('كل العربيات') }, { v: 'electric' as Filter, label: t('كهربا وهايبرد'), icon: 'flash-outline' }]}
                 selected={[filter]} onPick={setFilter} />
             ) : null}
             {step === 'model' && pts.length > 1 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                <Chips options={[{ v: 'all' as Powertrain | 'all', label: 'الكل' }, ...pts.map((p) => ({ v: p.v as Powertrain | 'all', label: p.short }))]}
+                <Chips options={[{ v: 'all' as Powertrain | 'all', label: t('الكل') }, ...pts.map((p) => ({ v: p.v as Powertrain | 'all', label: p.short }))]}
                   selected={[pt]} onPick={setPt} />
               </ScrollView>
             ) : null}
@@ -95,16 +96,16 @@ export function CarPicker({ open, onClose, onDone, startMake }: {
 
         <ScrollView contentContainerStyle={{ width: '100%', maxWidth: 560, alignSelf: 'center', padding: 16, paddingBottom: 40 + insets.bottom, gap: 12 }} keyboardShouldPersistTaps="handled">
           {step === 'make' ? (
-            !makes ? (failed ? <Muted center>الماركات مااتحمّلتش. اتأكد من النت.</Muted> : <Loading />) : list.length ? (
+            !makes ? (failed ? <Muted center>{t('الماركات مااتحمّلتش. اتأكد من النت.')}</Muted> : <Loading />) : list.length ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 }}>
                 {list.map((m) => (
                   <Press key={m.id} onPress={() => pickMake(m)} label={m.name_ar} style={{ width: '25%', alignItems: 'center', gap: 6 }}>
                     <MakeLogo make={m} size={60} />
-                    <T size={12.5} w="medium" center numberOfLines={1}>{m.name_ar}</T>
+                    <T size={12.5} w="medium" center numberOfLines={1}>{makeName(m)}</T>
                   </Press>
                 ))}
               </View>
-            ) : <Muted center>مفيش ماركة بالاسم ده.</Muted>
+            ) : <Muted center>{t('مفيش ماركة بالاسم ده.')}</Muted>
           ) : null}
 
           {step === 'model' ? (
@@ -116,7 +117,7 @@ export function CarPicker({ open, onClose, onDone, startMake }: {
                       <Press key={m.id} onPress={() => pickModel(m)} label={m.name_ar}
                         style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, minHeight: 54, borderTopWidth: i ? 1 : 0, borderColor: '#EEF0F3' }}>
                         <View style={{ flex: 1 }}>
-                          <T w="medium" size={15}>{m.name_ar}{m.name_en && m.name_en !== m.name_ar ? <T size={13} color={colors.muted}>{'  '}{m.name_en}</T> : null}</T>
+                          <T w="medium" size={15}>{modelName(m)}{m.name_en && m.name_en !== m.name_ar ? <T size={13} color={colors.muted}>{'  '}{isEn() ? m.name_ar : m.name_en}</T> : null}</T>
                         </View>
                         {m.powertrains.some(isElectrified) ? (
                           <Muted size={12}>{m.powertrains.map((p) => POWERTRAINS.find((x) => x.v === p)?.short).join(' · ')}</Muted>
@@ -125,11 +126,11 @@ export function CarPicker({ open, onClose, onDone, startMake }: {
                       </Press>
                     ))}
                   </View>
-                ) : <Muted center>{models.length ? 'مفيش موديل بالاسم ده.' : 'لسه مفيش موديلات للماركة دي.'}</Muted>}
+                ) : <Muted center>{models.length ? t('مفيش موديل بالاسم ده.') : t('لسه مفيش موديلات للماركة دي.')}</Muted>}
                 <View style={{ gap: 8, marginTop: 8 }}>
-                  <T w="semibold" size={14}>مش لاقي عربيتك؟ اكتب الموديل</T>
-                  <Field value={typed} onChangeText={setTyped} placeholder="مثلاً: سيراتو ٢" />
-                  {typed.trim().length > 0 ? <Btn kind="secondary" title="كمّل" onPress={() => pickModel(null, typed.trim())} /> : null}
+                  <T w="semibold" size={14}>{t('مش لاقي عربيتك؟ اكتب الموديل')}</T>
+                  <Field value={typed} onChangeText={setTyped} placeholder={t('مثلاً: سيراتو ٢')} />
+                  {typed.trim().length > 0 ? <Btn kind="secondary" title={t('كمّل')} onPress={() => pickModel(null, typed.trim())} /> : null}
                 </View>
               </>
             )
@@ -148,9 +149,9 @@ export function CarPicker({ open, onClose, onDone, startMake }: {
 
           {step === 'pt' ? (
             <View style={{ gap: 10 }}>
-              <Muted size={14}>مكتوب في رخصة العربية. لو مش متأكد اختار «مش عارف».</Muted>
+              <Muted size={14}>{t('مكتوب في رخصة العربية. لو مش متأكد اختار «مش عارف».')}</Muted>
               <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
-                {[...POWERTRAINS.filter((p) => (model?.powertrains ?? make?.powertrains ?? []).includes(p.v)), { v: '' as const, label: 'مش عارف', short: '' }].map((p, i) => (
+                {[...POWERTRAINS.filter((p) => (model?.powertrains ?? make?.powertrains ?? []).includes(p.v)), { v: '' as const, label: t('مش عارف'), short: '' }].map((p, i) => (
                   <Press key={p.v || 'none'} onPress={() => finish(year, p.v)} label={p.label}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, minHeight: 54, borderTopWidth: i ? 1 : 0, borderColor: '#EEF0F3' }}>
                     <Icon name={p.v === 'ev' ? 'flash-outline' : p.v === 'hev' || p.v === 'phev' || p.v === 'erev' ? 'leaf-outline' : p.v ? 'water-outline' : 'help-circle-outline'} size={20} color={colors.ink} />

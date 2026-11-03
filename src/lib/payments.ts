@@ -1,25 +1,26 @@
 import { Linking, Platform } from 'react-native';
 import type { Order, PayMethod, PayStatus } from './data';
 import { supabase } from './supabase';
+import { t } from '@/lib/i18n';
 
 /** The four ways to pay, in the order the checkout lists them. */
 export const PAY_METHODS: { v: PayMethod; title: string; sub: string; icon: string }[] = [
-  { v: 'cash', title: 'كاش عند الاستلام', sub: 'ادفع للمندوب أو المحل لما القطعة توصلك', icon: 'cash' },
-  { v: 'instapay', title: 'InstaPay أو محفظة', sub: 'حوّل للمحل مباشرة وارفع صورة الإيصال، والمحل يأكد', icon: 'phone' },
-  { v: 'card', title: 'بطاقة بنكية', sub: 'فيزا، ماستركارد، ميزة، دفع آمن عن طريق Paymob', icon: 'card' },
-  { v: 'shop', title: 'الدفع في المحل', sub: 'للاستلام من المحل بس: ادفع وانت بتستلم', icon: 'storefront' },
+  { v: 'cash', title: t('كاش عند الاستلام'), sub: t('ادفع للمندوب أو المحل لما القطعة توصلك'), icon: 'cash' },
+  { v: 'instapay', title: t('InstaPay أو محفظة'), sub: t('حوّل للمحل مباشرة وارفع صورة الإيصال، والمحل يأكد'), icon: 'phone' },
+  { v: 'card', title: t('بطاقة بنكية'), sub: t('فيزا، ماستركارد، ميزة، دفع آمن عن طريق Paymob'), icon: 'card' },
+  { v: 'shop', title: t('الدفع في المحل'), sub: t('للاستلام من المحل بس: ادفع وانت بتستلم'), icon: 'storefront' },
 ];
-export const PAY_NAME: Record<PayMethod, string> = { cash: 'كاش عند الاستلام', instapay: 'InstaPay / محفظة', card: 'بطاقة بنكية', shop: 'الدفع في المحل' };
+export const PAY_NAME: Record<PayMethod, string> = { cash: t('كاش عند الاستلام'), instapay: t('InstaPay / محفظة'), card: t('بطاقة بنكية'), shop: t('الدفع في المحل') };
 
 /** How each payment state reads to the customer, and its pill tone. */
 export const PAY_STATUS: Record<PayStatus, { label: string; tone: 'good' | 'wait' | 'bad' | 'plain' | 'new' }> = {
-  unpaid: { label: 'الدفع عند الاستلام', tone: 'plain' },
-  awaiting: { label: 'مستني الدفع', tone: 'wait' },
-  review: { label: 'المحل بيراجع الإيصال', tone: 'new' },
-  paid: { label: 'مدفوع', tone: 'good' },
-  failed: { label: 'الدفع ماتمّش', tone: 'bad' },
-  refund_due: { label: 'هيترجّعلك المبلغ', tone: 'wait' },
-  refunded: { label: 'المبلغ رجع', tone: 'plain' },
+  unpaid: { label: t('الدفع عند الاستلام'), tone: 'plain' },
+  awaiting: { label: t('مستني الدفع'), tone: 'wait' },
+  review: { label: t('المحل بيراجع الإيصال'), tone: 'new' },
+  paid: { label: t('مدفوع'), tone: 'good' },
+  failed: { label: t('الدفع ماتمّش'), tone: 'bad' },
+  refund_due: { label: t('هيترجّعلك المبلغ'), tone: 'wait' },
+  refunded: { label: t('المبلغ رجع'), tone: 'plain' },
 };
 
 /** True when an online payment still has to happen before the shop can move on. */
@@ -40,7 +41,7 @@ export async function cardAvailable(): Promise<boolean> {
 /** Opens Paymob's secure checkout for one order. Returns an error message, or null when it opened. */
 export async function payByCard(orderId: string): Promise<string | null> {
   const { data, error } = await supabase.functions.invoke('paymob', { body: { mode: 'create', order: orderId } });
-  if (error || !data?.url) return data?.configured === false ? 'الدفع بالبطاقة لسه مش متفعّل.' : 'مقدرناش نفتح صفحة الدفع. جرّب تاني.';
+  if (error || !data?.url) return data?.configured === false ? t('الدفع بالبطاقة لسه مش متفعّل.') : t('مقدرناش نفتح صفحة الدفع. جرّب تاني.');
   if (Platform.OS === 'web' && typeof window !== 'undefined') window.location.href = data.url;
   else await Linking.openURL(data.url);
   return null;

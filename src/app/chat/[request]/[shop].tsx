@@ -8,6 +8,7 @@ import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, fonts, lift } from '@/lib/theme';
+import { t, dir, startAlign } from '@/lib/i18n';
 
 /** One conversation between a request's customer and one shop. */
 export default function Chat() {
@@ -35,7 +36,7 @@ export default function Chat() {
   if (loading && !data) return <Screen><Loading /></Screen>;
   const r = data?.req;
   const iAmShop = uid === shop;
-  const title = iAmShop ? 'عميل في ' + (data?.req?.area ?? '') : data?.name ?? 'محل في ' + (data?.sh?.area ?? '');
+  const title = iAmShop ? t('عميل في ') + (data?.req?.area ?? '') : data?.name ?? t('محل في ') + (data?.sh?.area ?? '');
   const back = () => (router.canGoBack() ? router.back() : router.replace('/messages'));
 
   async function send(photo?: string, preset?: string) {
@@ -51,12 +52,12 @@ export default function Chat() {
     finally { setSending(false); }
   }
   async function sendPhoto() {
-    try { const uri = await pickPhoto(); if (uri) await send(uri); } catch { toast('الصورة دي مش مدعومة.'); }
+    try { const uri = await pickPhoto(); if (uri) await send(uri); } catch { toast(t('الصورة دي مش مدعومة.')); }
   }
 
   const quick = iAmShop
-    ? ['القطعة متوفرة أصلي', 'ابعتلي صورة القطعة القديمة', 'محتاج رقم الشاسيه', 'السعر نهائي']
-    : ['لسه متوفرة؟', 'ابعتلي صورة للقطعة', 'أصلي ولا تجاري؟', 'ممكن توصيل النهارده؟'];
+    ? [t('القطعة متوفرة أصلي'), t('ابعتلي صورة القطعة القديمة'), t('محتاج رقم الشاسيه'), t('السعر نهائي')]
+    : [t('لسه متوفرة؟'), t('ابعتلي صورة للقطعة'), t('أصلي ولا تجاري؟'), t('ممكن توصيل النهارده؟')];
   const deal = !!data?.deal;
 
   const input = (
@@ -69,13 +70,13 @@ export default function Chat() {
         ))}
       </ScrollView>
       <Row gap={8}>
-        <Press onPress={sendPhoto} label="ابعت صورة" style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
+        <Press onPress={sendPhoto} label={t('ابعت صورة')} style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="camera" size={21} />
         </Press>
-        <TextInput value={text} onChangeText={setText} placeholder="اكتب رسالة…" placeholderTextColor={colors.faint}
+        <TextInput value={text} onChangeText={setText} placeholder={t('اكتب رسالة…')} placeholderTextColor={colors.faint}
           onSubmitEditing={() => send()} submitBehavior="submit" returnKeyType="send"
-          style={[{ flex: 1, minHeight: 46, maxHeight: 120, backgroundColor: colors.soft, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 11, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, textAlign: 'right' }, { outlineStyle: 'none' } as any]} />
-        <Press onPress={() => send()} disabled={sending || !text.trim()} label="ابعت"
+          style={[{ flex: 1, minHeight: 46, maxHeight: 120, backgroundColor: colors.soft, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 11, fontFamily: fonts.medium, fontSize: 15, color: colors.ink, textAlign: startAlign() }, { outlineStyle: 'none' } as any]} />
+        <Press onPress={() => send()} disabled={sending || !text.trim()} label={t('ابعت')}
           style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: text.trim() ? colors.accent : colors.soft, alignItems: 'center', justifyContent: 'center' }}>
           {sending ? <ActivityIndicator color={colors.ink} /> : <Icon name="arrow-up" size={20} color={text.trim() ? colors.ink : colors.faint} />}
         </Press>
@@ -85,13 +86,13 @@ export default function Chat() {
 
   return (
     <Screen footer={input}>
-      <BackBar title={title} onBack={back} right={deal ? <Pill label="أوردر مؤكد" tone="good" icon="checkmark" /> : undefined} />
+      <BackBar title={title} onBack={back} right={deal ? <Pill label={t('أوردر مؤكد')} tone="good" icon="checkmark" /> : undefined} />
       {r ? (
         <Press onPress={back} style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 18, padding: 10 }, lift]}>
           <Photo uri={photoUrl(r.photo_path)} size={44} />
           <View style={{ flex: 1 }}>
-            <T w="semibold" size={14}>{r.part}</T>
-            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}{data?.quote ? (data.offers > 1 && !data.deal ? `، ${ar(data.offers)} عروض من ${money(data.quote.price)} ج.م` : `، عرض المحل ${money(data.quote.price)} ج.م`) : ''}</Muted>
+            <T w="semibold" size={14}>{t(r.part)}</T>
+            <Muted size={12}>{r.car_make} {r.car_model} {ar(r.car_year)}{data?.quote ? (data.offers > 1 && !data.deal ? t('، {0} عروض من {1} ج.م', ar(data.offers), money(data.quote.price)) : t('، عرض المحل {0} ج.م', money(data.quote.price))) : ''}</Muted>
           </View>
           <Icon name="chevron-back" size={16} color={colors.faint} />
         </Press>
@@ -99,7 +100,7 @@ export default function Chat() {
       {!deal ? (
         <Row gap={10} style={{ alignItems: 'flex-start', backgroundColor: colors.accentSoft, borderRadius: 16, padding: 12 }}>
           <Icon name="lock-closed" size={18} color={colors.accentDeep} />
-          <T size={12.5} style={{ flex: 1 }}>قبل تأكيد الأوردر، الأرقام والإيميلات واللينكات وحسابات السوشيال بتتشال من الرسائل تلقائياً. اتعاملوا من خلال ضغطة عشان الضمان يكون محفوظ.</T>
+          <T size={12.5} style={{ flex: 1 }}>{t('قبل تأكيد الأوردر، الأرقام والإيميلات واللينكات وحسابات السوشيال بتتشال من الرسائل تلقائياً. اتعاملوا من خلال ضغطة عشان الضمان يكون محفوظ.')}</T>
         </Row>
       ) : null}
       {data?.msgs.length ? (
@@ -113,15 +114,15 @@ export default function Chat() {
                   {m.body ? <T color={mine ? '#fff' : colors.ink} size={15}>{m.body}</T> : null}
                 </View>
                 {m.flagged ? (
-                  <Row gap={4} style={{ alignSelf: mine ? 'flex-start' : 'flex-end' }}><Icon name="eye-off" size={12} color={colors.bad} /><T size={11} color={colors.bad}>اتشال رقم أو لينك من الرسالة</T></Row>
+                  <Row gap={4} style={{ alignSelf: mine ? 'flex-start' : 'flex-end' }}><Icon name="eye-off" size={12} color={colors.bad} /><T size={11} color={colors.bad}>{t('اتشال رقم أو لينك من الرسالة')}</T></Row>
                 ) : null}
                 <Muted size={10.5} style={{ textAlign: mine ? 'right' : 'left', color: colors.faint }}>{ago(m.created_at)}</Muted>
               </View>
             );
           })}
         </View>
-      ) : <Empty icon="chatbubbles-outline" text={iAmShop ? 'اسأل العميل عن أي تفاصيل محتاجها.' : 'اسأل المحل عن حالة القطعة أو اطلب صور أكتر.'} />}
-      {profile?.is_shop && !iAmShop ? <Muted center>المحادثة دي مش بتاعتك.</Muted> : null}
+      ) : <Empty icon="chatbubbles-outline" text={iAmShop ? t('اسأل العميل عن أي تفاصيل محتاجها.') : t('اسأل المحل عن حالة القطعة أو اطلب صور أكتر.')} />}
+      {profile?.is_shop && !iAmShop ? <Muted center>{t('المحادثة دي مش بتاعتك.')}</Muted> : null}
     </Screen>
   );
 }

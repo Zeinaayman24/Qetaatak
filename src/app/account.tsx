@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { SHOP_TYPES, addressLine, ar, friendlyError } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t, dir, isEn, setLang, startAlign } from '@/lib/i18n';
 
 function Item({ icon, title, sub, onPress, danger }: { icon: string; title: string; sub?: string; onPress: () => void; danger?: boolean }) {
   return (
@@ -46,39 +47,41 @@ export default function Account() {
           {first ? <T w="bold" size={22} color="#fff">{first.charAt(0)}</T> : <Icon name="person" size={24} color="#fff" />}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <T w="bold" size={20}>{first || 'حسابي'}</T>
-          <Muted size={14} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{profile.phone || session?.user.email}</Muted>
+          <T w="bold" size={20}>{first || t('حسابي')}</T>
+          <Muted size={14} style={{ writingDirection: 'ltr', textAlign: startAlign() }}>{profile.phone || session?.user.email}</Muted>
         </View>
         <Pressable onPress={() => router.push('/profile')} accessibilityRole="button" hitSlop={8} style={{ padding: 8 }}>
-          <T w="medium" size={14} color={colors.primary}>عدّل</T>
+          <T w="medium" size={14} color={colors.primary}>{t('عدّل')}</T>
         </Pressable>
       </Row>
 
       <Group>
-        <Item icon="car-sport-outline" title="عربياتي" sub={car} onPress={() => router.push('/cars')} />
+        <Item icon="car-sport-outline" title={t('عربياتي')} sub={car} onPress={() => router.push('/cars')} />
         <Line />
-        <Item icon="location-outline" title="بياناتي وعنواني" sub={addressLine(profile)} onPress={() => router.push('/profile')} />
+        <Item icon="location-outline" title={t('بياناتي وعنواني')} sub={addressLine(profile)} onPress={() => router.push('/profile')} />
         <Line />
-        <Item icon="heart-outline" title="المحلات المفضلة" onPress={() => router.push('/favorites')} />
+        <Item icon="heart-outline" title={t('المحلات المفضلة')} onPress={() => router.push('/favorites')} />
       </Group>
 
       <Group>
-        <Item icon="notifications-outline" title="الإشعارات" onPress={() => router.push('/notifications')} />
+        <Item icon="notifications-outline" title={t('الإشعارات')} onPress={() => router.push('/notifications')} />
         <Line />
-        <Item icon="chatbubbles-outline" title="المساعد" onPress={() => router.push('/assistant')} />
+        <Item icon="chatbubbles-outline" title={t('المساعد')} onPress={() => router.push('/assistant')} />
         <Line />
-        <Item icon="help-circle-outline" title="الدعم" onPress={() => router.push('/support')} />
+        <Item icon="help-circle-outline" title={t('الدعم')} onPress={() => router.push('/support')} />
       </Group>
 
       <Group>
-        <Item icon="shield-outline" title="الخصوصية والشروط" sub="الشروط، الخصوصية، الإلغاء، بياناتك" onPress={() => router.push('/privacy')} />
+        <Item icon="language-outline" title={isEn() ? 'اللغة: العربية' : 'Language: English'} sub={t('اللغة دلوقتي: العربية')} onPress={() => setLang(isEn() ? 'ar' : 'en')} />
+        <Line />
+        <Item icon="shield-outline" title={t('الخصوصية والشروط')} sub={t('الشروط، الخصوصية، الإلغاء، بياناتك')} onPress={() => router.push('/privacy')} />
       </Group>
 
       <InstallCard />
       <Pressable onPress={signOut} accessibilityRole="button" style={({ pressed }) => [{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.7 }]}>
-        <T w="medium" size={15} color={colors.bad}>تسجيل خروج</T>
+        <T w="medium" size={15} color={colors.bad}>{t('تسجيل خروج')}</T>
       </Pressable>
-      <Muted center size={12}>ضغطة · نسخة {APP_VERSION}</Muted>
+      <Muted center size={12}>{t('ضغطة · نسخة')}{' '}{APP_VERSION}</Muted>
     </Screen>
   );
 }
@@ -102,7 +105,7 @@ function ShopAccount() {
     if (error) return toast(friendlyError(error));
     setClosing(null); await signOut();
   }
-  const status = shop?.status === 'approved' ? 'المحل شغال' : shop?.status === 'suspended' || shop?.status === 'closed' ? 'موقوف' : 'تحت المراجعة';
+  const status = shop?.status === 'approved' ? t('المحل شغال') : shop?.status === 'suspended' || shop?.status === 'closed' ? t('موقوف') : t('تحت المراجعة');
   return (
     <Screen nav={<BottomNav role="shop" />}>
       <Row gap={14}>
@@ -111,57 +114,57 @@ function ShopAccount() {
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <T w="bold" size={20}>{shopPrivate?.name}</T>
-          <Muted size={13}><T size={13} color={colors.muted} style={{ writingDirection: 'ltr' }}>{profile.phone || session?.user.email}</T> · صاحب المحل</Muted>
+          <Muted size={13}><T size={13} color={colors.muted} style={{ writingDirection: 'ltr' }}>{profile.phone || session?.user.email}</T> {t('· صاحب المحل')}</Muted>
         </View>
       </Row>
       <Row gap={8}>
         <Pill label={status} tone={shop?.status === 'approved' ? 'good' : shop?.status === 'suspended' || shop?.status === 'closed' ? 'bad' : 'wait'} />
-        {shop ? <Pill label={`${shop.area}، ${shop.governorate} · ${SHOP_TYPES[shop.shop_type]}`} /> : null}
+        {shop ? <Pill label={t('{0}، {1} · {2}', shop.area, shop.governorate, SHOP_TYPES[shop.shop_type])} /> : null}
       </Row>
 
       <Group>
-        <Item icon="storefront-outline" title="بيانات المحل" onPress={() => setup(0)} />
+        <Item icon="storefront-outline" title={t('بيانات المحل')} onPress={() => setup(0)} />
         <Line />
-        <Item icon="time-outline" title="مواعيد العمل" onPress={() => setup(1)} />
+        <Item icon="time-outline" title={t('مواعيد العمل')} onPress={() => setup(1)} />
         <Line />
-        <Item icon="bicycle-outline" title="التوصيل وأسعاره" onPress={() => setup(2)} />
+        <Item icon="bicycle-outline" title={t('التوصيل وأسعاره')} onPress={() => setup(2)} />
         <Line />
-        <Item icon="wallet-outline" title="استلام الفلوس بالتحويل" onPress={() => setup(3)} />
-        {shop?.status === 'approved' ? (<><Line /><Item icon="eye-outline" title="صفحة المحل زي ما العملاء بيشوفوها" onPress={() => router.push(`/shop-profile/${shop.id}`)} /></>) : null}
+        <Item icon="wallet-outline" title={t('استلام الفلوس بالتحويل')} onPress={() => setup(3)} />
+        {shop?.status === 'approved' ? (<><Line /><Item icon="eye-outline" title={t('صفحة المحل زي ما العملاء بيشوفوها')} onPress={() => router.push(`/shop-profile/${shop.id}`)} /></>) : null}
       </Group>
 
       {shop && shop.status !== 'draft' && shop.status !== 'pending' ? (
         <Group>
-          <Item icon="pulse-outline" title="أداء محلك" onPress={() => router.push('/shop/performance')} />
+          <Item icon="pulse-outline" title={t('أداء محلك')} onPress={() => router.push('/shop/performance')} />
           <Line />
-          <Item icon="receipt-outline" title="حسابك مع ضغطة" onPress={() => router.push('/shop/balance')} />
+          <Item icon="receipt-outline" title={t('حسابك مع ضغطة')} onPress={() => router.push('/shop/balance')} />
         </Group>
       ) : null}
 
       <Group>
-        <Item icon="notifications-outline" title="الإشعارات" onPress={() => router.push('/notifications')} />
+        <Item icon="notifications-outline" title={t('الإشعارات')} onPress={() => router.push('/notifications')} />
         <Line />
-        <Item icon="help-circle-outline" title="الدعم" onPress={() => router.push('/support')} />
+        <Item icon="help-circle-outline" title={t('الدعم')} onPress={() => router.push('/support')} />
         <Line />
-        <Item icon="document-text-outline" title="اتفاقية التاجر" onPress={() => router.push('/legal/merchant')} />
+        <Item icon="document-text-outline" title={t('اتفاقية التاجر')} onPress={() => router.push('/legal/merchant')} />
         <Line />
-        <Item icon="document-outline" title="الشروط والأحكام" onPress={() => router.push('/legal/terms')} />
+        <Item icon="document-outline" title={t('الشروط والأحكام')} onPress={() => router.push('/legal/terms')} />
         <Line />
-        <Item icon="shield-outline" title="سياسة الخصوصية" onPress={() => router.push('/legal/privacy')} />
+        <Item icon="shield-outline" title={t('سياسة الخصوصية')} onPress={() => router.push('/legal/privacy')} />
       </Group>
 
       <Group>
-        <Item icon="log-out-outline" title="تسجيل خروج" onPress={signOut} danger />
+        <Item icon="log-out-outline" title={t('تسجيل خروج')} onPress={signOut} danger />
       </Group>
       <InstallCard />
-      <Muted center size={12}>ضغطة · نسخة {APP_VERSION}</Muted>
+      <Muted center size={12}>{t('ضغطة · نسخة')}{' '}{APP_VERSION}</Muted>
       {shop && shop.status !== 'closed' ? (
         <Pressable onPress={askClose} accessibilityRole="button" style={{ alignSelf: 'center', padding: 8 }}>
-          <T size={13} w="semibold" color={colors.bad}>قفل حساب المحل</T>
+          <T size={13} w="semibold" color={colors.bad}>{t('قفل حساب المحل')}</T>
         </Pressable>
       ) : null}
-      <ConfirmSheet open={!!closing} title="قفل حساب المحل" body="لازم تكمّل الأوردرات الشغالة، وترجّع أي فلوس لعملاء، وتسدّد العمولة الأول."
-        yes="قفل حساب المحل" danger busy={busy} onYes={() => (closing?.blocked ? toast('لسه فيه أوردرات أو فلوس مستحقة.') : close())} onClose={() => setClosing(null)} />
+      <ConfirmSheet open={!!closing} title={t('قفل حساب المحل')} body={t('لازم تكمّل الأوردرات الشغالة، وترجّع أي فلوس لعملاء، وتسدّد العمولة الأول.')}
+        yes={t('قفل حساب المحل')} danger busy={busy} onYes={() => (closing?.blocked ? toast(t('لسه فيه أوردرات أو فلوس مستحقة.')) : close())} onClose={() => setClosing(null)} />
     </Screen>
   );
 }

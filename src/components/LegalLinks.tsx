@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Muted, Press, Row, T } from '@/components/ui';
 import { type LegalKey } from '@/lib/legal';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 const Link = ({ k, label }: { k: LegalKey; label: string }) => (
   <Press role="link" label={label} onPress={() => router.push(`/legal/${k}`)}>
@@ -14,9 +15,9 @@ export function LegalLinks({ lead, withCancellation }: { lead: string; withCance
   return (
     <Row gap={4} style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
       <Muted size={12.5}>{lead}</Muted>
-      <Link k="terms" label="الشروط والأحكام" />
-      <Muted size={12.5}>و</Muted>
-      <Link k={withCancellation ? 'cancellation' : 'privacy'} label={withCancellation ? 'سياسة الإلغاء' : 'سياسة الخصوصية'} />
+      <Link k="terms" label={t('الشروط والأحكام')} />
+      <Muted size={12.5}>{t('و')}</Muted>
+      <Link k={withCancellation ? 'cancellation' : 'privacy'} label={withCancellation ? t('سياسة الإلغاء') : t('سياسة الخصوصية')} />
     </Row>
   );
 }

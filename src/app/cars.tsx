@@ -5,11 +5,12 @@ import { CarPicker, type PickedCar } from '@/components/CarPicker';
 import { MakeLogo } from '@/components/MakeLogo';
 import { BackBar, Btn, ErrorText, Field, Icon, Muted, Pill, Press, Row, Screen, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { makeByName, ptShort, useMakes } from '@/lib/catalogue';
+import { carLabel, usePreloadModels, makeByName, ptShort, useMakes } from '@/lib/catalogue';
 import { ar, friendlyError, type Car } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { t } from '@/lib/i18n';
 
 type CarRow = { key: string; make: string; model: string; year: number; vin: string; powertrain: string; main: boolean };
 
@@ -29,6 +30,7 @@ export default function Cars() {
     if (!uid) return [] as Car[];
     return must(await supabase.from('cars').select('*').eq('owner_id', uid).order('created_at')) as Car[];
   }, ['cars'], [uid]);
+  usePreloadModels([profile?.car_make, ...((data ?? []).map((c) => c.make))]);
 
   // arriving from a make's logo on the home screen opens the picker on that make
   useEffect(() => {
@@ -52,7 +54,7 @@ export default function Cars() {
       : await supabase.from('profiles').update({ car_make: picked.make, car_model: picked.model, car_year: picked.year, car_vin: v, car_powertrain: picked.powertrain }).eq('id', profile.id);
     setBusy(false);
     if (error) return setErr(friendlyError(error));
-    setPicked(null); setVin(''); reload(); await refreshProfile(); toast('العربية اتضافت');
+    setPicked(null); setVin(''); reload(); await refreshProfile(); toast(t('العربية اتضافت'));
   }
   async function remove(id: string) {
     const { error } = await supabase.from('cars').delete().eq('id', id);
@@ -69,13 +71,13 @@ export default function Cars() {
       : await supabase.from('cars').delete().eq('id', r.key);
     setBusy(false);
     if (a.error || b.error) return toast(friendlyError(a.error ?? b.error));
-    reload(); await refreshProfile(); toast('بقت عربيتك الأساسية');
+    reload(); await refreshProfile(); toast(t('بقت عربيتك الأساسية'));
   }
 
   return (
     <Screen>
-      <BackBar title="عربياتي" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
-      <Muted size={14}>الطلب بيتبعت بالعربية الأساسية. تقدر تغيّرها وانت بتعمل الطلب.</Muted>
+      <BackBar title={t('عربياتي')} onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
+      <Muted size={14}>{t('الطلب بيتبعت بالعربية الأساسية. تقدر تغيّرها وانت بتعمل الطلب.')}</Muted>
 
       {rows.length ? (
         <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
@@ -83,46 +85,46 @@ export default function Cars() {
             <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderTopWidth: i ? 1 : 0, borderColor: '#EEF0F3' }}>
               <MakeLogo make={makeByName(makes, r.make) ?? { name_ar: r.make, name_en: r.make, logo_url: '' }} size={48} />
               <View style={{ flex: 1, gap: 2 }}>
-                <T w="semibold" size={15}>{r.make} {r.model} {ar(r.year)}</T>
+                <T w="semibold" size={15}>{carLabel(r.make, r.model, r.year)}</T>
                 <Row gap={6} style={{ flexWrap: 'wrap' }}>
-                  {r.main ? <Pill label="الأساسية" tone="accent" /> : null}
+                  {r.main ? <Pill label={t('الأساسية')} tone="accent" /> : null}
                   {r.powertrain ? <Pill label={ptShort(r.powertrain)} tone={r.powertrain === 'petrol' || r.powertrain === 'diesel' ? 'plain' : 'good'} /> : null}
-                  <Muted size={12.5}>{r.vin ? 'شاسيه: ' + r.vin : 'من غير رقم شاسيه'}</Muted>
+                  <Muted size={12.5}>{r.vin ? t('شاسيه: ') + r.vin : t('من غير رقم شاسيه')}</Muted>
                 </Row>
                 {!r.main ? (
-                  <Press onPress={() => makeMain(r)} disabled={busy} label="خليها الأساسية" style={{ alignSelf: 'flex-start', paddingVertical: 4 }}>
-                    <T size={13.5} w="medium" color={colors.primary}>خليها الأساسية</T>
+                  <Press onPress={() => makeMain(r)} disabled={busy} label={t('خليها الأساسية')} style={{ alignSelf: 'flex-start', paddingVertical: 4 }}>
+                    <T size={13.5} w="medium" color={colors.primary}>{t('خليها الأساسية')}</T>
                   </Press>
                 ) : null}
               </View>
               {r.main ? (
-                <Btn kind="link" title="عدّل" onPress={() => router.push('/profile')} />
+                <Btn kind="link" title={t('عدّل')} onPress={() => router.push('/profile')} />
               ) : (
-                <Pressable onPress={() => remove(r.key)} accessibilityLabel="امسح العربية" hitSlop={8} style={{ padding: 6 }}><Icon name="trash-outline" size={20} color={colors.bad} /></Pressable>
+                <Pressable onPress={() => remove(r.key)} accessibilityLabel={t('امسح العربية')} hitSlop={8} style={{ padding: 6 }}><Icon name="trash-outline" size={20} color={colors.bad} /></Pressable>
               )}
             </View>
           ))}
         </View>
       ) : null}
 
-      <Btn kind="secondary" icon="add" title={rows.length ? 'أضف عربية تانية' : 'أضف عربيتك'} onPress={() => { setStartMake(null); setPicking(true); }} />
+      <Btn kind="secondary" icon="add" title={rows.length ? t('أضف عربية تانية') : t('أضف عربيتك')} onPress={() => { setStartMake(null); setPicking(true); }} />
 
       <CarPicker open={picking} startMake={startMake} onClose={() => { setPicking(false); if (params.make) router.setParams({ make: undefined }); }}
         onDone={(c) => { setPicking(false); setPicked(c); if (params.make) router.setParams({ make: undefined }); }} />
 
-      <Sheet open={!!picked} onClose={() => setPicked(null)} title="أضف العربية">
+      <Sheet open={!!picked} onClose={() => setPicked(null)} title={t('أضف العربية')}>
         {picked ? (
           <View style={{ gap: 14 }}>
             <Row gap={12}>
               <MakeLogo make={makeByName(makes, picked.make)} size={48} />
               <View style={{ flex: 1 }}>
-                <T w="semibold" size={16}>{picked.make} {picked.model} {ar(picked.year)}</T>
+                <T w="semibold" size={16}>{carLabel(picked.make, picked.model, picked.year)}</T>
                 {picked.powertrain ? <Muted size={13}>{ptShort(picked.powertrain)}</Muted> : null}
               </View>
             </Row>
-            <Field label="رقم الشاسيه VIN (اختياري)" value={vin} onChangeText={setVin} ltr placeholder="17 حرف ورقم" hint="مكتوب في رخصة العربية. بيخلّي المحل يجيب القطعة الصح من أول مرة." />
+            <Field label={t('رقم الشاسيه VIN (اختياري)')} value={vin} onChangeText={setVin} ltr placeholder={t('17 حرف ورقم')} hint={t('مكتوب في رخصة العربية. بيخلّي المحل يجيب القطعة الصح من أول مرة.')} />
             <ErrorText text={err} />
-            <Btn title="أضف العربية" onPress={save} loading={busy} />
+            <Btn title={t('أضف العربية')} onPress={save} loading={busy} />
           </View>
         ) : null}
       </Sheet>
