@@ -1,10 +1,9 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect } from 'react';
 import { View } from 'react-native';
-import { BottomNav, Logo, rememberRole } from '@/components/AppHeader';
+import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
-import { Icon, Loading, Muted, Plate, Press, Row, Screen, Section, T } from '@/components/ui';
-import { InstallCard } from '@/components/InstallCard';
+import { Icon, Loading, Muted, Pill, Press, Row, Screen, Section, T } from '@/components/ui';
 import { OrderRow, RowList } from '@/components/OrderRows';
 import { AdBanner } from '@/components/AdBanner';
 import { useAuth } from '@/lib/auth';
@@ -12,7 +11,7 @@ import { ar, groupRequests, partsLabel, reqNo, type Order, type Quote, type Requ
 import { must, useLive } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
-import { colors, lift } from '@/lib/theme';
+import { colors } from '@/lib/theme';
 
 const CATEGORIES: { label: string; part: string; icon: string }[] = [
   { label: 'فوانيس', part: 'فانوس أمامي', icon: 'car-light-high' },
@@ -49,79 +48,78 @@ export default function CustomerHome() {
   const hot = groups.map((g) => ({ g, n: offersIn(g) })).filter((x) => x.n > 0);
   const waiting = groups.filter((g) => !offersIn(g));
 
+  // the top band: greeting, the car, and one big search bar. Everything else waits below it.
   const hero = (
-    <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, paddingBottom: 64 }}>
-      <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 12, gap: 18 }}>
+    <View style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.line }}>
+      <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 20, gap: 16 }}>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Logo size={24} on="dark" />
-          <Bell light />
-        </Row>
-        <View style={{ gap: 2 }}>
-          <T size={15} w="medium" color="rgba(255,255,255,.72)">أهلاً يا {first}</T>
-          <T w="bold" size={28} color="#fff" style={{ lineHeight: 40, letterSpacing: -0.4 }}>محتاج قطعة إيه النهارده؟</T>
-        </View>
-        <Press onPress={() => newReq()} label="اكتب اسم القطعة"
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: 16, paddingStart: 16, paddingEnd: 6, height: 56 }}>
-          <Icon name="search" size={21} color={colors.faint} />
-          <T size={15} color={colors.faint} style={{ flex: 1 }} numberOfLines={1}>فانوس، رديتر، مراية…</T>
-          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="camera" size={21} color="#fff" />
+          <View style={{ gap: 0, flex: 1 }}>
+            <T size={14} color={colors.muted}>أهلاً يا {first}</T>
+            <T w="bold" size={23} style={{ lineHeight: 34 }}>محتاج قطعة إيه؟</T>
           </View>
+          <Bell />
+        </Row>
+        <Press onPress={() => router.push('/cars')} label="غيّر العربية"
+          style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, height: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.ground }}>
+          <Icon set="mci" name="car-side" size={18} color={colors.ink} />
+          <T size={14} w="medium">{profile.car_make} {profile.car_model} {ar(profile.car_year ?? '')}</T>
+          <Icon name="chevron-down" size={14} color={colors.muted} />
+        </Press>
+        <Press onPress={() => newReq()} label="اكتب اسم القطعة"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.ink, paddingStart: 16, paddingEnd: 8, height: 58,
+            shadowColor: colors.shadow, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}>
+          <Icon name="search" size={21} color={colors.ink} stroke={2.2} />
+          <T size={15.5} color={colors.faint} style={{ flex: 1 }} numberOfLines={1}>اكتب اسم القطعة، مثلاً فانوس أمامي</T>
+          <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="camera" size={20} color={colors.primary} />
+          </View>
+        </Press>
+        <Press onPress={() => router.push('/assistant')} label="اوصف القطعة للمساعد" role="link" style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 }}>
+          <Icon name="sparkles" size={16} color={colors.primary} />
+          <T size={14} w="medium" color={colors.primary}>مش عارف اسمها؟ اوصفها للمساعد</T>
         </Press>
       </View>
     </View>
   );
 
+  const top1 = hot[0];
+  const nothingYet = !groups.length && !orders.length;
+
   return (
     <Screen top={hero} nav={<BottomNav role="customer" />}>
-      {/* offers waiting: the first thing the customer sees */}
-      {hot.length ? (
-        <View style={{ marginTop: -60, gap: 8 }}>
-          {hot.slice(0, 3).map(({ g, n }) => (
-            <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)} label="شوف العروض"
-              style={[lift, { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.lime, borderRadius: 18, padding: 14 }]}>
-              <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-                <T w="bold" size={19} color={colors.lime} style={{ lineHeight: 26 }}>{ar(n)}</T>
-              </View>
-              <View style={{ flex: 1 }}>
-                <T w="bold" size={16} color={colors.ink}>{n > 1 ? `${ar(n)} عروض وصلتك` : 'وصلك عرض'}</T>
-                <T size={13} color={colors.ink} numberOfLines={1}>على {partsLabel(g.items.filter((r) => r.status === 'open'))}، اختار دلوقتي</T>
-              </View>
-              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="chevron-back" size={18} color={colors.lime} />
-              </View>
-            </Press>
-          ))}
-        </View>
+      {/* ONE card for the thing that needs the customer most: offers to compare */}
+      {top1 ? (
+        <Press onPress={() => router.push(`/customer/${top1.g.first.id}`)} label="قارن العروض"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.ink, borderRadius: 16, padding: 16 }}>
+          <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#1E3354', alignItems: 'center', justifyContent: 'center' }}>
+            <T w="bold" size={19} color="#fff" style={{ lineHeight: 26 }}>{ar(top1.n)}</T>
+          </View>
+          <View style={{ flex: 1 }}>
+            <T w="semibold" size={16} color="#fff">{top1.n > 1 ? `وصلك ${ar(top1.n)} عروض على طلبك` : 'وصلك عرض على طلبك'}</T>
+            <T size={13} color="#B9C3D3" numberOfLines={1}>{partsLabel(top1.g.items.filter((r) => r.status === 'open'))}{hot.length > 1 ? ` · و${ar(hot.length - 1)} طلب تاني` : ''}</T>
+          </View>
+          <View style={{ height: 36, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#fff', justifyContent: 'center' }}>
+            <T w="semibold" size={14}>قارن</T>
+          </View>
+        </Press>
       ) : null}
 
-      {/* car + categories card overlapping the hero */}
-      <View style={[lift, { marginTop: hot.length ? 0 : -60, backgroundColor: colors.surface, borderRadius: 20, padding: 16, gap: 16 }]}>
-        <Press onPress={() => router.push('/cars')} label="غيّر العربية" style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Plate top={profile.car_model || '—'} bottom={ar(profile.car_year ?? '')} size="sm" />
-          <View style={{ flex: 1 }}>
-            <T w="semibold" size={14}>{profile.car_make} {profile.car_model}</T>
-            <Muted size={12}>الطلبات هتروح لمحلات {profile.car_make}</Muted>
-          </View>
-          <Row gap={2}><T size={12.5} w="semibold" color={colors.primary}>تغيير</T><Icon name="chevron-back" size={14} color={colors.primary} /></Row>
-        </Press>
-        <View style={{ height: 1, backgroundColor: colors.line }} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 }}>
+      <View style={{ gap: 14 }}>
+        <T w="bold" size={17}>اختار من الأقسام</T>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 }}>
           {CATEGORIES.map((c) => (
-            <Press key={c.label} onPress={() => router.push({ pathname: '/customer/new', params: { cat: c.label } })} label={c.label} style={{ width: '25%', alignItems: 'center', gap: 6 }}>
-              <View style={{ width: 58, height: 58, borderRadius: 16, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon set="mci" name={c.icon} size={27} color={colors.primary} />
+            <Press key={c.label} onPress={() => router.push({ pathname: '/customer/new', params: { cat: c.label } })} label={c.label} style={{ width: '25%', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 60, height: 60, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon set="mci" name={c.icon} size={27} color={colors.ink} />
               </View>
-              <T size={12.5} w="medium">{c.label}</T>
+              <T size={13} w="medium">{c.label}</T>
             </Press>
           ))}
         </View>
       </View>
 
-      <AdBanner />
-
-      {orders.length ? (
-        <Section title="أوردراتك" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>
+      {orders.length || waiting.length ? (
+        <Section title="طلباتك الحالية" action={{ label: 'الكل', onPress: () => router.push('/customer/requests') }}>
           <RowList>
             {orders.slice(0, 3).map((o, i) => {
               const ps = (data?.reqs ?? []).filter((r) => r.order_id === o.id);
@@ -129,55 +127,39 @@ export default function CustomerHome() {
                 flag={needsPayment(o) ? { label: 'ادفع', tone: 'wait' } : undefined}
                 onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })} />;
             })}
-          </RowList>
-        </Section>
-      ) : null}
-
-      {waiting.length ? (
-        <Section title="مستنيين عروض" action={{ label: 'الكل', onPress: () => router.push({ pathname: '/customer/requests', params: { tab: 'quotes' } }) }}>
-          <RowList>
-            {waiting.map((g, i) => (
+            {waiting.slice(0, Math.max(0, 3 - Math.min(orders.length, 3))).map((g, i) => (
               <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)} label={partsLabel(g.items)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
-                <T w="bold" size={13.5} color={colors.muted}>{reqNo(g.first.num)}</T>
-                <T w="bold" size={15} numberOfLines={1} style={{ flex: 1 }}>{partsLabel(g.items)}</T>
-                <Row gap={3}><Icon name="time-outline" size={13} color={colors.muted} /><Muted size={12.5}>بندوّر</Muted></Row>
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14, borderTopWidth: i || orders.length ? 1 : 0, borderColor: '#EEF0F3' }}>
+                <View style={{ flex: 1 }}>
+                  <T w="semibold" size={15} numberOfLines={1}>{partsLabel(g.items)}</T>
+                  <Muted size={13}>طلب {reqNo(g.first.num)}</Muted>
+                </View>
+                <Pill label="بندوّر على عروض" tone="plain" />
               </Press>
             ))}
           </RowList>
         </Section>
       ) : null}
 
-      <Press onPress={() => router.push('/assistant')} style={{ backgroundColor: colors.ink, borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-        <View style={{ width: 50, height: 50, borderRadius: 14, backgroundColor: 'rgba(10,171,254,.16)', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="sparkles" size={24} color={colors.accent} />
-        </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <T w="bold" size={16} color="#fff">مش عارف اسم القطعة؟</T>
-          <T size={13} color="rgba(255,255,255,.7)">اوصفها للمساعد بكلامك وهو يكمّل الطلب</T>
-        </View>
-        <Icon name="chevron-back" size={18} color="rgba(255,255,255,.6)" />
-      </Press>
+      <AdBanner />
 
-      <InstallCard />
-
-      <Section title="إزاي بيشتغل">
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          {[
-            ['camera-outline', 'صوّر أو اكتب القطعة'],
-            ['pricetags-outline', 'المحلات تبعت أسعارها'],
-            ['bicycle-outline', 'اختار ويوصلك لحد البيت'],
-          ].map(([icon, text], i) => (
-            <View key={text} style={[lift, { flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 12, gap: 8 }]}>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon name={icon} size={20} color={colors.primary} /></View>
-                <T size={12} w="bold" color={colors.faint}>{ar(i + 1)}</T>
+      {/* first visit only: three quiet steps instead of an empty screen */}
+      {nothingYet ? (
+        <Section title="إزاي بيشتغل">
+          <View style={{ gap: 12 }}>
+            {[
+              ['camera-outline', 'اكتب اسم القطعة أو صوّرها'],
+              ['pricetags-outline', 'المحلات تبعتلك أسعارها'],
+              ['bicycle-outline', 'اختار العرض اللي يناسبك'],
+            ].map(([icon, text], i) => (
+              <Row key={text} gap={12}>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}><T w="bold" size={14} color={colors.primary}>{ar(i + 1)}</T></View>
+                <T size={15}>{text}</T>
               </Row>
-              <T size={13} w="medium" style={{ lineHeight: 20 }}>{text}</T>
-            </View>
-          ))}
-        </View>
-      </Section>
+            ))}
+          </View>
+        </Section>
+      ) : null}
     </Screen>
   );
 }

@@ -12,89 +12,72 @@ import { colors } from '@/lib/theme';
 
 function Item({ icon, title, sub, onPress, danger }: { icon: string; title: string; sub?: string; onPress: () => void; danger?: boolean }) {
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 }, pressed && { opacity: 0.6 }]}>
-      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: danger ? '#FCEDED' : colors.card, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={icon} size={20} color={danger ? colors.bad : colors.ink} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <T w="semibold" color={danger ? colors.bad : colors.ink}>{title}</T>
-        {sub ? <Muted size={12.5} numberOfLines={1}>{sub}</Muted> : null}
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, paddingVertical: 10, paddingHorizontal: 16 }, pressed && { backgroundColor: colors.soft }]}>
+      <Icon name={icon} size={22} color={danger ? colors.bad : colors.ink} />
+      <View style={{ flex: 1, gap: 1 }}>
+        <T w="medium" size={15} color={danger ? colors.bad : colors.ink}>{title}</T>
+        {sub ? <Muted size={13} numberOfLines={1}>{sub}</Muted> : null}
       </View>
       {!danger ? <Icon name="chevron-back" size={16} color={colors.faint} /> : null}
     </Pressable>
   );
 }
 
-const Line = () => <View style={{ height: 1, backgroundColor: colors.line }} />;
+const Line = () => <View style={{ height: 1, backgroundColor: colors.line, marginStart: 52 }} />;
 const Group = ({ children }: { children: React.ReactNode }) => (
-  <View style={{ backgroundColor: colors.ground, borderWidth: 1, borderColor: colors.line, borderRadius: 18, paddingHorizontal: 14 }}>{children}</View>
+  <View style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 16, overflow: 'hidden' }}>{children}</View>
 );
 
 const APP_VERSION = '1.0.0';
 
 export default function Account() {
-  const { ready, session, profile, shop, shopPrivate, signOut } = useAuth();
+  const { ready, session, profile, signOut } = useAuth();
   if (ready && !session) return <Redirect href="/login" />;
   if (!profile) return <Screen><Loading /></Screen>;
   const isShop = profile.is_shop;
   if (isShop) return <ShopAccount />;
 
+  const first = (profile.full_name || '').trim();
+  const car = [profile.car_make, profile.car_model, profile.car_year ? ar(profile.car_year) : ''].filter(Boolean).join(' ');
   return (
-    <Screen nav={<BottomNav role={isShop ? 'shop' : 'customer'} />}>
-      <Row gap={14}>
-        <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={isShop ? 'storefront' : 'person'} size={26} color="#fff" />
+    <Screen nav={<BottomNav role="customer" />}>
+      <Row gap={14} style={{ alignItems: 'center' }}>
+        <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' }}>
+          {first ? <T w="bold" size={22} color="#fff">{first.charAt(0)}</T> : <Icon name="person" size={24} color="#fff" />}
         </View>
-        <View style={{ flex: 1 }}>
-          <T w="bold" size={20}>{isShop ? shopPrivate?.name : profile.full_name}</T>
-          <Muted size={13} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{profile.phone || session?.user.email}</Muted>
+        <View style={{ flex: 1, gap: 2 }}>
+          <T w="bold" size={20}>{first || 'حسابي'}</T>
+          <Muted size={14} style={{ writingDirection: 'ltr', textAlign: 'right' }}>{profile.phone || session?.user.email}</Muted>
         </View>
+        <Pressable onPress={() => router.push('/profile')} accessibilityRole="button" hitSlop={8} style={{ padding: 8 }}>
+          <T w="medium" size={14} color={colors.primary}>عدّل</T>
+        </Pressable>
       </Row>
 
-      {isShop ? (
-        <Group>
-          <Item icon="storefront-outline" title="بيانات المحل" sub={shop ? `${shop.area}، ${shop.governorate}، ${SHOP_TYPES[shop.shop_type]}` : ''} onPress={() => router.push('/shop-setup')} />
-          {shop ? (
-            <Row style={{ paddingBottom: 14 }} gap={8}>
-              <Pill label={shop.status === 'approved' ? 'المحل شغال' : shop.status === 'pending' ? 'تحت المراجعة' : 'موقوف'} tone={shop.status === 'approved' ? 'good' : shop.status === 'pending' ? 'wait' : 'plain'} />
-              <Pill label={shop.offers_delivery ? 'بيوصّل' : 'استلام من المحل'} />
-            </Row>
-          ) : null}
-          {shop?.status === 'approved' ? (<><Line /><Item icon="star-outline" title="صفحة المحل والتقييمات" sub="زي ما العملاء بيشوفوها" onPress={() => router.push(`/shop-profile/${shop.id}`)} /></>) : null}
-        </Group>
-      ) : (
-        <Group>
-          <Item icon="person-outline" title="بياناتي وعنواني" sub={addressLine(profile)} onPress={() => router.push('/profile')} />
-          <Line />
-          <Item icon="car-sport-outline" title="عربياتي" sub={`${profile.car_make ?? ''} ${profile.car_model ?? ''} ${ar(profile.car_year ?? '')}`} onPress={() => router.push('/cars')} />
-          <Line />
-          <Item icon="heart-outline" title="المحلات المفضلة" onPress={() => router.push('/favorites')} />
-        </Group>
-      )}
-
       <Group>
-        <Item icon="notifications-outline" title="الإشعارات" onPress={() => router.push('/notifications')} />
-        {!isShop ? (<><Line /><Item icon="lock-closed-outline" title="الخصوصية" onPress={() => router.push('/privacy')} /></>) : null}
+        <Item icon="car-sport-outline" title="عربياتي" sub={car} onPress={() => router.push('/cars')} />
+        <Line />
+        <Item icon="location-outline" title="بياناتي وعنواني" sub={addressLine(profile)} onPress={() => router.push('/profile')} />
+        <Line />
+        <Item icon="heart-outline" title="المحلات المفضلة" onPress={() => router.push('/favorites')} />
       </Group>
 
       <Group>
+        <Item icon="notifications-outline" title="الإشعارات" onPress={() => router.push('/notifications')} />
+        <Line />
         <Item icon="chatbubbles-outline" title="المساعد" onPress={() => router.push('/assistant')} />
         <Line />
         <Item icon="help-circle-outline" title="الدعم" onPress={() => router.push('/support')} />
       </Group>
 
       <Group>
-        <Item icon="document-text-outline" title="الشروط والأحكام" onPress={() => router.push('/legal/terms')} />
-        <Line />
-        <Item icon="shield-outline" title="سياسة الخصوصية" onPress={() => router.push('/legal/privacy')} />
-        <Line />
-        <Item icon="receipt-outline" title="سياسة الإلغاء" onPress={() => router.push('/legal/cancellation')} />
+        <Item icon="shield-outline" title="الخصوصية والشروط" sub="الشروط، الخصوصية، الإلغاء، بياناتك" onPress={() => router.push('/privacy')} />
       </Group>
 
-      <Group>
-        <Item icon="log-out-outline" title="تسجيل خروج" onPress={signOut} danger />
-      </Group>
       <InstallCard />
+      <Pressable onPress={signOut} accessibilityRole="button" style={({ pressed }) => [{ minHeight: 52, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.7 }]}>
+        <T w="medium" size={15} color={colors.bad}>تسجيل خروج</T>
+      </Pressable>
       <Muted center size={12}>ضغطة · نسخة {APP_VERSION}</Muted>
     </Screen>
   );

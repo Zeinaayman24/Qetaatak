@@ -2,23 +2,24 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { BottomNav } from '@/components/AppHeader';
-import { OrderRow, RowList, StatusTabs, bucketOf, type Bucket } from '@/components/OrderRows';
-import { Btn, Empty, Icon, Loading, Muted, Press, Row, Screen, T } from '@/components/ui';
+import { bucketOf, type Bucket } from '@/components/OrderRows';
+import { Btn, Empty, Loading, Muted, Press, Row, Screen, Seg, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { ar, elapsed, groupRequests, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
+import { ORDER_LABEL, ar, elapsed, groupRequests, money, orderNo, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive, useNow } from '@/lib/live';
 import { needsPayment } from '@/lib/payments';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 
-type Tab = 'quotes' | 'preparing' | 'ready' | 'done';
+type Tab = 'active' | 'done';
 
-/** Everything the customer started: price requests waiting for a choice, and orders by status. */
+/** Everything the customer started, in two tabs: still going (requests and open orders, what needs you first) and finished. */
 export default function MyRequests() {
   const { ready, session } = useAuth();
   const params = useLocalSearchParams<{ tab?: string }>();
   const uid = session?.user.id;
-  const [picked, setTab] = useState<Tab | null>((['quotes', 'preparing', 'ready', 'done'].includes(String(params.tab)) ? params.tab : null) as Tab | null);
+  // older links still say quotes / preparing / ready: they all open the «شغّالة» tab
+  const [picked, setTab] = useState<Tab | null>(params.tab === 'done' ? 'done' : params.tab ? 'active' : null);
   const now = useNow(60000);
   const { data, loading } = useLive(async () => {
     if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[], orders: [] as Order[] };
@@ -37,83 +38,75 @@ export default function MyRequests() {
   const orders = data?.orders ?? [];
   const openGroups = groupRequests(reqs).filter((g) => g.items.some((r) => r.status === 'open'));
   const offersOf = (g: (typeof openGroups)[number]) => data!.quotes.filter((q) => g.items.some((r) => r.id === q.request_id && r.status === 'open')).length;
-  const withOffers = openGroups.filter((g) => offersOf(g) > 0).length;
   const inTab = (b: Bucket) => orders.filter((o) => bucketOf(o) === b);
-  // open on whatever needs the customer most: offers to choose, then ready orders
-  const tab: Tab = picked ?? (withOffers ? 'quotes' : inTab('ready').length ? 'ready' : inTab('preparing').length ? 'preparing' : openGroups.length ? 'quotes' : 'done');
+  const live = [...inTab('ready'), ...inTab('preparing')];
+  const tab: Tab = picked ?? (openGroups.length || live.length ? 'active' : 'done');
   const partsOf = (o: Order) => reqs.filter((r) => r.order_id === o.id);
-  const list = tab === 'quotes' ? [] : inTab(tab);
   // requests that closed after 7 days with no order (A16)
-  const expired = tab === 'done' ? groupRequests(reqs).filter((g) => g.items.some((r) => r.status === 'expired') && g.items.every((r) => r.status === 'expired' || r.status === 'cancelled')) : [];
-  const expiredList = expired.length ? (
-    <RowList>
-      {expired.map((g, i) => (
-        <Row key={g.key} gap={8} style={{ paddingHorizontal: 14, paddingVertical: 13, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <T w="semibold" size={14.5} numberOfLines={1}>طلب {reqNo(g.first.num)} · {partsLabel(g.items)}</T>
-            <Muted size={12.5}>انتهى من غير أوردر</Muted>
-          </View>
-          <Btn kind="small" title="اطلب تاني" onPress={() => router.push({ pathname: '/customer/new', params: { part: g.first.part, cond: g.first.wanted_condition } })} />
-        </Row>
-      ))}
-    </RowList>
-  ) : null;
+  const expired = groupRequests(reqs).filter((g) => g.items.some((r) => r.status === 'expired') && g.items.every((r) => r.status === 'expired' || r.status === 'cancelled'));
+  const finished = inTab('done');
+
+  /** One card: what it is, its status, and the next step on the bottom line. */
+  const card = (key: string, title: string, sub: string, status: string, tone: [string, string], when: string, next: string, go: () => void) => (
+    <Press key={key} onPress={go} label={title}
+      style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 16, gap: 10 }}>
+      <Row style={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <T w="semibold" size={16} numberOfLines={1}>{title}</T>
+          <Muted size={13} numberOfLines={1}>{sub}</Muted>
+        </View>
+        <View style={{ backgroundColor: tone[0], borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 }}><T size={13} w="semibold" color={tone[1]} style={{ lineHeight: 19 }}>{status}</T></View>
+      </Row>
+      <Row style={{ justifyContent: 'space-between', borderTopWidth: 1, borderColor: '#EEF0F3', paddingTop: 10 }}>
+        <Muted size={13.5}>{when}</Muted>
+        {next ? <T size={14} w="semibold" color={colors.primary}>{next}</T> : null}
+      </Row>
+    </Press>
+  );
+  const blue: [string, string] = [colors.primarySoft, colors.primary], grey: [string, string] = [colors.soft, colors.muted];
+  const green: [string, string] = [colors.goodSoft, colors.good], orange: [string, string] = [colors.warnSoft, colors.warn], red: [string, string] = [colors.badSoft, colors.bad];
+  const groupsSorted = [...openGroups].sort((a, b) => offersOf(b) - offersOf(a));
 
   return (
     <Screen nav={<BottomNav role="customer" />}>
-      <T w="bold" size={28} style={{ lineHeight: 40 }}>طلباتي</T>
-      <StatusTabs<Tab> value={tab} onPick={setTab} items={[
-        { v: 'quotes', label: 'عروض الأسعار', n: openGroups.length, hot: withOffers > 0 },
-        { v: 'preparing', label: 'بيتجهز', n: inTab('preparing').length },
-        { v: 'ready', label: 'جاهز', n: inTab('ready').length, hot: inTab('ready').length > 0 },
-        { v: 'done', label: 'خلصت' },
-      ]} />
+      <Row style={{ justifyContent: 'space-between' }}>
+        <T w="bold" size={24} style={{ lineHeight: 36 }}>طلباتي</T>
+        <Btn kind="small" icon="add" title="طلب جديد" onPress={() => router.push('/customer/new')} />
+      </Row>
+      <Seg options={[{ v: 'active', label: openGroups.length + live.length ? `شغّالة (${ar(openGroups.length + live.length)})` : 'شغّالة' }, { v: 'done', label: 'خلصت' }]} value={tab} onPick={(v) => setTab(v as Tab)} />
 
-      {loading && !data ? <Loading /> : tab === 'quotes' ? (
-        openGroups.length ? (
-          <RowList>
-            {openGroups.map((g, i) => {
-              const open = g.items.filter((r) => r.status === 'open');
-              const n = offersOf(g);
-              return (
-                <Press key={g.key} onPress={() => router.push(`/customer/${g.first.id}`)} label={partsLabel(open)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 13, gap: 6, borderTopWidth: i ? 1 : 0, borderColor: colors.line, backgroundColor: n ? colors.primarySoft : colors.surface }}>
-                  <Row gap={8}>
-                    <T w="bold" size={13.5} color={colors.muted}>{reqNo(g.first.num)}</T>
-                    <T w="bold" size={15} numberOfLines={1} style={{ flex: 1 }}>{partsLabel(open)}</T>
-                    <Row gap={3}><Icon name="time-outline" size={13} color={colors.muted} /><T size={12.5} w="semibold" color={colors.muted}>{elapsed(g.first.created_at, now)}</T></Row>
-                  </Row>
-                  <Row gap={8}>
-                    <Muted size={12.5} style={{ flex: 1 }}>{g.first.car_make} {g.first.car_model}{g.items.length > open.length ? `، ${ar(g.items.length - open.length)} في أوردرات` : ''}</Muted>
-                    {n ? (
-                      <Row gap={5} style={{ backgroundColor: colors.lime, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                        <Icon name="pricetags" size={13} color={colors.ink} /><T w="bold" size={12.5} color={colors.ink}>{ar(n)} {n > 1 ? 'عروض' : 'عرض'}، اختار</T>
-                      </Row>
-                    ) : <Muted size={12.5}>بندوّر عند المحلات…</Muted>}
-                  </Row>
-                </Press>
-              );
+      {loading && !data ? <Loading /> : tab === 'active' ? (
+        groupsSorted.length || live.length ? (
+          <View style={{ gap: 10 }}>
+            {groupsSorted.filter((g) => offersOf(g) > 0).map((g) => {
+              const open = g.items.filter((r) => r.status === 'open'); const n = offersOf(g);
+              return card(g.key, partsLabel(open), `طلب ${reqNo(g.first.num)} · ${g.first.car_make} ${g.first.car_model}`, n > 1 ? `${ar(n)} عروض` : 'عرض', blue, 'من ' + elapsed(g.first.created_at, now), 'قارن العروض', () => router.push(`/customer/${g.first.id}`));
             })}
-          </RowList>
-        ) : <Empty icon="pricetags-outline" text="مفيش طلبات أسعار مفتوحة." action={{ label: 'اطلب قطعة', onPress: () => router.push('/customer/new') }} />
-      ) : list.length ? (
-        <>
-        <RowList>
-          {list.map((o, i) => {
+            {live.map((o) => {
+              const ps = partsOf(o); const pay = needsPayment(o); const ready = bucketOf(o) === 'ready';
+              return card(o.id, ps.length ? partsLabel(ps) : 'أوردر', `أوردر ${orderNo(o.order_no)} · ${money(Number(o.items_total) + Number(o.delivery_fee))} ج.م`,
+                pay ? 'ادفع' : ORDER_LABEL[o.status].short, pay ? orange : ready ? green : orange, 'من ' + elapsed(o.created_at, now), pay ? 'ادفع دلوقتي' : 'تابع الأوردر',
+                () => router.push({ pathname: '/order/[id]', params: { id: o.id } }));
+            })}
+            {groupsSorted.filter((g) => !offersOf(g)).map((g) => {
+              const open = g.items.filter((r) => r.status === 'open');
+              return card(g.key, partsLabel(open), `طلب ${reqNo(g.first.num)} · ${g.first.car_make} ${g.first.car_model}`, 'بندوّر', grey, 'من ' + elapsed(g.first.created_at, now), '', () => router.push(`/customer/${g.first.id}`));
+            })}
+          </View>
+        ) : <Empty icon="pricetags-outline" text="مفيش طلبات شغّالة دلوقتي." action={{ label: 'اطلب قطعة', onPress: () => router.push('/customer/new') }} />
+      ) : finished.length || expired.length ? (
+        <View style={{ gap: 10 }}>
+          {finished.map((o) => {
             const ps = partsOf(o);
-            return (
-              <OrderRow key={o.id} o={o} first={i === 0} title={ps.length ? partsLabel(ps) : 'أوردر'}
-                flag={needsPayment(o) ? { label: 'ادفع', tone: 'wait' } : o.status === 'received' && !o.rating ? { label: 'قيّم', tone: 'wait' } : undefined}
-                onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })} />
-            );
+            return card(o.id, ps.length ? partsLabel(ps) : 'أوردر', `أوردر ${orderNo(o.order_no)} · ${money(Number(o.items_total) + Number(o.delivery_fee))} ج.م`,
+              ORDER_LABEL[o.status].short, o.status === 'cancelled' ? red : grey,
+              new Date(o.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' }), o.status === 'received' && !o.rating ? 'قيّم المحل' : '',
+              () => router.push({ pathname: '/order/[id]', params: { id: o.id } }));
           })}
-        </RowList>
-        {expiredList}
-        </>
-      ) : expiredList ? expiredList : (
-        <Empty icon={tab === 'done' ? 'time-outline' : 'cube-outline'}
-          text={tab === 'done' ? 'لسه مفيش أوردرات خلصت.' : tab === 'ready' ? 'مفيش أوردرات جاهزة دلوقتي.' : 'مفيش أوردرات بتتجهز دلوقتي.\nلما تختار عرض، الأوردر بيظهر هنا.'} />
-      )}
+          {expired.map((g) => card(g.key, partsLabel(g.items), `طلب ${reqNo(g.first.num)}`, 'انتهى', grey, 'من غير أوردر', 'اطلب تاني',
+            () => router.push({ pathname: '/customer/new', params: { part: g.first.part, cond: g.first.wanted_condition } })))}
+        </View>
+      ) : <Empty icon="time-outline" text="لسه مفيش أوردرات خلصت." />}
     </Screen>
   );
 }

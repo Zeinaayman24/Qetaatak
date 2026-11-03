@@ -29,8 +29,8 @@ export { Logo };
 type Item = { href: string; label: string; icon: string; match: (p: string) => boolean; badge?: number };
 
 /**
- * The tab bar docked at the bottom of every main screen. Customers get a raised blue button in the middle for a new request;
- * customers and shops each see only their own tabs.
+ * The tab bar docked at the bottom of every main screen: four tabs each for customers and shops.
+ * A new request starts from the search bar on the customer home screen (and the button on «طلباتي»).
  */
 export function BottomNav({ role }: { role: 'customer' | 'shop' }) {
   const path = usePathname();
@@ -67,18 +67,7 @@ export function BottomNav({ role }: { role: 'customer' | 'shop' }) {
   };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface }} accessibilityRole="tablist">
-      {role === 'customer' ? (
-        <>
-          {items.slice(0, 2).map(tab)}
-          <View style={{ width: 72, alignItems: 'center' }}>
-            <Press onPress={() => router.push('/customer/new')} label="طلب جديد"
-              style={[liftStrong, { width: 58, height: 58, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: -26, borderWidth: 4, borderColor: colors.surface }]}>
-              <Icon name="add" size={28} color="#fff" stroke={2.4} />
-            </Press>
-          </View>
-          {items.slice(2).map(tab)}
-        </>
-      ) : items.map(tab)}
+      {items.map(tab)}
     </View>
   );
 }

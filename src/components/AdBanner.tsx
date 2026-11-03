@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Image, Linking, View } from 'react-native';
@@ -14,7 +13,6 @@ export type Ad = {
 
 const EVERY_MS = 5000;     // time each ad stays on screen
 const PAUSE_MS = 9000;     // after the customer swipes or taps a dot, wait longer before moving on
-const HEIGHT = 156;
 
 // each ad is counted once per app session, however often the home screen re-renders
 const seen = new Set<string>();
@@ -66,69 +64,34 @@ export function AdBanner() {
   };
 
   return (
-    <View style={{ gap: 10 }}>
-      <View
-        onTouchStart={(e) => { touchX.current = e.nativeEvent.pageX; moved.current = false; }}
-        onTouchMove={(e) => { if (touchX.current != null && Math.abs(e.nativeEvent.pageX - touchX.current) > 10) moved.current = true; }}
-        onTouchEnd={(e) => {
-          const from = touchX.current; touchX.current = null;
-          if (from == null) return;
-          const dx = e.nativeEvent.pageX - from;
-          // right-to-left app: swiping right brings the next ad, like turning a page
-          if (Math.abs(dx) > 40) go(dx > 0 ? i + 1 : i - 1, true);
-        }}
-        style={{ height: HEIGHT, borderRadius: 20, overflow: 'hidden', backgroundColor: colors.ink }}>
-        <Animated.View style={{ flex: 1, opacity: fade }}>
-          <Press onPress={open} label={a.title || 'إعلان'} style={{ flex: 1 }}>
-            {img ? (
-              <Image source={{ uri: img }} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' }} resizeMode="cover" />
-            ) : (
-              <>
-                <LinearGradient colors={[colors.ink, '#0A3A75', colors.primary]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }}
-                  style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
-                <View style={{ position: 'absolute', left: -30, bottom: -40, width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(255,255,255,.07)' }} />
-                <View style={{ position: 'absolute', left: 28, top: 34, width: 76, height: 76, borderRadius: 22, backgroundColor: 'rgba(255,255,255,.12)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Icon name="megaphone" size={34} color="#fff" />
-                </View>
-              </>
-            )}
-            {/* dark wash behind the text side (right, in Arabic) so it stays readable on any photo */}
-            {img ? (
-              <LinearGradient colors={['rgba(4,29,63,.92)', 'rgba(4,29,63,.70)', 'rgba(4,29,63,.05)']} locations={[0, 0.55, 1]} start={{ x: 1, y: 0.5 }} end={{ x: 0, y: 0.5 }}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
-            ) : null}
-
-            <View style={{ flex: 1, paddingHorizontal: 18, paddingVertical: 14, justifyContent: 'space-between', maxWidth: '72%' }}>
-              <Row gap={6}>
-                <View style={{ backgroundColor: colors.lime, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 1 }}>
-                  <T size={10.5} w="bold" color={colors.ink} style={{ lineHeight: 16 }}>إعلان</T>
-                </View>
-                {a.advertiser ? <T size={12} w="semibold" color="rgba(255,255,255,.85)" numberOfLines={1} style={{ flexShrink: 1 }}>{a.advertiser}</T> : null}
-              </Row>
-              <View style={{ gap: 3 }}>
-                {a.title ? <T w="bold" size={19} color="#fff" numberOfLines={2} style={{ lineHeight: 27 }}>{a.title}</T> : null}
-                {a.subtitle ? <T size={13} color="rgba(255,255,255,.88)" numberOfLines={2} style={{ lineHeight: 19 }}>{a.subtitle}</T> : null}
+    <View
+      onTouchStart={(e) => { touchX.current = e.nativeEvent.pageX; moved.current = false; }}
+      onTouchMove={(e) => { if (touchX.current != null && Math.abs(e.nativeEvent.pageX - touchX.current) > 10) moved.current = true; }}
+      onTouchEnd={(e) => {
+        const from = touchX.current; touchX.current = null;
+        if (from == null) return;
+        const dx = e.nativeEvent.pageX - from;
+        // right-to-left app: swiping right brings the next ad, like turning a page
+        if (Math.abs(dx) > 40) go(dx > 0 ? i + 1 : i - 1, true);
+      }}
+      style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, overflow: 'hidden' }}>
+      <Animated.View style={{ opacity: fade }}>
+        {/* one quiet row: the ad is clearly labelled and never louder than the customer's own orders */}
+        <Press onPress={open} label={a.title || 'إعلان'} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 72 }}>
+          {img ? <Image source={{ uri: img }} style={{ width: 52, height: 52, borderRadius: 12, backgroundColor: colors.soft }} resizeMode="cover" /> : null}
+          <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
+            <Row gap={6}>
+              <View style={{ borderWidth: 1, borderColor: '#D5DAE1', borderRadius: 6, paddingHorizontal: 6 }}>
+                <T size={11} w="semibold" color={colors.muted} style={{ lineHeight: 17 }}>إعلان</T>
               </View>
-              {a.link ? (
-                <Row gap={4} style={{ alignSelf: 'flex-start', backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 }}>
-                  <T size={12.5} w="bold" color={colors.ink} style={{ lineHeight: 17 }}>اعرف أكتر</T>
-                  <Icon name="chevron-back" size={13} color={colors.ink} stroke={2.4} />
-                </Row>
-              ) : <View />}
-            </View>
-          </Press>
-        </Animated.View>
-      </View>
-
-      {n > 1 ? (
-        <Row gap={6} style={{ justifyContent: 'center' }}>
-          {ads.map((x, k) => (
-            <Press key={x.id} onPress={() => go(k, true)} label={`إعلان ${k + 1}`} style={{ paddingVertical: 4 }}>
-              <View style={{ width: k === i ? 18 : 7, height: 7, borderRadius: 4, backgroundColor: k === i ? colors.primary : colors.line }} />
-            </Press>
-          ))}
-        </Row>
-      ) : null}
+              {a.advertiser ? <T size={12.5} color={colors.muted} numberOfLines={1} style={{ flexShrink: 1 }}>{a.advertiser}</T> : null}
+            </Row>
+            {a.title ? <T w="semibold" size={14.5} numberOfLines={1}>{a.title}</T> : null}
+            {a.subtitle ? <T size={12.5} color={colors.muted} numberOfLines={1}>{a.subtitle}</T> : null}
+          </View>
+          {a.link ? <Icon name="chevron-back" size={16} color={colors.faint} /> : null}
+        </Press>
+      </Animated.View>
     </View>
   );
 }

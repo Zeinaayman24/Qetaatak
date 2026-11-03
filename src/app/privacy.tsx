@@ -32,7 +32,7 @@ export default function Privacy() {
 
   return (
     <Screen>
-      <BackBar title="الخصوصية" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
+      <BackBar title="الخصوصية والشروط" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
       <Card>
         <Row gap={12} style={{ alignItems: 'center' }}>
           <View style={{ flex: 1, gap: 2 }}>
@@ -46,7 +46,12 @@ export default function Privacy() {
         <T w="semibold" size={15}>مين بيشوف بياناتك</T>
         <Muted size={13.5}>رقمك وعنوانك بيظهروا بس للمحل اللي بتشتري منه، بعد تأكيد الأوردر. المحلات التانية بتشوف القطعة والعربية ومنطقتك بس.</Muted>
         <Muted size={13.5}>محادثاتك مع المساعد بيعالجها ذكاء اصطناعي وبنحتفظ بيها عشان الدعم.</Muted>
-        <Btn kind="link" title="سياسة الخصوصية" onPress={() => router.push('/legal/privacy')} />
+      </Card>
+      <Card>
+        <T w="semibold" size={15}>الشروط والسياسات</T>
+        <Btn kind="link" title="الشروط والأحكام" onPress={() => router.push('/legal/terms')} style={{ alignSelf: 'flex-start' }} />
+        <Btn kind="link" title="سياسة الخصوصية" onPress={() => router.push('/legal/privacy')} style={{ alignSelf: 'flex-start' }} />
+        <Btn kind="link" title="سياسة الإلغاء" onPress={() => router.push('/legal/cancellation')} style={{ alignSelf: 'flex-start' }} />
       </Card>
       <Card>
         <T w="semibold" size={15}>اطلب نسخة من بياناتك</T>

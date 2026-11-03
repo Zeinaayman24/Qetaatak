@@ -1,10 +1,10 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, Linking, Platform, View } from 'react-native';
+import { useState } from 'react';
+import { Image, Linking, View } from 'react-native';
 import { ConfirmSheet } from '@/components/Confirm';
 import { PaymentPanel } from '@/components/Payment';
 import { ReceiptButton } from '@/components/ReceiptButton';
-import { BackBar, Btn, Card, Chips, Empty, Field, Icon, Lines, Loading, Muted, Photo, Press, Row, Screen, Sheet, T, toast } from '@/components/ui';
+import { BackBar, Btn, Card, Chips, Empty, Field, Icon, IconButton, Lines, Loading, Muted, Photo, Press, Row, Screen, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
   CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, warrantyLabel, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
@@ -84,10 +84,10 @@ export default function OrderPage() {
   const footer = o.status === 'cancelled' || unpaid ? undefined
     : isReady
       ? (
-        <Row gap={10}>
-          <Btn icon="checkmark-done" title="استلمت الأوردر" onPress={() => setAsk('received')} style={{ flex: 1 }} />
-          <Btn kind="secondary" title="رفضت القطعة" onPress={() => setAsk('refuse')} style={{ minWidth: 120 }} />
-        </Row>
+        <>
+          <Btn title="استلمت الأوردر" onPress={() => setAsk('received')} />
+          <Btn kind="danger" title="القطعة مش زي العرض؟ ارفضها" onPress={() => setAsk('refuse')} style={{ minHeight: 40 }} />
+        </>
       )
       : o.status === 'preparing' ? undefined
       : !o.rating
@@ -98,26 +98,20 @@ export default function OrderPage() {
     <Screen footer={footer}>
       <BackBar title={'أوردر ' + orderNo(o.order_no)} onBack={back} />
 
-      {/* live status */}
-      <View style={{ backgroundColor: o.status === 'cancelled' ? colors.soft : o.status === 'received' ? colors.goodSoft : colors.ink, borderRadius: 20, padding: 18, gap: 18 }}>
-        <Row gap={14}>
-          <StatusIcon name={unpaid ? 'card' : lbl.icon} live={o.status !== 'received' && o.status !== 'cancelled'} tone={o.status === 'received' ? 'good' : o.status === 'cancelled' ? 'plain' : 'live'} />
-          <View style={{ flex: 1 }}>
-            <T w="bold" size={20} color={o.status === 'received' || o.status === 'cancelled' ? colors.ink : '#fff'}>{unpaid ? 'فاضل خطوة الدفع' : orderTitle(o)}</T>
-            <T size={13} color={o.status === 'received' || o.status === 'cancelled' ? colors.muted : 'rgba(255,255,255,.7)'}>
-              {o.delivery_mode === 'delivery' ? 'توصيل لعنوانك' : 'استلام من المحل'} · آخر تحديث {ago(o.updated_at)}
-            </T>
-          </View>
-        </Row>
+      {/* live status: light, one line of what is happening, a simple progress bar */}
+      <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 18, gap: 16 }}>
+        <View style={{ gap: 2 }}>
+          <T w="bold" size={22} style={{ lineHeight: 32 }} color={o.status === 'cancelled' ? colors.bad : colors.ink}>{unpaid ? 'فاضل خطوة الدفع' : orderTitle(o)}</T>
+          <Muted size={14}>{o.delivery_mode === 'delivery' ? 'توصيل لعنوانك' : 'استلام من المحل'} · آخر تحديث {ago(o.updated_at)}</Muted>
+        </View>
         {o.status !== 'cancelled' ? (
           <Row gap={6}>
-            {steps.map((s, i) => {
+            {steps.map((st, i) => {
               const done = i <= at;
-              const dark = o.status !== 'received';
               return (
-                <View key={s} style={{ flex: 1, gap: 6 }}>
-                  <View style={{ height: 6, borderRadius: 3, backgroundColor: done ? colors.accent : dark ? 'rgba(255,255,255,.15)' : colors.line }} />
-                  <T size={11.5} w={i === at ? 'bold' : 'regular'} color={dark ? (done ? '#fff' : 'rgba(255,255,255,.5)') : colors.ink}>{ORDER_STEP_NAME[s]}</T>
+                <View key={st} style={{ flex: 1, gap: 8 }}>
+                  <View style={{ height: 5, borderRadius: 3, backgroundColor: done ? (o.status === 'received' ? colors.good : colors.primary) : '#E3E7EC' }} />
+                  <T size={13} w={i === at ? 'semibold' : 'regular'} color={done ? colors.ink : colors.faint}>{ORDER_STEP_NAME[st]}</T>
                 </View>
               );
             })}
@@ -131,14 +125,12 @@ export default function OrderPage() {
           <View style={{ flex: 1 }}><T w="bold" size={15}>الأوردر اتأكد.</T><Muted size={12.5}>إيصالك جاهز، حمّله من تحت.</Muted></View>
         </Row>
       ) : null}
-      {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
 
       {data!.code && o.status !== 'received' && o.status !== 'cancelled' ? (
-        <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.primary, padding: 16, gap: 8, alignItems: 'center' }}>
-          <Row gap={6}><Icon name="lock-closed" size={16} color={colors.primary} /><T w="semibold" size={13.5} color={colors.primary}>كود الاستلام</T></Row>
-          <T w="bold" size={40} style={{ letterSpacing: 10, lineHeight: 52, writingDirection: 'ltr' }} selectable>{ar(data!.code)}</T>
-          <Muted size={12.5} center>افحص القطعة كويس الأول. لو زي العرض، ادّي الكود للمحل أو المندوب. بعد الكود، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
-          <Muted size={12} center>اتأكد من: الموديل · الجهة · الحالة · زي صورة العرض</Muted>
+        <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 20, gap: 8, alignItems: 'center' }}>
+          <Muted size={14}>كود الاستلام</Muted>
+          <T w="bold" size={44} style={{ letterSpacing: 10, lineHeight: 56, writingDirection: 'ltr' }} selectable>{ar(data!.code)}</T>
+          <Muted size={13.5} center>افحص القطعة الأول: الموديل، الجهة، الحالة، وإنها زي صورة العرض. لو زي العرض، ادّي الكود للمحل أو المندوب. بعد الكود، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
         </View>
       ) : null}
 
@@ -156,17 +148,13 @@ export default function OrderPage() {
       {/* the shop */}
       {o.status !== 'cancelled' ? (
         <Card>
-          <Row gap={12}>
-            <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={24} color={colors.primary} /></View>
-            <View style={{ flex: 1 }}>
-              <T w="bold" size={16}>{priv?.name ?? 'المحل'}</T>
-              <Muted size={12.5}>{shop?.area}، {shop?.governorate}</Muted>
-            </View>
-            <Press onPress={() => router.push(`/shop-profile/${o.shop_id}`)} label="صفحة المحل" hitSlop={6}><Icon name="information-circle-outline" size={24} color={colors.muted} /></Press>
-          </Row>
           <Row gap={10}>
-            {priv?.phone ? <Btn kind="dark" icon="call" title="اتصل" onPress={() => Linking.openURL('tel:' + priv.phone)} style={{ flex: 1 }} /> : null}
-            {firstPart ? <Btn kind="secondary" icon="chatbubble-ellipses" title="رسالة" onPress={() => router.push(`/chat/${firstPart.id}/${o.shop_id}`)} style={{ flex: 1, minHeight: 46 }} /> : null}
+            <Press onPress={() => router.push(`/shop-profile/${o.shop_id}`)} label="صفحة المحل" role="link" style={{ flex: 1 }}>
+              <T w="semibold" size={16}>{priv?.name ?? 'المحل'}</T>
+              <Muted size={13}>{shop?.area}، {shop?.governorate}</Muted>
+            </Press>
+            {firstPart ? <IconButton name="chatbubble-ellipses" label="رسالة للمحل" size={44} onPress={() => router.push(`/chat/${firstPart.id}/${o.shop_id}`)} /> : null}
+            {priv?.phone ? <IconButton name="call" label="اتصل بالمحل" size={44} onPress={() => Linking.openURL('tel:' + priv.phone)} /> : null}
           </Row>
           {o.delivery_mode === 'pickup' && priv ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
@@ -199,15 +187,8 @@ export default function OrderPage() {
         <Lines rows={[['القطع', money(o.items_total) + ' ج.م'], ['التوصيل', o.delivery_fee ? money(o.delivery_fee) + ' ج.م' : 'مجاناً']]} total={['الإجمالي', money(Number(o.items_total) + Number(o.delivery_fee)) + ' ج.م']} />
       </Card>
 
-      {!warrantyEnd && o.status !== 'cancelled' ? (
-        <Row gap={12} style={{ backgroundColor: colors.primarySoft, borderRadius: 16, padding: 16, alignItems: 'flex-start' }}>
-          <Icon name="shield-checkmark" size={24} color={colors.primary} />
-          <View style={{ flex: 1 }}>
-            <T w="bold" size={14.5}>افحص قبل ما تستلم</T>
-            <Muted size={12.5}>افحصها كويس قبل ما تدّي الكود: الموديل، الجهة، الحالة، وإنها زي صورة العرض. لو مش زي العرض ارفضها. بعد الاستلام، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
-          </View>
-        </Row>
-      ) : null}
+      {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
+
       {warrantyEnd ? (
         <Row gap={12} style={{ backgroundColor: colors.goodSoft, borderRadius: 16, padding: 16 }}>
           <Icon name="shield-checkmark" size={26} color={colors.good} />
@@ -221,7 +202,7 @@ export default function OrderPage() {
       {o.status === 'received' ? (
         o.rating ? (
           <Card>
-            <Row gap={4}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={22} color={o.rating! >= n ? colors.accent : colors.line} />)}</Row>
+            <Row gap={4}>{[1, 2, 3, 4, 5].map((n) => <Icon key={n} name="star" size={22} color={o.rating! >= n ? '#E8A317' : colors.line} />)}</Row>
             {o.review ? <T size={14}>«{o.review}»</T> : <Muted>شكراً على تقييمك.</Muted>}
           </Card>
         ) : (
@@ -230,7 +211,7 @@ export default function OrderPage() {
             <Row gap={8} style={{ justifyContent: 'center' }}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <Press key={n} onPress={() => setStars(n)} label={ar(n) + ' نجوم'} hitSlop={4}>
-                  <Icon name={stars >= n ? 'star' : 'star-outline'} size={40} color={stars >= n ? colors.accent : colors.faint} />
+                  <Icon name={stars >= n ? 'star' : 'star-outline'} size={40} color={stars >= n ? '#E8A317' : colors.faint} />
                 </Press>
               ))}
             </Row>
@@ -263,23 +244,5 @@ export default function OrderPage() {
         </View>
       </Sheet>
     </Screen>
-  );
-}
-
-function StatusIcon({ name, live, tone }: { name: string; live: boolean; tone: 'live' | 'good' | 'plain' }) {
-  const a = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!live) return;
-    const loop = Animated.loop(Animated.timing(a, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: Platform.OS !== 'web' }));
-    loop.start(); return () => loop.stop();
-  }, [a, live]);
-  const bg = tone === 'live' ? colors.accent : tone === 'good' ? colors.good : colors.faint;
-  return (
-    <View style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center' }}>
-      {live ? <Animated.View style={{ position: 'absolute', width: 60, height: 60, borderRadius: 30, backgroundColor: bg, opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] }), transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.4] }) }] }} /> : null}
-      <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={name} size={26} color={tone === 'live' ? colors.ink : '#fff'} />
-      </View>
-    </View>
   );
 }

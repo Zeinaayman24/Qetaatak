@@ -3,38 +3,38 @@ import { Platform } from 'react-native';
 // Deep navy carries the brand and the text; sky blue is the call to action; lime marks a "tap" / success moment.
 // Taken from the brand mark (gear + pressing finger + speed lines).
 export const brand = {
-  navy: '#041D3F',
+  navy: '#0B1B33',
   sky: '#0AABFE',
   lime: '#7CD035',
 };
 
 export const colors = {
-  ground: '#F4F7FB',     // app background: a cool, almost white blue
+  ground: '#F6F7F9',     // app background: a quiet, neutral grey
   surface: '#FFFFFF',    // cards, sheets, bars
   card: '#FFFFFF',
-  soft: '#F0F4F9',       // inputs, chips, inner wells
-  ink: '#041D3F',        // navy: text, headers, strong surfaces
-  muted: '#55627A',
-  faint: '#8F9BB0',
-  line: '#E3E9F1',       // hairlines and card borders
-  brand: '#041D3F',
+  soft: '#F2F4F7',       // tags, inner wells
+  ink: '#0B1B33',        // navy: text, headings, strong surfaces
+  muted: '#5B6676',      // secondary text (passes AA on white)
+  faint: '#6B7484',      // hints and inactive icons (passes AA on white)
+  line: '#E6E9EE',       // hairlines and card borders
+  brand: '#0B1B33',
   brandInk: '#FFFFFF',
-  primary: '#0077D6',    // the action blue: main buttons, links, selection (white text passes AA)
+  primary: '#0A6CDB',    // the one action colour: main buttons, links, selection
   primaryInk: '#FFFFFF',
-  primarySoft: '#E8F3FD',
-  accent: '#0AABFE',     // the logo's sky blue: highlights, progress, badges
-  accentDeep: '#0071B8', // sky that reads on white
-  accentInk: '#041D3F',
-  accentSoft: '#E2F4FF',
-  lime: '#7CD035',       // the "tap" green from the logo
-  good: '#2B7F0E',
-  goodSoft: '#EAF7DF',
-  bad: '#D93F45',
-  badSoft: '#FDECEC',
-  warn: '#8A5A00',
-  warnSoft: '#FFF4DC',
+  primarySoft: '#F0F5FD',
+  accent: '#0A6CDB',     // kept for older screens: same as the action blue now
+  accentDeep: '#0856AF',
+  accentInk: '#FFFFFF',
+  accentSoft: '#F0F5FD',
+  lime: '#12805C',       // retired: older screens fall back to the "good" green
+  good: '#12805C',       // ready, done, guarantee
+  goodSoft: '#E7F5EF',
+  bad: '#C4321F',        // refuse, error, delete
+  badSoft: '#FBE9E7',
+  warn: '#8A4B00',       // preparing, waiting
+  warnSoft: '#FDF1E2',
   plate: '#7DB4EA',      // the light-blue band of an Egyptian private-car plate
-  shadow: '#0B2545',
+  shadow: '#0B1B33',
 };
 
 // Arabic text: Times New Roman where the device has it (Windows, Mac, iPhone), otherwise Noto Naskh Arabic,
@@ -51,13 +51,12 @@ export const fonts = {
 /** Times New Roman only has regular and bold, so the browser needs the weight too. */
 export const fontWeights = { regular: '400', medium: '500', semibold: '600', bold: '700', display: '700' } as const;
 
-export const radius = { sm: 10, md: 12, lg: 16, xl: 22, pill: 999 };
+export const radius = { sm: 10, md: 14, lg: 16, xl: 20, pill: 999 };
 
 /** Soft lift for cards and floating bars. */
 /** Cards sit on a hairline border with only a whisper of shadow (flat, modern). */
 export const lift = {
   borderWidth: 1, borderColor: colors.line,
-  shadowColor: colors.shadow, shadowOpacity: 0.04, shadowRadius: 10, shadowOffset: { width: 0, height: 3 }, elevation: 1,
 } as const;
 /** Floating things (tab bar, sheets, toasts) get a real shadow. */
 export const liftStrong = {

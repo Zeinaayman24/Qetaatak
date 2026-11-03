@@ -6,9 +6,9 @@ import { isFeatured } from '@/components/AdBanner';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, View } from 'react-native';
-import { PaymentPicker, RadioCard, payOptions, type Handover } from '@/components/Payment';
+import { PaymentPicker, payOptions, type Handover } from '@/components/Payment';
 import {
-  BackBar, Btn, Card, Chips, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Plate, Press, Row, Screen, Seg, Sheet, SlideToConfirm, T, TabPills, toast,
+  BackBar, Btn, Chips, Empty, Field, Icon, Lines, Loading, Muted, Photo, Pill, Press, Row, Screen, Seg, Sheet, T, TabPills, toast,
 } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import {
@@ -16,7 +16,7 @@ import {
   type Order, type PayMethod, type Quote, type Request, type Shop, type ShopCard,
 } from '@/lib/data';
 import { partIsSided } from '@/lib/assistant';
-import { PAY_NAME, payByCard } from '@/lib/payments';
+import { payByCard } from '@/lib/payments';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { must, useLive, useNow } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -25,8 +25,9 @@ import { colors, lift } from '@/lib/theme';
 type Mode = 'delivery' | 'pickup';
 type Declines = Record<string, { n: number; reasons: string[] }>;
 type Data = { req: Request | null; parts: Request[]; quotes: Quote[]; shops: Record<string, Shop>; orders: Record<string, Order>; declines: Declines; shopCount: number; transfer: Record<string, boolean>; fees: Record<string, number | null>; cards: Record<string, ShopCard> };
-type Step = 'offers' | 'handover' | 'payment' | 'review';
-const STEPS: { v: Step; label: string }[] = [{ v: 'handover', label: 'الاستلام' }, { v: 'payment', label: 'الدفع' }, { v: 'review', label: 'التأكيد' }];
+type Step = 'offers' | 'checkout';
+type Sort = 'best' | 'cheap' | 'warranty' | 'fast';
+const SORTS: { v: Sort; label: string }[] = [{ v: 'best', label: 'الأنسب' }, { v: 'cheap', label: 'الأرخص' }, { v: 'warranty', label: 'الضمان' }, { v: 'fast', label: 'الأسرع رد' }];
 
 /** A price request: offers per part, side by side. Accepted parts move into orders. */
 export default function PriceRequest() {
@@ -35,7 +36,8 @@ export default function PriceRequest() {
   const [tab, setTab] = useState<string | null>(null);
   const [sel, setSel] = useState<Record<string, string>>({}); // part id → quote id
   const [modes, setModes] = useState<Record<string, Mode>>({});
-  const [step, setStep] = useState<Step>('offers'); // checkout runs as three pages: handover → payment → review
+  const [step, setStep] = useState<Step>('offers'); // checkout is one page: handover, payment and the summary together
+  const [sort, setSort] = useState<Sort>('best');
   const [pay, setPay] = useState<PayMethod>('cash');
   const card = false; // card payment stays hidden until it is switched on (A19)
   const [busy, setBusy] = useState(false);
@@ -102,6 +104,13 @@ export default function PriceRequest() {
     return [...(feat ? [feat] : []), ...live.filter((q) => q !== feat), ...all.filter(expiredQ)];
   };
   const featuredOf = (p: Request) => { const f = quotesOf(p)[0]; return f && !expiredQ(f) && isFeatured(d.shops[f.shop_id]) ? f.id : null; };
+  // the customer's sort; «الأنسب» keeps the default order (cheapest total, one marked featured offer on top). Ended offers stay last.
+  const sorted = (qs: Quote[], p: Request) => {
+    if (sort === 'best') return qs;
+    const live = qs.filter((q) => !expiredQ(q)), ended = qs.filter(expiredQ);
+    const key = (q: Quote) => sort === 'cheap' ? totalOf(q, p) : sort === 'warranty' ? -(q.warranty_days || 0) : (d.cards[q.shop_id]?.reply_min ?? 9999);
+    return [...[...live].sort((a, b) => key(a) - key(b)), ...ended];
+  };
   const open = d.parts.filter((p) => p.status === 'open');
   const current = d.parts.find((p) => p.id === tab) ?? open.find((p) => quotesOf(p).length) ?? open[0] ?? d.parts[0];
   const chosen = Object.entries(sel)
@@ -218,11 +227,31 @@ export default function PriceRequest() {
           <Empty icon="time-outline" text="الطلب ده انتهى من غير أوردر." action={{ label: 'اطلب تاني', onPress: () => router.push({ pathname: '/customer/new', params: { part: p.part, cond: p.wanted_condition, notes: p.notes, side: p.side } }) }} />
         ) : qs.length ? (
           <>
-            <View style={[{ backgroundColor: colors.surface, borderRadius: 18, overflow: 'hidden' }, lift]}>
-              {qs.map((q, i) => (
-                <OfferRow key={q.id} q={q} shop={d.shops[q.shop_id]} card={d.cards[q.shop_id]} fee={d.fees[q.id]} on={sel[p.id] === q.id} first={i === 0}
+            {liveQs.length > 1 ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {SORTS.map((o) => {
+                  const on = sort === o.v;
+                  return (
+                    <Press key={o.v} onPress={() => setSort(o.v)} selected={on} label={'رتّب: ' + o.label}
+                      style={{ height: 36, paddingHorizontal: 14, borderRadius: 18, justifyContent: 'center', backgroundColor: on ? colors.ink : colors.surface, borderWidth: 1, borderColor: on ? colors.ink : '#D5DAE1' }}>
+                      <T size={14} w={on ? 'semibold' : 'regular'} color={on ? '#fff' : colors.ink}>{o.label}</T>
+                    </Press>
+                  );
+                })}
+              </View>
+            ) : null}
+            <Pressable onPress={() => setGuarantee(true)} accessibilityRole="button" hitSlop={4}>
+              <Row gap={6}>
+                <Icon name="shield-checkmark" size={16} color={colors.good} />
+                <T size={13} color={colors.good} style={{ flexShrink: 1 }}>كل العروض محمية بضمان ضغطة لما تأكّد من التطبيق</T>
+                <T size={13} w="semibold" color={colors.primary}>إيه ده؟</T>
+              </Row>
+            </Pressable>
+            <View style={{ gap: 10 }}>
+              {sorted(qs, p).map((q) => (
+                <OfferRow key={q.id} q={q} shop={d.shops[q.shop_id]} card={d.cards[q.shop_id]} fee={d.fees[q.id]} on={sel[p.id] === q.id}
                   cheapest={liveQs.length > 1 && !expiredQ(q) && liveQs.findIndex((x) => totalOf(x, p) === low) === liveQs.indexOf(q)} featured={q.id === feat}
-                  expired={expiredQ(q)} now={now} qty={p.qty || 1} onGuarantee={() => setGuarantee(true)}
+                  expired={expiredQ(q)} now={now} qty={p.qty || 1}
                   onPick={() => pick(p, q)} onChat={() => router.push(`/chat/${p.id}/${q.shop_id}`)} />
               ))}
             </View>
@@ -256,94 +285,78 @@ export default function PriceRequest() {
     );
   };
 
-  /* ---------------------------------------------------------------- checkout: three pages */
-  if (step !== 'offers' && chosen.length) {
+  /* ---------------------------------------------------------------- checkout: one page */
+  if (step === 'checkout' && chosen.length) {
     const grand = partsTotal + deliveryTotal;
-    const at = STEPS.findIndex((x) => x.v === step);
-    const prev = () => setStep(at === 0 ? 'offers' : STEPS[at - 1].v);
     const shopName = (sid: string) => d.cards[sid]?.name ?? 'المحل';
-    const totalRow = (
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Muted size={13}>الإجمالي{step !== 'handover' ? '، ' + PAY_NAME[method] : ''}</Muted>
-        <T w="bold" size={20} color={colors.primary}>{money(grand)} ج.م</T>
-      </Row>
-    );
-    const goNext = () => {
-      if (step === 'handover' && !allPickup) { const bad = addressProblem(addr); if (bad) return toast(bad); }
-      setStep(STEPS[at + 1].v);
+    const confirm = () => {
+      if (!allPickup) { const bad = addressProblem(addr); if (bad) return toast(bad); }
+      accept();
     };
-    const footer = step === 'review' ? (
-      <>{totalRow}<SlideToConfirm label={method === 'card' ? 'اسحب وكمّل للدفع' : 'اسحب لتأكيد الأوردر'} busy={busy} onConfirm={accept} /></>
-    ) : (
-      <>{totalRow}<Btn title={step === 'handover' ? 'التالي: الدفع' : 'التالي: مراجعة الأوردر'} icon="arrow-back" onPress={goNext} /></>
+    const footer = (
+      <Btn title={`${method === 'card' ? 'كمّل للدفع' : 'أكّد الأوردر'} · ${money(grand)} ج.م`} loading={busy} onPress={confirm} />
     );
     return (
       <Screen footer={footer}>
-        <BackBar title={STEPS[at].label} onBack={prev} />
-        <Stepper at={at} />
+        <BackBar title="راجع وأكّد" onBack={() => setStep('offers')} />
 
-        {step === 'handover' ? (
-          <>
-            <T w="bold" size={22}>هتستلم إزاي؟</T>
-            {byShop.map((g) => {
+        <View style={{ gap: 10 }}>
+          <T w="bold" size={16}>هتستلم إزاي؟</T>
+          {byShop.map((g) => {
+            const sid = g[0].quote.shop_id;
+            const shop = d.shops[sid];
+            const opts: { v: Mode; label: string }[] = canDeliver(sid)
+              ? [{ v: 'delivery', label: `توصيل · ${money(feeOf(sid))} ج.م` }, { v: 'pickup', label: 'أستلم من المحل' }]
+              : [{ v: 'pickup', label: 'أستلم من المحل' }];
+            return (
+              <View key={sid} style={{ gap: 8 }}>
+                {byShop.length > 1 ? <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={[`${ar(g.length)} ${g.length > 1 ? 'قطع' : 'قطعة'}`, shop?.area].filter(Boolean).join(' · ')} /> : null}
+                <Seg options={opts} value={modeOf(sid)} onPick={(v) => setModes((m) => ({ ...m, [sid]: v }))} />
+                {!canDeliver(sid) ? <Muted size={12.5}>{!shop?.offers_delivery ? 'المحل ده مش بيوصّل' : g.length > 1 && g.some((c) => d.fees[c.quote.id] != null) ? 'قطعة من دول استلام من المحل بس' : 'المحل مش بيوصّل لمنطقتك'}</Muted>
+                  : modeOf(sid) === 'pickup' ? <Muted size={12.5}>عنوان المحل ومواعيده هيظهروا بعد التأكيد.</Muted> : null}
+              </View>
+            );
+          })}
+          {!allPickup && profile ? <AddressPicker profile={profile} value={addr} onChange={setAddr} /> : null}
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <T w="bold" size={16}>هتدفع إزاي؟</T>
+          <PaymentPicker value={method} onPick={setPay} card={card} instapay={transferOk} handover={handover} />
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <T w="bold" size={16}>الأوردر</T>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
+            {byShop.map((g, gi) => {
               const sid = g[0].quote.shop_id;
-              const shop = d.shops[sid];
               return (
-                <Card key={sid}>
-                  <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={[`${ar(g.length)} ${g.length > 1 ? 'قطع' : 'قطعة'}`, shop?.area].filter(Boolean).join(' · ')} />
-                  <RadioCard title="توصيل لعنوانك" icon="bicycle" right={canDeliver(sid) ? `+${money(feeOf(sid))} ج.م` : undefined}
-                    sub={canDeliver(sid) ? 'سعر التوصيل من المحل حسب منطقتك' : !shop?.offers_delivery ? 'المحل ده مش بيوصّل' : g.length > 1 && g.some((c) => d.fees[c.quote.id] != null) ? 'قطعة من دول استلام من المحل بس' : 'المحل مش بيوصّل لمنطقتك'}
-                    on={modeOf(sid) === 'delivery'} disabled={!canDeliver(sid)} onPress={() => setModes((m) => ({ ...m, [sid]: 'delivery' }))} />
-                  <RadioCard title="استلام من المحل" sub="العنوان ومواعيد المحل هتظهر بعد التأكيد" icon="walk" right="مجاناً"
-                    on={modeOf(sid) === 'pickup'} onPress={() => setModes((m) => ({ ...m, [sid]: 'pickup' }))} />
-                </Card>
+                <View key={sid} style={{ padding: 16, gap: 10, borderTopWidth: gi ? 1 : 0, borderColor: '#EEF0F3' }}>
+                  {g.map((c) => (
+                    <Row key={c.part.id} gap={10} style={{ alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1 }}>
+                        <T w="semibold" size={15}>{c.part.part}{c.quote.brand ? ` (${c.quote.brand})` : ''}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
+                        <Muted size={13}>{shopName(sid)} · {CONDITIONS[c.quote.condition]} · {warrantyLabel(c.quote.warranty_days)}</Muted>
+                      </View>
+                      <T w="semibold" size={15}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
+                    </Row>
+                  ))}
+                </View>
               );
             })}
-            {!allPickup && profile ? <AddressPicker profile={profile} value={addr} onChange={setAddr} /> : null}
-          </>
-        ) : step === 'payment' ? (
-          <>
-            <T w="bold" size={22}>هتدفع إزاي؟</T>
-            <Muted size={13}>{handover === 'pickup' ? 'بتستلم من المحل، فدي طرق الدفع اللي تنفع.' : handover === 'delivery' ? 'بيوصلك البيت، فدي طرق الدفع اللي تنفع.' : 'في قطع هتتوصّل وقطع هتستلمها، فدي الطرق اللي تنفع للاتنين.'}</Muted>
-            <PaymentPicker value={method} onPick={setPay} card={card} instapay={transferOk} handover={handover} />
-          </>
-        ) : (
-          <>
-            <T w="bold" size={22}>راجع الأوردر وأكّده</T>
-            <View style={[{ backgroundColor: colors.surface, borderRadius: 18, overflow: 'hidden' }, lift]}>
-              {byShop.map((g, gi) => {
-                const sid = g[0].quote.shop_id;
-                const mode = modeOf(sid);
-                return (
-                  <View key={sid} style={{ padding: 16, gap: 10, borderTopWidth: gi ? 1 : 0, borderColor: colors.line }}>
-                    <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={mode === 'delivery' ? `توصيل ${money(feeOf(sid))} ج.م` : 'استلام من المحل'} />
-                    {g.map((c) => (
-                      <Row key={c.part.id} gap={10}>
-                        <View style={{ flex: 1 }}>
-                          <T w="semibold" size={14}>{c.part.part}{c.quote.brand ? ` (${c.quote.brand})` : ''}{c.part.qty > 1 ? ` × ${ar(c.part.qty)}` : ''}</T>
-                          <Muted size={12}>{CONDITIONS[c.quote.condition]} · {warrantyLabel(c.quote.warranty_days)}</Muted>
-                        </View>
-                        <T w="semibold" size={14}>{money(c.quote.price * (c.part.qty || 1))} ج.م</T>
-                      </Row>
-                    ))}
-                  </View>
-                );
-              })}
-              <View style={{ padding: 16, gap: 8, backgroundColor: colors.soft }}>
-                <Lines rows={[['القطع', money(partsTotal) + ' ج.م'], ['التوصيل', deliveryTotal ? money(deliveryTotal) + ' ج.م' : 'مجاناً'], ['الدفع', PAY_NAME[method]]]}
-                  total={['الإجمالي', money(grand) + ' ج.م']} />
-              </View>
+            <View style={{ padding: 16, gap: 8, borderTopWidth: 1, borderColor: '#EEF0F3' }}>
+              <Lines rows={[['التوصيل', deliveryTotal ? money(deliveryTotal) + ' ج.م' : 'مجاناً']]} total={['الإجمالي', money(grand) + ' ج.م']} />
             </View>
-            <Row gap={8} style={{ backgroundColor: colors.primarySoft, borderRadius: 14, padding: 12 }}>
-              <Icon name="document-text" size={18} color={colors.primary} />
-              <Muted size={12.5} style={{ flex: 1 }}>بعد التأكيد هيتعملك إيصال PDF فيه الضمان، تقدر تحمّله من صفحة الأوردر.</Muted>
-            </Row>
-            {byShop.length > 1 ? <Muted size={12.5}>هيتعمل {ar(byShop.length)} أوردرات، واحد لكل محل.</Muted> : null}
-            {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في الطلب مستنية عروض.</Muted> : null}
-            <Muted size={12} center>افحص القطعة قبل ما تدّي الكود أو تدفع. لو مش زي العرض ارفضها. بعد الاستلام، الاسترجاع بيكون مع المحل حسب القانون.</Muted>
-            <LegalLinks lead="بتأكيد الأوردر بتوافق على" withCancellation />
-          </>
-        )}
+          </View>
+          {byShop.length > 1 ? <Muted size={12.5}>هيتعمل {ar(byShop.length)} أوردرات، واحد لكل محل.</Muted> : null}
+          {open.length > chosen.length ? <Muted size={12.5}>باقي القطع ({ar(open.length - chosen.length)}) هتفضل في الطلب مستنية عروض.</Muted> : null}
+        </View>
+
+        <Row gap={10} style={{ alignItems: 'flex-start', backgroundColor: colors.goodSoft, borderRadius: 14, padding: 14 }}>
+          <Icon name="shield-checkmark" size={20} color={colors.good} />
+          <T size={13.5} color="#0B4D37" style={{ flex: 1 }}>افحص القطعة قبل ما تدّي الكود أو تدفع. لو مش زي العرض، ارفضها. بعد الاستلام، الاسترجاع بيكون مع المحل حسب القانون.</T>
+        </Row>
+        <LegalLinks lead="بتأكيد الأوردر بتوافق على" withCancellation />
       </Screen>
     );
   }
@@ -352,10 +365,10 @@ export default function PriceRequest() {
   const footer = chosen.length ? (
     <Row gap={12}>
       <View style={{ flex: 1 }}>
-        <Muted size={12}>اخترت {ar(chosen.length)} من {ar(open.length)}</Muted>
+        <Muted size={13}>اخترت {ar(chosen.length)} من {ar(open.length)}</Muted>
         <T w="bold" size={19}>{money(partsTotal)} ج.م</T>
       </View>
-      <Btn title="كمّل" icon="arrow-back" onPress={() => setStep('handover')} style={{ minWidth: 150 }} />
+      <Btn title="كمّل الأوردر" onPress={() => setStep('checkout')} style={{ minWidth: 160 }} />
     </Row>
   ) : undefined;
   const withOffers = d.parts.filter((p) => quotesOf(p).some((q) => !expiredQ(q)) && p.status === 'open').length;
@@ -363,31 +376,14 @@ export default function PriceRequest() {
 
   return (
     <Screen footer={footer}>
-      <BackBar title={'طلب ' + reqNo(first.num)} onBack={back} />
-      <View style={{ backgroundColor: colors.ink, borderRadius: 18, padding: 16, gap: 14 }}>
-        <Row gap={14}>
-          <Plate top={first.car_model || '—'} bottom={ar(first.car_year)} size="sm" />
-          <View style={{ flex: 1 }}>
-            <T w="bold" size={16} color="#fff">{d.parts.length > 1 ? `${ar(d.parts.length)} قطع` : first.part}</T>
-            <T size={12.5} color="rgba(255,255,255,.7)">{first.car_make} {first.car_model}</T>
-          </View>
-          <Since iso={first.created_at} />
-        </Row>
-        {liveCount ? (
-          <Row gap={8} style={{ backgroundColor: colors.lime, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}>
-            <Icon name="pricetags" size={18} color={colors.ink} />
-            <T w="bold" size={14} color={colors.ink} style={{ flex: 1 }}>
-              {d.parts.length > 1 ? `وصلك ${ar(liveCount)} عروض على ${ar(withOffers)} من ${ar(d.parts.length)} قطع.` : `وصلك ${liveCount > 1 ? ar(liveCount) + ' عروض' : 'عرض'}. اختار اللي يناسبك.`}
-            </T>
-          </Row>
-        ) : null}
-      </View>
+      <BackBar title={'عروض طلب ' + reqNo(first.num)} onBack={back} />
+      <Muted size={13} center style={{ marginTop: -14 }}>{first.car_make} {first.car_model} {ar(first.car_year)} · <SinceText iso={first.created_at} /></Muted>
 
       {bundle && !chosen.length ? (
         <Press onPress={() => setSel(Object.fromEntries(open.map((p, i) => [p.id, bundle.qs[i].id])))}
-          style={{ backgroundColor: colors.accentSoft, borderRadius: 18, padding: 16, gap: 6, borderWidth: 1.5, borderColor: colors.accent }}>
+          style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 16, gap: 6, borderWidth: 1, borderColor: colors.line }}>
           <Row style={{ justifyContent: 'space-between' }}>
-            <Row gap={8}><Icon name="bag-check" size={20} color={colors.accentDeep} /><T w="bold" size={15}>كل القطع من محل واحد</T></Row>
+            <Row gap={8}><Icon name="bag-check" size={20} color={colors.primary} /><T w="bold" size={15}>كل القطع من محل واحد</T></Row>
             <T w="bold" size={17}>{money(bundle.total)} ج.م</T>
           </Row>
           <Muted size={12.5}>{d.cards[bundle.sid]?.name ?? 'محل موثّق'} عنده كل القطع. أوردر واحد وتوصيل واحد.</Muted>
@@ -416,25 +412,6 @@ export default function PriceRequest() {
   );
 }
 
-/** Checkout progress: الاستلام → الدفع → التأكيد. */
-function Stepper({ at }: { at: number }) {
-  return (
-    <Row gap={6}>
-      {STEPS.map((s, i) => (
-        <View key={s.v} style={{ flex: 1, gap: 6 }}>
-          <View style={{ height: 4, borderRadius: 2, backgroundColor: i <= at ? colors.primary : colors.line }} />
-          <Row gap={5}>
-            <View style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: i < at ? colors.primary : i === at ? colors.ink : colors.soft }}>
-              {i < at ? <Icon name="checkmark" size={12} color="#fff" /> : <T size={10.5} w="bold" color={i === at ? '#fff' : colors.muted} style={{ lineHeight: 16 }}>{ar(i + 1)}</T>}
-            </View>
-            <T size={12.5} w={i === at ? 'bold' : 'medium'} color={i <= at ? colors.ink : colors.muted}>{s.label}</T>
-          </Row>
-        </View>
-      ))}
-    </Row>
-  );
-}
-
 /** Shop name with rating and how fast it usually answers. */
 function ShopLine({ name, card, sub }: { name: string; card?: ShopCard; sub?: string }) {
   return (
@@ -448,66 +425,64 @@ function ShopLine({ name, card, sub }: { name: string; card?: ShopCard; sub?: st
   );
 }
 
-/** One offer as a slim row: radio, price, shop, and the details in one line. */
-function OfferRow({ q, card, fee, on, first, cheapest, featured, expired, now, qty, onPick, onChat, onGuarantee }: {
-  q: Quote; shop?: Shop; card?: ShopCard; fee?: number | null; on: boolean; first: boolean; cheapest: boolean; featured: boolean; expired: boolean; now: number; qty: number;
-  onPick: () => void; onChat: () => void; onGuarantee: () => void;
+/** One offer as its own card: shop and rating, the price large on the far side, then condition, warranty and delivery as tags. */
+function OfferRow({ q, card, fee, on, cheapest, featured, expired, now, qty, onPick, onChat }: {
+  q: Quote; shop?: Shop; card?: ShopCard; fee?: number | null; on: boolean; cheapest: boolean; featured: boolean; expired: boolean; now: number; qty: number;
+  onPick: () => void; onChat: () => void;
 }) {
-  const details = [q.brand, CONDITIONS[q.condition], warrantyLabel(q.warranty_days), fee != null ? `توصيل ${money(fee)} ج.م` : 'استلام من المحل بس'].filter(Boolean).join(' · ');
+  const tags = [[q.brand, CONDITIONS[q.condition]].filter(Boolean).join(' · '), warrantyLabel(q.warranty_days), fee != null ? `توصيل ${money(fee)} ج.م` : 'استلام من المحل بس'];
   const left = new Date(q.expires_at).getTime() - now;
   const soon = !expired && left < 6 * 3600000;
   const leftText = left >= 3600000 ? `${ar(Math.floor(left / 3600000))} ساعة` : `${ar(Math.max(1, Math.ceil(left / 60000)))} دقيقة`;
+  const rating = card?.rating ? `★ ${ar(card.rating.toFixed(1)).replace('.', '٫')}` : '';
   return (
     <Press onPress={onPick} selected={on} label={`عرض ${money(q.price)} جنيه`}
-      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 14, paddingVertical: 14, borderTopWidth: first ? 0 : 1, borderColor: colors.line, backgroundColor: on ? colors.primarySoft : colors.surface, opacity: expired ? 0.55 : 1 }}>
-      <View style={{ width: 22, height: 22, marginTop: 6, borderRadius: 11, borderWidth: 2, borderColor: on ? colors.primary : colors.faint, alignItems: 'center', justifyContent: 'center' }}>
-        {on ? <View style={{ width: 11, height: 11, borderRadius: 6, backgroundColor: colors.primary }} /> : null}
-      </View>
-      <View style={{ flex: 1, gap: 3 }}>
-        <Row gap={6} style={{ flexWrap: 'wrap' }}>
-          <T w="bold" size={20} style={{ lineHeight: 30 }}>{money(q.price)}</T>
-          <T size={12.5} color={colors.muted}>ج.م{qty > 1 ? ' للقطعة' : ''}</T>
-          {cheapest ? <Pill label="الأرخص" tone="accent" /> : null}
-          {featured ? <Pill label="مميّز" icon="star" tone="wait" /> : null}
-          {expired ? <Pill label="العرض ده انتهى" tone="plain" /> : null}
-        </Row>
-        <Pressable onPress={() => router.push(`/shop-profile/${q.shop_id}`)} hitSlop={4}>
-          <Row gap={6} style={{ flexWrap: 'wrap' }}>
-            <T w="semibold" size={13.5} color={colors.primary}>{card?.name ?? 'محل موثّق'}</T>
-            {card?.rating ? <T size={12.5} w="semibold" color={colors.warn}>★ {ar(card.rating.toFixed(1)).replace('.', '٫')}</T> : null}
-            <Row gap={3}><Icon name="flash" size={12} color={colors.good} /><T size={12} color={colors.good} w="medium">{replyLabel(card?.reply_min)}</T></Row>
+      style={{ gap: 12, padding: 16, borderRadius: 16, backgroundColor: colors.surface, borderWidth: on ? 2 : 1, borderColor: on ? colors.primary : colors.line, opacity: expired ? 0.55 : 1 }}>
+      <Row gap={12} style={{ alignItems: 'flex-start' }}>
+        <View style={{ width: 24, height: 24, marginTop: 2, borderRadius: 12, borderWidth: on ? 7 : 2, borderColor: on ? colors.primary : '#C9D0DA' }} />
+        <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
+          <Pressable onPress={() => router.push(`/shop-profile/${q.shop_id}`)} hitSlop={4} accessibilityRole="link">
+            <T w="semibold" size={16} numberOfLines={1}>{card?.name ?? 'محل موثّق'}</T>
+          </Pressable>
+          <Muted size={13} numberOfLines={1}>{[rating, replyLabel(card?.reply_min)].filter(Boolean).join(' · ')}</Muted>
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+          <Row gap={4} style={{ alignItems: 'baseline' }}>
+            <T w="bold" size={22} style={{ lineHeight: 30 }}>{money(q.price)}</T>
+            <T size={13} color={colors.muted}>ج.م{qty > 1 ? ' للقطعة' : ''}</T>
           </Row>
-        </Pressable>
-        <Muted size={12.5}>{details}</Muted>
-        {q.note ? <Muted size={12.5}>«{q.note}»</Muted> : null}
-        {!expired ? (
-          <Row gap={10} style={{ flexWrap: 'wrap' }}>
-            <Pressable onPress={onGuarantee} hitSlop={6} accessibilityRole="button">
-              <Row gap={4}><Icon name="shield-checkmark" size={13} color={colors.good} /><T size={12} w="semibold" color={colors.good}>محمي بضمان ضغطة</T></Row>
+          {expired ? <Pill label="العرض انتهى" tone="plain" /> : featured ? <Pill label="مميّز · إعلان" tone="plain" /> : cheapest ? <Pill label="الأرخص" tone="good" /> : null}
+        </View>
+      </Row>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingStart: 36 }}>
+        {tags.filter(Boolean).map((t) => (
+          <View key={t} style={{ backgroundColor: colors.soft, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 3 }}>
+            <T size={12.5} style={{ lineHeight: 19 }}>{t}</T>
+          </View>
+        ))}
+      </View>
+      {q.note || q.photo_path || !expired ? (
+        <Row gap={10} style={{ paddingStart: 36 }}>
+          {q.photo_path ? <Photo uri={photoUrl(q.photo_path)} size={44} /> : null}
+          <View style={{ flex: 1, gap: 2 }}>
+            {q.note ? <Muted size={13}>«{q.note}»</Muted> : null}
+            {soon ? <T size={12.5} color={colors.warn}>العرض بينتهي بعد {leftText}</T> : null}
+          </View>
+          {!expired ? (
+            <Pressable onPress={onChat} hitSlop={8} accessibilityRole="button" accessibilityLabel="اسأل المحل">
+              <Row gap={4}><Icon name="chatbubble-ellipses" size={15} color={colors.primary} /><T size={13.5} w="medium" color={colors.primary}>اسأل المحل</T></Row>
             </Pressable>
-            {soon ? <Row gap={4}><Icon name="time" size={13} color={colors.warn} /><T size={12} w="medium" color={colors.warn}>بينتهي بعد {leftText}</T></Row> : null}
-          </Row>
-        ) : null}
-      </View>
-      <View style={{ alignItems: 'center', gap: 8 }}>
-        {q.photo_path ? <Photo uri={photoUrl(q.photo_path)} size={48} /> : null}
-        <Press onPress={onChat} label="اسأل المحل" style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="chatbubble-ellipses" size={17} color={colors.ink} />
-        </Press>
-      </View>
+          ) : null}
+        </Row>
+      ) : null}
     </Press>
   );
 }
 
-/** A live stopwatch since the request went out: the app is about speed. */
-function Since({ iso }: { iso: string }) {
+/** How long ago the request went out, ticking: the app is about speed. */
+function SinceText({ iso }: { iso: string }) {
   const now = useNow(1000);
-  return (
-    <View style={{ alignItems: 'center', backgroundColor: 'rgba(255,255,255,.08)', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
-      <Row gap={4}><Icon name="time" size={13} color={colors.accent} /><T w="bold" size={13.5} color="#fff">{elapsed(iso, now)}</T></Row>
-      <T size={10.5} color="rgba(255,255,255,.6)">من وقت الطلب</T>
-    </View>
-  );
+  return <>من {elapsed(iso, now)}</>;
 }
 
 /** A calm pulse while shops look at the request (no shop count: it is low at launch). */
@@ -522,7 +497,7 @@ function Searching({ since, make }: { since: string; make: string }) {
     <View style={[{ backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 26, paddingHorizontal: 16, alignItems: 'center', gap: 10 }, lift]}>
       <View style={{ width: 90, height: 90, alignItems: 'center', justifyContent: 'center' }}>
         <Animated.View style={{ position: 'absolute', width: 90, height: 90, borderRadius: 45, backgroundColor: colors.accent, opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }), transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.2] }) }] }} />
-        <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={24} color={colors.ink} /></View>
+        <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }}><Icon name="storefront" size={24} color="#fff" /></View>
       </View>
       <T w="bold" size={16}>طلبك وصل لمحلات {make}</T>
       <Row gap={4}><Icon name="time" size={14} color={colors.muted} /><Muted size={13}>بقاله {elapsed(since, now)}</Muted></Row>

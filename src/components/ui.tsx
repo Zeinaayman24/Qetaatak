@@ -38,7 +38,8 @@ const tick = () => { if (Platform.OS !== 'web') Haptics.selectionAsync().catch((
 
 /** A pressable that gives back: it sinks slightly under the finger and ticks on phones. */
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-export function Press({ children, onPress, style, disabled, label, role = 'button', hitSlop, selected }: {
+export function Press({ children, onPress, style, disabled, label, role = 'button', hitSlop, selected, dim = true }: {
+  dim?: boolean;
   children: ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; label?: string;
   role?: 'button' | 'link' | 'tab' | 'imagebutton'; hitSlop?: number; selected?: boolean;
 }) {
@@ -48,7 +49,7 @@ export function Press({ children, onPress, style, disabled, label, role = 'butto
     <AnimatedPressable onPress={() => { tick(); onPress?.(); }} disabled={disabled || !onPress} accessibilityRole={role} accessibilityLabel={label}
       accessibilityState={selected === undefined ? undefined : { selected }} hitSlop={hitSlop}
       onPressIn={() => to(0.965)} onPressOut={() => to(1)}
-      style={[style as any, { transform: [{ scale }] }, disabled && { opacity: 0.45 }]}>
+      style={[style as any, { transform: [{ scale }] }, disabled && dim && { opacity: 0.45 }]}>
       {children}
     </AnimatedPressable>
   );
@@ -152,7 +153,7 @@ export function IconButton({ name, onPress, label, tone = 'white', size = 42, se
   const bg = tone === 'ink' ? colors.ink : tone === 'clear' ? 'rgba(255,255,255,.12)' : colors.surface;
   return (
     <Press onPress={onPress} label={label} hitSlop={6}
-      style={[{ width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: bg, alignItems: 'center', justifyContent: 'center' },
+      style={[{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' },
         tone === 'white' && { borderWidth: 1, borderColor: colors.line }, tone === 'clear' && { borderWidth: 1, borderColor: 'rgba(255,255,255,.14)' }]}>
       <Icon name={name} set={set} size={Math.round(size * 0.46)} color={tone === 'white' ? colors.ink : '#fff'} />
     </Press>
@@ -175,12 +176,15 @@ export function Btn({ title, onPress, kind = 'primary', disabled, loading, style
   title: string; onPress: () => void; kind?: Kind; disabled?: boolean; loading?: boolean; style?: StyleProp<ViewStyle>; icon?: string;
 }) {
   const k = btnStyles[kind];
+  // a filled button that can't be pressed yet turns plain grey instead of a faded blue
+  const off = !!disabled && !loading && (kind === 'primary' || kind === 'accent' || kind === 'dark');
+  const color = off ? '#6B7484' : k.color;
   return (
-    <Press onPress={onPress} disabled={disabled || loading} style={[k.box, style]}>
+    <Press onPress={onPress} disabled={disabled || loading} dim={!off} style={[k.box, off && { backgroundColor: '#E3E7EC', borderColor: '#E3E7EC' }, style]}>
       {loading ? <ActivityIndicator color={k.color} /> : (
         <Row gap={8} style={{ justifyContent: 'center' }}>
-          {icon ? <Icon name={icon} size={k.size + 3} color={k.color} /> : null}
-          <T w="semibold" size={k.size} color={k.color} center>{title}</T>
+          {icon ? <Icon name={icon} size={k.size + 3} color={color} /> : null}
+          <T w="semibold" size={k.size} color={color} center>{title}</T>
         </Row>
       )}
     </Press>
@@ -220,11 +224,10 @@ export function Chips<V extends string | number>({ options, selected, onPick }: 
         const on = selected.includes(o.v);
         return (
           <Press key={String(o.v)} onPress={() => onPick(o.v)} selected={on}
-            style={[s.chip, on && { backgroundColor: colors.primarySoft, borderColor: colors.primary }]}>
+            style={[s.chip, on && { backgroundColor: colors.ink, borderColor: colors.ink }]}>
             <Row gap={6}>
-              {o.icon ? <Icon name={o.icon} size={15} color={on ? colors.primary : colors.muted} /> : null}
-              <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? colors.primary : colors.ink}>{o.label}</T>
-              {on ? <Icon name="checkmark" size={14} color={colors.primary} /> : null}
+              {o.icon ? <Icon name={o.icon} size={15} color={on ? '#fff' : colors.muted} /> : null}
+              <T size={14} w={on ? 'semibold' : 'medium'} color={on ? '#fff' : colors.ink}>{o.label}</T>
             </Row>
           </Press>
         );
@@ -241,7 +244,7 @@ export function Seg<V extends string | number>({ options, value, onPick }: { opt
         return (
           <Pressable key={String(o.v)} onPress={() => { tick(); onPick(o.v); }} accessibilityRole="button" accessibilityState={{ selected: on }}
             style={[s.segBtn, on && s.segOn]}>
-            <T size={13.5} w={on ? 'semibold' : 'medium'} color={on ? colors.primary : colors.muted} center>{o.label}</T>
+            <T size={14.5} w={on ? 'semibold' : 'medium'} color={on ? colors.ink : colors.muted} center>{o.label}</T>
           </Pressable>
         );
       })}
@@ -301,10 +304,10 @@ export function Select<V extends string | number>({ label, value, options, onPic
 /* ---------------------------------------------------------------- bits */
 type Tone = 'new' | 'good' | 'wait' | 'plain' | 'bad' | 'accent';
 export function Pill({ label, tone = 'plain', icon }: { label: string; tone?: Tone; icon?: string }) {
-  const bg = { new: colors.primarySoft, good: colors.goodSoft, wait: colors.warnSoft, plain: colors.soft, bad: colors.badSoft, accent: colors.accent }[tone];
-  const fg = { new: colors.primary, good: colors.good, wait: colors.warn, plain: colors.muted, bad: colors.bad, accent: colors.ink }[tone];
+  const bg = { new: colors.primarySoft, good: colors.goodSoft, wait: colors.warnSoft, plain: colors.soft, bad: colors.badSoft, accent: colors.primarySoft }[tone];
+  const fg = { new: colors.primary, good: colors.good, wait: colors.warn, plain: colors.muted, bad: colors.bad, accent: colors.primary }[tone];
   return (
-    <View style={{ backgroundColor: bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+    <View style={{ backgroundColor: bg, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       {icon ? <Icon name={icon} size={12} color={fg} /> : null}
       <T size={12} w="semibold" color={fg} style={{ lineHeight: 17 }}>{label}</T>
     </View>
@@ -312,7 +315,7 @@ export function Pill({ label, tone = 'plain', icon }: { label: string; tone?: To
 }
 
 export const Notice = ({ children, icon = 'information-circle' }: { children: ReactNode; icon?: string }) => (
-  <View style={{ backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderWidth: 1, borderColor: '#D3E8FB' }}>
+  <View style={{ backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' }}>
     <Icon name={icon} size={20} color={colors.primary} />
     <View style={{ flex: 1, gap: 2 }}>{typeof children === 'string' ? <T size={14}>{children}</T> : children}</View>
   </View>
@@ -486,14 +489,14 @@ export function ToastHost({ bottom }: { bottom: number }) {
 }
 
 /* ---------------------------------------------------------------- styles */
-const base: ViewStyle = { borderRadius: 14, minHeight: 54, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18 };
+const base: ViewStyle = { borderRadius: 14, minHeight: 52, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18 };
 const btnStyles: Record<Kind, { box: ViewStyle; color: string; size: number }> = {
   primary: { box: { ...base, backgroundColor: colors.primary }, color: colors.primaryInk, size: 16 },
   accent: { box: { ...base, backgroundColor: colors.primary }, color: colors.primaryInk, size: 16 },
-  dark: { box: { ...base, minHeight: 46, borderRadius: 12, backgroundColor: colors.ink }, color: colors.brandInk, size: 14.5 },
-  secondary: { box: { ...base, minHeight: 50, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }, color: colors.ink, size: 15 },
-  danger: { box: { ...base, minHeight: 48, backgroundColor: colors.badSoft }, color: colors.bad, size: 14 },
-  small: { box: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14, alignSelf: 'flex-start' }, color: colors.primaryInk, size: 13 },
+  dark: { box: { ...base, minHeight: 46, borderRadius: 14, backgroundColor: colors.ink }, color: colors.brandInk, size: 15 },
+  secondary: { box: { ...base, minHeight: 50, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#D5DAE1' }, color: colors.ink, size: 15 },
+  danger: { box: { ...base, minHeight: 44, backgroundColor: 'transparent' }, color: colors.bad, size: 15 },
+  small: { box: { backgroundColor: colors.primarySoft, borderRadius: 12, minHeight: 40, justifyContent: 'center', paddingHorizontal: 14, alignSelf: 'flex-start' }, color: colors.primary, size: 14 },
   link: { box: { paddingVertical: 4, alignSelf: 'flex-start' }, color: colors.primary, size: 13.5 },
 };
 
@@ -501,12 +504,12 @@ const s = StyleSheet.create({
   column: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18 },
   body: { flexGrow: 1, paddingTop: 16, gap: 18 },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: 16, gap: 12, ...lift },
-  inputBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.soft, borderWidth: 1.5, borderColor: colors.soft, borderRadius: radius.md, paddingHorizontal: 14 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: 14 },
   input: { flex: 1, fontFamily: fonts.medium, fontSize: 16, color: colors.ink, paddingVertical: 13 },
-  chip: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
-  seg: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.md, padding: 4, gap: 4, borderWidth: 1, borderColor: colors.line },
-  segBtn: { flex: 1, borderRadius: 9, paddingVertical: 9 },
-  segOn: { backgroundColor: colors.primarySoft },
+  chip: { borderWidth: 1, borderColor: '#D5DAE1', backgroundColor: colors.surface, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 7 },
+  seg: { flexDirection: 'row', backgroundColor: '#EAEDF1', borderRadius: radius.md, padding: 4, gap: 4 },
+  segBtn: { flex: 1, borderRadius: 11, paddingVertical: 10 },
+  segOn: { backgroundColor: colors.surface, shadowColor: colors.shadow, shadowOpacity: 0.12, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(17,21,30,.4)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(17,21,30,.4)', justifyContent: 'flex-end', alignItems: 'center' },
   sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 10, width: '100%', maxWidth: 560 },

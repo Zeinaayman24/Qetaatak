@@ -19,7 +19,7 @@ export function Bell({ light }: { light?: boolean } = {}) {
   const n = data ?? 0;
   return (
     <Pressable onPress={() => router.push('/notifications')} accessibilityRole="button" accessibilityLabel={n ? `${n} إشعارات جديدة` : 'الإشعارات'} hitSlop={8}
-      style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: light ? 'rgba(255,255,255,.28)' : colors.surface, alignItems: 'center', justifyContent: 'center' }}>
+      style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: light ? 'rgba(255,255,255,.28)' : colors.surface, borderWidth: light ? 0 : 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' }}>
       <Icon name="notifications-outline" size={21} />
       {n ? (
         <View style={{ position: 'absolute', top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: light ? colors.ink : colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: light ? colors.accent : colors.surface }}>
