@@ -12,6 +12,15 @@ const PTS: { v: PT; label: string }[] = [
   { v: 'phev', label: 'Plug-in' }, { v: 'erev', label: 'EREV' }, { v: 'ev', label: 'كهربا' },
 ];
 const toggle = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
+/** Plain-Arabic reason for the common errors. */
+function explain(e: any): string {
+  const m = String(e?.message ?? e ?? '');
+  if (/row-level security|permission|not allowed|Unauthorized|403/i.test(m)) return 'مش مسموح. سجّل خروج وادخل تاني بالكود.';
+  if (/mime|type/i.test(m)) return 'نوع الملف مش مدعوم. استخدم PNG أو SVG أو WEBP أو JPG.';
+  if (/size|too large|exceeded/i.test(m)) return 'الملف كبير. أقصى حجم ٢ ميجا.';
+  if (/duplicate|unique/i.test(m)) return 'الاسم ده موجود قبل كده.';
+  return m || 'حصلت مشكلة';
+}
 const num = (s: string) => (s.trim() === '' ? null : Number(s));
 
 /** Car catalogue: makes (with logos and the home-screen order) and their models with powertrains. Admin only. */
@@ -34,9 +43,11 @@ export default function Cars() {
   const models = data?.models ?? [];
   const make = makes.find((m) => m.id === sel) ?? null;
   const shown = makes.filter((m) => !q || m.name_ar.includes(q) || m.name_en.toLowerCase().includes(q.toLowerCase()));
-  const run = async (f: () => Promise<unknown>, ok = '') => {
+  /** Runs a change and says what happened in a banner at the bottom of the screen. Returns true when it worked. */
+  const run = async (f: () => Promise<unknown>, ok = 'اتحفظ.') => {
     setMsg('');
-    try { await f(); if (ok) setMsg(ok); reload(); } catch (e: any) { setMsg(e?.message ?? 'حصلت مشكلة'); }
+    try { await f(); setMsg(ok); reload(); return true; }
+    catch (e: any) { console.error(e); setMsg('ماتحفظش: ' + explain(e)); return false; }
   };
 
   const updMake = (m: Make, p: Partial<Make>) => run(async () => must(await supabase.from('car_makes').update(p).eq('id', m.id)));
@@ -46,7 +57,7 @@ export default function Cars() {
     await run(async () => {
       const ext = (file.name.split('.').pop() || 'png').toLowerCase();
       const path = `${m.id}-${Date.now()}.${ext}`;
-      must(await supabase.storage.from('brand-logos').upload(path, file, { contentType: file.type, upsert: true }));
+      must(await supabase.storage.from('brand-logos').upload(path, file, { contentType: file.type || 'image/png' }));
       const url = supabase.storage.from('brand-logos').getPublicUrl(path).data.publicUrl;
       must(await supabase.from('car_makes').update({ logo_url: url }).eq('id', m.id));
     }, 'اللوجو اترفع.');
@@ -59,9 +70,9 @@ export default function Cars() {
     setNewMake({ id: '', name_ar: '', name_en: '', country: '' }); setSel(id);
   }
   async function addModel(makeId: string, name_ar: string, name_en = '', pts: PT[] = ['petrol'], yf: number | null = null, yt: number | null = null) {
-    if (!name_ar.trim()) return setMsg('اكتب اسم الموديل.');
-    if (!pts.length) return setMsg('اختار نوع محرك واحد على الأقل.');
-    await run(async () => must(await supabase.from('car_models').insert({ make_id: makeId, name_ar: name_ar.trim(), name_en: name_en.trim(), powertrains: pts, year_from: yf, year_to: yt })), 'الموديل اتضاف.');
+    if (!name_ar.trim()) { setMsg('اكتب اسم الموديل بالعربي.'); return false; }
+    if (!pts.length) { setMsg('اختار نوع محرك واحد على الأقل.'); return false; }
+    return run(async () => must(await supabase.from('car_models').insert({ make_id: makeId, name_ar: name_ar.trim(), name_en: name_en.trim(), powertrains: pts, year_from: yf, year_to: yt })), 'الموديل اتضاف.');
   }
 
   const noLogo = makes.filter((m) => !m.logo_url).length;
@@ -74,7 +85,10 @@ export default function Cars() {
         <div className="kpi"><span className="muted small">عربيات العملاء كتبوها بإيدهم</span><strong>{data?.misses.length ?? 0}</strong></div>
       </div>
       {!admin ? <p className="muted small">التعديل للأدمن بس.</p> : null}
-      {msg ? <p className="muted small">{msg}</p> : null}
+      {msg ? (
+        <div role="status" onClick={() => setMsg('')} style={{ position: 'fixed', insetInline: 0, bottom: 20, margin: '0 auto', width: 'fit-content', maxWidth: '90%', zIndex: 50,
+          background: msg.startsWith('ماتحفظش') ? '#C4321F' : '#041D3F', color: '#fff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 20px rgba(0,0,0,.2)', cursor: 'pointer' }}>{msg}</div>
+      ) : null}
 
       {data?.misses.length ? (
         <section className="panel flush">
@@ -184,7 +198,7 @@ export default function Cars() {
                         <input type="checkbox" checked={newModel.pts.includes(p.v)} onChange={() => setNewModel({ ...newModel, pts: toggle(newModel.pts, p.v) })} />{p.label}
                       </label>
                     ))}
-                    <button className="btn" onClick={async () => { await addModel(make.id, newModel.name_ar, newModel.name_en, newModel.pts, num(newModel.year_from), num(newModel.year_to)); setNewModel({ name_ar: '', name_en: '', year_from: '', year_to: '', pts: ['petrol'] }); }}>أضف الموديل</button>
+                    <button className="btn" onClick={async () => { if (await addModel(make.id, newModel.name_ar, newModel.name_en, newModel.pts, num(newModel.year_from), num(newModel.year_to))) setNewModel({ name_ar: '', name_en: '', year_from: '', year_to: '', pts: ['petrol'] }); }}>أضف الموديل</button>
                   </div>
                 </div>
               ) : null}
