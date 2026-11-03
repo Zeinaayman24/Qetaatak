@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { I18nManager, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/lib/auth';
+import { LockGate } from '@/components/LockGate';
 import { colors } from '@/lib/theme';
 import { dir, lang, loadLang } from '@/lib/i18n';
 
@@ -47,7 +48,7 @@ export default function RootLayout() {
       <AuthProvider>
         <StatusBar style="dark" />
         <View style={{ flex: 1, direction: dir(), backgroundColor: colors.ground }}>
-          <Slot />
+          <LockGate><Slot /></LockGate>
         </View>
       </AuthProvider>
     </SafeAreaProvider>

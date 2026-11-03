@@ -878,4 +878,7 @@ export const EN: Record<string, string> = {
   "اللغة دلوقتي: العربية": "Current language: English",
   "طلب {0} · {1}": "Request {0} · {1}",
   "صورة المحل": "Shop photo",
+  "ضغطة مقفولة مؤقتًا": "Daghta is closed for now",
+  "بنجهّز حاجات جديدة. هنفتح قريب، وهتقدر تدخل بنفس حسابك.": "We're getting new things ready. We'll open again soon, and you can sign in with the same account.",
+  "دخول فريق ضغطة": "Daghta team sign-in",
 };
