@@ -5,6 +5,7 @@ import { Animated, Easing, Image, Platform, ScrollView, TextInput, View } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Btn, Chips, ErrorText, Field, Icon, IconButton, Labeled, Loading, Muted, Plate, Press, Row, Seg, T, ToastHost, toast } from '@/components/ui';
 import { partIsSided } from '@/lib/assistant';
+import { isElectrified, matches } from '@/lib/catalogue';
 import { useAuth } from '@/lib/auth';
 import { SIDES, WANTED, ar, friendlyError, newId, reqNo, type Car } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
@@ -13,9 +14,9 @@ import { supabase } from '@/lib/supabase';
 import { colors, fonts, lift } from '@/lib/theme';
 
 type Cond = 'used' | 'new' | 'any';
-type Item = { key: string; part: string; side: string; cond: Cond; qty: number; photo: string | null; notes: string };
-type CarOpt = { key: string; make: string; model: string; year: number; vin: string };
-const item = (part: string): Item => ({ key: newId(), part, side: '', cond: 'any', qty: 1, photo: null, notes: '' });
+type Item = { key: string; part: string; side: string; cond: Cond; qty: number; photo: string | null; notes: string; pn?: string };
+type CarOpt = { key: string; make: string; model: string; year: number; vin: string; powertrain: string };
+const item = (part: string): Item => ({ key: newId(), part, side: '', cond: 'any', qty: 1, photo: null, notes: '', pn: '' });
 
 const CATALOG: { part: string; icon: string }[] = [
   { part: 'فانوس أمامي', icon: 'car-light-high' }, { part: 'فانوس خلفي', icon: 'car-light-dimmed' }, { part: 'مراية جنب', icon: 'mirror' },
@@ -33,7 +34,22 @@ const CATEGORY_PARTS: Record<string, { parts: string[]; icon: string }> = {
   'دبرياج': { icon: 'car-clutch', parts: ['طقم دبرياج', 'بلية دبرياج', 'طرمبة دبرياج'] },
   'كهرباء': { icon: 'car-battery', parts: ['دينامو', 'مارش', 'بطارية', 'كويل'] },
   'صاج': { icon: 'car-door', parts: ['رفرف', 'اكصدام أمامي', 'اكصدام خلفي', 'كبوت', 'باب'] },
+  'كهربا وهايبرد': { icon: 'car-electric', parts: ['بطارية الجهد العالي', 'موتور كهربا', 'إنفرتر', 'شاحن العربية', 'مخرج الشحن', 'نظام إدارة البطارية BMS', 'تبريد البطارية', 'كمبيوتر العربية', 'حساسات'] },
 };
+/** EV and hybrid parts, shown first for electrified cars. */
+const EV_PARTS: { part: string; icon: string }[] = [
+  { part: 'بطارية الجهد العالي', icon: 'battery-high' }, { part: 'موتور كهربا', icon: 'engine' }, { part: 'إنفرتر', icon: 'flash' },
+  { part: 'شاحن العربية', icon: 'ev-station' }, { part: 'مخرج الشحن', icon: 'ev-plug-type2' }, { part: 'نظام إدارة البطارية BMS', icon: 'chip' },
+];
+/** Names people type in English or other words for the same part. */
+const ALIASES: Record<string, string> = {
+  headlight: 'فانوس أمامي', 'head light': 'فانوس أمامي', taillight: 'فانوس خلفي', mirror: 'مراية جنب', radiator: 'رديتر', 'ac compressor': 'كمبروسر تكييف',
+  compressor: 'كمبروسر تكييف', clutch: 'طقم دبرياج', brake: 'تيل فرامل', 'brake pads': 'تيل فرامل', alternator: 'دينامو', starter: 'مارش', battery: 'بطارية',
+  fender: 'رفرف', bumper: 'اكصدام أمامي', shock: 'مساعدين', 'shock absorber': 'مساعدين', hood: 'كبوت', door: 'باب', inverter: 'إنفرتر', charger: 'شاحن العربية',
+  'دينمو': 'دينامو', 'رادياتير': 'رديتر', 'ردياتير': 'رديتر', 'بطاريه': 'بطارية', 'شكمان': 'شكمان', 'كشاف': 'كشاف ضباب', 'مرايه': 'مراية جنب', 'صدام': 'اكصدام أمامي',
+};
+/** Looks like a part/OEM number: letters and digits, at least 5, with digits in it. */
+const looksLikePartNo = (t: string) => /^[A-Za-z0-9\-\s.]{5,}$/.test(t.trim()) && /\d{3,}/.test(t);
 const iconOf = (p: string) => CATALOG.find((c) => c.part === p)?.icon ?? Object.values(CATEGORY_PARTS).find((c) => c.parts.includes(p))?.icon ?? 'car-wrench';
 const DRAFT = 'daghta-request-draft';
 const DAY = 86400000;
@@ -87,8 +103,8 @@ export default function NewRequest() {
   if (ready && !session) return <Redirect href="/login" />;
   if (!profile) return <View style={{ flex: 1, backgroundColor: colors.ground, padding: 20 }}><Loading /></View>;
   const cars: CarOpt[] = [
-    { key: 'main', make: profile.car_make ?? '', model: profile.car_model ?? '', year: profile.car_year ?? 0, vin: profile.car_vin ?? '' },
-    ...(extra ?? []).map((c) => ({ key: c.id, make: c.make, model: c.model, year: c.year, vin: c.vin })),
+    { key: 'main', make: profile.car_make ?? '', model: profile.car_model ?? '', year: profile.car_year ?? 0, vin: profile.car_vin ?? '', powertrain: profile.car_powertrain ?? '' },
+    ...(extra ?? []).map((c) => ({ key: c.id, make: c.make, model: c.model, year: c.year, vin: c.vin, powertrain: c.powertrain ?? '' })),
   ];
   const car = cars.find((c) => c.key === carKey) ?? cars[0];
   // with one car there is nothing to choose: the car step is skipped (A13)
@@ -97,8 +113,15 @@ export default function NewRequest() {
   const kind = step === last ? 'review' : step === 0 ? 'parts' : step === 1 ? 'details' : 'car';
   const upd = (key: string, p: Partial<Item>) => setItems((xs) => xs.map((x) => (x.key === key ? { ...x, ...p } : x)));
   const add = (part: string) => {
-    const name = part.trim();
+    let name = part.trim();
     if (name.length < 2) return;
+    // a part number typed in the search becomes a part with that number attached
+    if (looksLikePartNo(name)) {
+      const pn = name.toUpperCase();
+      if (items.some((x) => x.pn === pn)) return toast('رقم القطعة ده موجود في الطلب.');
+      setItems((xs) => [...xs, { ...item(`قطعة رقم ${pn}`), pn }]); setQ(''); return;
+    }
+    name = ALIASES[name.toLowerCase()] ?? name;
     if (items.some((x) => x.part === name)) return toast('القطعة دي موجودة في الطلب.');
     setItems((xs) => [...xs, item(name)]); setQ('');
   };
@@ -117,7 +140,7 @@ export default function NewRequest() {
           catch { setBusy(false); upd(it.key, { photo: null }); return setErr('الصورة مااترفعتش. جرّب تاني أو ابعت من غير صورة.'); }
         }
         rows.push({
-          customer_id: profile!.id, part: it.part, qty: it.qty, car_make: car.make, car_model: car.model, car_year: car.year, vin: car.vin,
+          customer_id: profile!.id, part: it.part, qty: it.qty, car_make: car.make, car_model: car.model, car_year: car.year, vin: car.vin, powertrain: car.powertrain, part_number: (it.pn ?? '').trim().toUpperCase(),
           wanted_condition: it.cond, side: partIsSided(it.part) ? it.side : '', urgency, budget: null,
           area: profile!.area, notes: it.notes.trim(), photo_path, batch_id: batch,
         });
@@ -137,8 +160,13 @@ export default function NewRequest() {
 
   const canNext = step === 0 ? items.length > 0 : true;
   const next = () => (step < last ? setStep(step + 1) : send());
-  const pool = cat && !q.trim() ? CATEGORY_PARTS[cat].parts.map((part) => ({ part, icon: iconOf(part) })) : [...CATALOG, ...Object.values(CATEGORY_PARTS).flatMap((c) => c.parts.filter((x) => !CATALOG.some((y) => y.part === x)).map((part) => ({ part, icon: c.icon })))];
-  const suggestions = pool.filter((c) => !items.some((x) => x.part === c.part) && (!q.trim() || c.part.includes(q.trim()))).slice(0, 12);
+  const electric = isElectrified(car.powertrain);
+  const all = [...(electric ? EV_PARTS : []), ...CATALOG, ...Object.values(CATEGORY_PARTS).flatMap((c) => c.parts.map((part) => ({ part, icon: c.icon })))]
+    .filter((c, i, xs) => xs.findIndex((y) => y.part === c.part) === i);
+  const pool = cat && !q.trim() ? CATEGORY_PARTS[cat].parts.map((part) => ({ part, icon: iconOf(part) })) : all;
+  const typed = q.trim().toLowerCase();
+  const alias = Object.entries(ALIASES).filter(([k]) => typed.length > 2 && k.startsWith(typed)).map(([, v]) => v);
+  const suggestions = pool.filter((c) => !items.some((x) => x.part === c.part) && (!typed || matches(typed, c.part) || alias.includes(c.part))).slice(0, 12);
 
   if (draft) {
     return (
@@ -241,6 +269,7 @@ export default function NewRequest() {
                     <T size={13.5} w="medium" style={{ flex: 1 }}>{it.photo ? 'الصورة اتضافت · تغيير' : 'صوّر القطعة القديمة (اختياري)'}</T>
                   </Press>
                   <Field value={it.notes} onChangeText={(v) => upd(it.key, { notes: v })} placeholder="ملاحظة للمحل (اختياري)" />
+                  <Field value={it.pn ?? ''} onChangeText={(v) => upd(it.key, { pn: v })} ltr placeholder="رقم القطعة / OEM (اختياري)" />
                 </View>
               ))}
             </>

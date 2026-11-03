@@ -1,21 +1,27 @@
-import { Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { BackBar, Btn, Card, ErrorText, Field, Icon, Muted, Row, Screen, Section, Select, T, toast } from '@/components/ui';
+import { CarPicker, type PickedCar } from '@/components/CarPicker';
+import { MakeLogo } from '@/components/MakeLogo';
+import { BackBar, Btn, ErrorText, Field, Icon, Muted, Pill, Press, Row, Screen, Sheet, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { MAKES, YEARS, ar, friendlyError, type Car } from '@/lib/data';
+import { makeByName, ptShort, useMakes } from '@/lib/catalogue';
+import { ar, friendlyError, type Car } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 
-/** The customer's cars: the main car from their profile plus any extra cars. */
+type CarRow = { key: string; make: string; model: string; year: number; vin: string; powertrain: string; main: boolean };
+
+/** The customer's cars: the main car (kept on the profile) plus any extra cars. */
 export default function Cars() {
-  const { ready, session, profile } = useAuth();
+  const { ready, session, profile, refresh: refreshProfile } = useAuth();
   const uid = session?.user.id;
-  const [adding, setAdding] = useState(false);
-  const [make, setMake] = useState(MAKES[0]);
-  const [model, setModel] = useState('');
-  const [year, setYear] = useState(2015);
+  const params = useLocalSearchParams<{ make?: string }>();
+  const { makes } = useMakes();
+  const [picking, setPicking] = useState(false);
+  const [startMake, setStartMake] = useState<string | null>(null);
+  const [picked, setPicked] = useState<PickedCar | null>(null);
   const [vin, setVin] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -24,61 +30,102 @@ export default function Cars() {
     return must(await supabase.from('cars').select('*').eq('owner_id', uid).order('created_at')) as Car[];
   }, ['cars'], [uid]);
 
+  // arriving from a make's logo on the home screen opens the picker on that make
+  useEffect(() => {
+    if (params.make) { setStartMake(String(params.make)); setPicking(true); }
+  }, [params.make]);
+
   if (ready && !session) return <Redirect href="/login" />;
 
-  async function add() {
-    setErr(null);
-    if (!model.trim()) return setErr('اكتب موديل العربية.');
-    setBusy(true);
-    const { error } = await supabase.from('cars').insert({ make, model: model.trim(), year, vin: vin.trim().toUpperCase() });
+  const rows: CarRow[] = [
+    ...(profile?.car_make ? [{ key: 'main', make: profile.car_make, model: profile.car_model ?? '', year: profile.car_year ?? 0, vin: profile.car_vin ?? '', powertrain: profile.car_powertrain ?? '', main: true }] : []),
+    ...(data ?? []).map((c) => ({ key: c.id, make: c.make, model: c.model, year: c.year, vin: c.vin, powertrain: c.powertrain ?? '', main: false })),
+  ];
+
+  async function save() {
+    if (!picked || !profile) return;
+    setErr(null); setBusy(true);
+    const v = vin.trim().toUpperCase();
+    // the first car becomes the main one; later ones are extra cars
+    const { error } = profile.car_make
+      ? await supabase.from('cars').insert({ make: picked.make, model: picked.model, year: picked.year, vin: v, powertrain: picked.powertrain })
+      : await supabase.from('profiles').update({ car_make: picked.make, car_model: picked.model, car_year: picked.year, car_vin: v, car_powertrain: picked.powertrain }).eq('id', profile.id);
     setBusy(false);
     if (error) return setErr(friendlyError(error));
-    setAdding(false); setModel(''); setVin(''); reload(); toast('العربية اتضافت');
+    setPicked(null); setVin(''); reload(); await refreshProfile(); toast('العربية اتضافت');
   }
   async function remove(id: string) {
     const { error } = await supabase.from('cars').delete().eq('id', id);
     if (error) toast(friendlyError(error)); else reload();
   }
-
-  const carCard = (title: string, sub: string, action: React.ReactNode, main?: boolean) => (
-    <Card style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-      <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.ground, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="car-sport" size={22} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Row gap={6}><T w="semibold">{title}</T>{main ? <T size={11} w="semibold" color={colors.muted}>(الأساسية)</T> : null}</Row>
-        <Muted size={12.5}>{sub}</Muted>
-      </View>
-      {action}
-    </Card>
-  );
+  /** Swap an extra car with the main one: requests start from the main car. */
+  async function makeMain(r: CarRow) {
+    if (!profile || r.main) return;
+    setBusy(true);
+    const old = { make: profile.car_make ?? '', model: profile.car_model ?? '', year: profile.car_year ?? 0, vin: profile.car_vin ?? '', powertrain: profile.car_powertrain ?? '' };
+    const a = await supabase.from('profiles').update({ car_make: r.make, car_model: r.model, car_year: r.year, car_vin: r.vin, car_powertrain: r.powertrain }).eq('id', profile.id);
+    const b = a.error ? a : old.make
+      ? await supabase.from('cars').update(old).eq('id', r.key)
+      : await supabase.from('cars').delete().eq('id', r.key);
+    setBusy(false);
+    if (a.error || b.error) return toast(friendlyError(a.error ?? b.error));
+    reload(); await refreshProfile(); toast('بقت عربيتك الأساسية');
+  }
 
   return (
-    <Screen footer={adding ? <><ErrorText text={err} /><Btn title="أضف العربية" onPress={add} loading={busy} /></> : undefined}>
+    <Screen>
       <BackBar title="عربياتي" onBack={() => (router.canGoBack() ? router.back() : router.replace('/account'))} />
-      <Muted size={14}>اختار العربية وانت بتعمل الطلب. رقم الشاسيه (VIN) بيخلّي المحل يجيب القطعة الصح من أول مرة.</Muted>
-      {profile ? carCard(`${profile.car_make} ${profile.car_model} ${ar(profile.car_year ?? '')}`, profile.car_vin ? 'شاسيه: ' + profile.car_vin : 'من غير رقم شاسيه',
-        <Btn kind="link" title="تعديل" onPress={() => router.push('/profile')} />, true) : null}
-      {(data ?? []).map((c) => (
-        <View key={c.id}>
-          {carCard(`${c.make} ${c.model} ${ar(c.year)}`, c.vin ? 'شاسيه: ' + c.vin : 'من غير رقم شاسيه',
-            <Pressable onPress={() => remove(c.id)} accessibilityLabel="امسح العربية" hitSlop={8}><Icon name="trash-outline" size={20} color={colors.bad} /></Pressable>)}
+      <Muted size={14}>الطلب بيتبعت بالعربية الأساسية. تقدر تغيّرها وانت بتعمل الطلب.</Muted>
+
+      {rows.length ? (
+        <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
+          {rows.map((r, i) => (
+            <View key={r.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderTopWidth: i ? 1 : 0, borderColor: '#EEF0F3' }}>
+              <MakeLogo make={makeByName(makes, r.make) ?? { name_ar: r.make, name_en: r.make, logo_url: '' }} size={48} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <T w="semibold" size={15}>{r.make} {r.model} {ar(r.year)}</T>
+                <Row gap={6} style={{ flexWrap: 'wrap' }}>
+                  {r.main ? <Pill label="الأساسية" tone="accent" /> : null}
+                  {r.powertrain ? <Pill label={ptShort(r.powertrain)} tone={r.powertrain === 'petrol' || r.powertrain === 'diesel' ? 'plain' : 'good'} /> : null}
+                  <Muted size={12.5}>{r.vin ? 'شاسيه: ' + r.vin : 'من غير رقم شاسيه'}</Muted>
+                </Row>
+                {!r.main ? (
+                  <Press onPress={() => makeMain(r)} disabled={busy} label="خليها الأساسية" style={{ alignSelf: 'flex-start', paddingVertical: 4 }}>
+                    <T size={13.5} w="medium" color={colors.primary}>خليها الأساسية</T>
+                  </Press>
+                ) : null}
+              </View>
+              {r.main ? (
+                <Btn kind="link" title="عدّل" onPress={() => router.push('/profile')} />
+              ) : (
+                <Pressable onPress={() => remove(r.key)} accessibilityLabel="امسح العربية" hitSlop={8} style={{ padding: 6 }}><Icon name="trash-outline" size={20} color={colors.bad} /></Pressable>
+              )}
+            </View>
+          ))}
         </View>
-      ))}
-      {adding ? (
-        <Section title="عربية جديدة">
-          <View style={{ gap: 14, marginTop: 8 }}>
-            <Row style={{ alignItems: 'flex-start' }}>
-              <Select label="الماركة" value={make} options={MAKES.map((m) => ({ v: m, label: m }))} onPick={setMake} />
-              <Select label="سنة الصنع" value={year} options={YEARS.map((y) => ({ v: y, label: ar(y) }))} onPick={setYear} />
+      ) : null}
+
+      <Btn kind="secondary" icon="add" title={rows.length ? 'أضف عربية تانية' : 'أضف عربيتك'} onPress={() => { setStartMake(null); setPicking(true); }} />
+
+      <CarPicker open={picking} startMake={startMake} onClose={() => { setPicking(false); if (params.make) router.setParams({ make: undefined }); }}
+        onDone={(c) => { setPicking(false); setPicked(c); if (params.make) router.setParams({ make: undefined }); }} />
+
+      <Sheet open={!!picked} onClose={() => setPicked(null)} title="أضف العربية">
+        {picked ? (
+          <View style={{ gap: 14 }}>
+            <Row gap={12}>
+              <MakeLogo make={makeByName(makes, picked.make)} size={48} />
+              <View style={{ flex: 1 }}>
+                <T w="semibold" size={16}>{picked.make} {picked.model} {ar(picked.year)}</T>
+                {picked.powertrain ? <Muted size={13}>{ptShort(picked.powertrain)}</Muted> : null}
+              </View>
             </Row>
-            <Field label="الموديل" value={model} onChangeText={setModel} placeholder="مثلاً: سيراتو" />
-            <Field label="رقم الشاسيه VIN (اختياري)" value={vin} onChangeText={setVin} ltr placeholder="17 حرف ورقم" hint="مكتوب في رخصة العربية." />
+            <Field label="رقم الشاسيه VIN (اختياري)" value={vin} onChangeText={setVin} ltr placeholder="17 حرف ورقم" hint="مكتوب في رخصة العربية. بيخلّي المحل يجيب القطعة الصح من أول مرة." />
+            <ErrorText text={err} />
+            <Btn title="أضف العربية" onPress={save} loading={busy} />
           </View>
-        </Section>
-      ) : (
-        <Btn kind="secondary" title="+ أضف عربية تانية" onPress={() => setAdding(true)} />
-      )}
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }

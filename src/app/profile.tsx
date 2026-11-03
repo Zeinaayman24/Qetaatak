@@ -1,9 +1,12 @@
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { BackBar, Btn, ErrorText, Field, Loading, Muted, Row, Screen, Section, Select, T, toast } from '@/components/ui';
+import { BackBar, Btn, ErrorText, Field, Loading, Muted, Press, Row, Screen, Section, Select, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { COUNTRIES, GOVERNORATES, MAKES, YEARS, ar, friendlyError, toLatin, validPhone, validPostal } from '@/lib/data';
+import { CarPicker } from '@/components/CarPicker';
+import { MakeLogo } from '@/components/MakeLogo';
+import { makeByName, ptShort, useMakes } from '@/lib/catalogue';
+import { COUNTRIES, GOVERNORATES, ar, friendlyError, toLatin, validPhone, validPostal } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 
@@ -12,8 +15,10 @@ export default function ProfileScreen() {
   const { ready, session, profile, refresh } = useAuth();
   const [f, setF] = useState({
     name: '', phone: '', country: 'مصر', governorate: 'القاهرة', area: '', street: '', building: '', floor: '', apartment: '',
-    landmark: '', postal: '', make: MAKES[0], model: '', year: 2015, vin: '',
+    landmark: '', postal: '', make: '', model: '', year: 0, vin: '', powertrain: '',
   });
+  const [picking, setPicking] = useState(false);
+  const { makes } = useMakes();
   const set = (k: keyof typeof f) => (v: any) => setF((x) => ({ ...x, [k]: v }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -25,7 +30,7 @@ export default function ProfileScreen() {
       name: profile.full_name || '', phone: profile.phone || '', country: profile.country || 'مصر',
       governorate: profile.governorate || 'القاهرة', area: profile.area || '', street: profile.street || '', building: profile.building || '',
       floor: profile.floor || '', apartment: profile.apartment || '', landmark: profile.landmark || '', postal: profile.postal_code || '',
-      make: profile.car_make || MAKES[0], model: profile.car_model || '', year: profile.car_year || 2015, vin: profile.car_vin || '',
+      make: profile.car_make || '', model: profile.car_model || '', year: profile.car_year || 0, vin: profile.car_vin || '', powertrain: profile.car_powertrain || '',
     }));
   }, [profile?.id]);
 
@@ -41,13 +46,13 @@ export default function ProfileScreen() {
     if (!f.area.trim()) return setErr('اكتب المنطقة أو الحي.');
     if (!f.street.trim() || !f.building.trim()) return setErr('اكتب اسم الشارع ورقم العمارة.');
     if (!validPostal(f.postal)) return setErr('الرقم البريدي لازم يكون ٥ أرقام.');
-    if (!f.model.trim()) return setErr('اكتب موديل العربية.');
+    if (!f.make || !f.model.trim() || !f.year) return setErr('اختار عربيتك.');
     setBusy(true);
     const { error } = await supabase.from('profiles').update({
       full_name: f.name.trim(), phone: toLatin(f.phone).replace(/\s/g, ''), email,
       country: f.country, governorate: f.governorate, area: f.area.trim(), street: f.street.trim(), building: f.building.trim(),
       floor: f.floor.trim(), apartment: f.apartment.trim(), landmark: f.landmark.trim(), postal_code: toLatin(f.postal.trim()),
-      car_make: f.make, car_model: f.model.trim(), car_year: f.year, car_vin: f.vin.trim().toUpperCase(), is_customer: true,
+      car_make: f.make, car_model: f.model.trim(), car_year: f.year, car_vin: f.vin.trim().toUpperCase(), car_powertrain: f.powertrain, is_customer: true,
     }).eq('id', profile!.id);
     setBusy(false);
     if (error) return setErr(friendlyError(error));
@@ -94,14 +99,20 @@ export default function ProfileScreen() {
 
       <Section title="عربيتك">
         <View style={{ gap: 14, marginTop: 8 }}>
-          <Row style={{ alignItems: 'flex-start' }}>
-            <Select label="الماركة" value={f.make} options={MAKES.map((m) => ({ v: m, label: m }))} onPick={set('make')} />
-            <Select label="سنة الصنع" value={f.year} options={YEARS.map((y) => ({ v: y, label: ar(y) }))} onPick={set('year')} />
-          </Row>
-          <Field label="الموديل" value={f.model} onChangeText={set('model')} placeholder="مثلاً: فيرنا، سنترا، لانسر" />
+          <Press onPress={() => setPicking(true)} label="اختار عربيتك"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+            <MakeLogo make={makeByName(makes, f.make) ?? (f.make ? { name_ar: f.make, name_en: f.make, logo_url: '' } : null)} size={44} />
+            <View style={{ flex: 1 }}>
+              {f.make ? <T w="semibold" size={15}>{f.make} {f.model} {f.year ? ar(f.year) : ''}</T> : <T w="semibold" size={15} color={colors.primary}>اختار عربيتك</T>}
+              {f.powertrain ? <Muted size={13}>{ptShort(f.powertrain)}</Muted> : <Muted size={13}>الماركة والموديل والسنة</Muted>}
+            </View>
+            <T size={14} w="medium" color={colors.primary}>{f.make ? 'غيّر' : 'اختار'}</T>
+          </Press>
           <Field label="رقم الشاسيه VIN (اختياري)" value={f.vin} onChangeText={set('vin')} ltr placeholder="17 حرف ورقم" hint="مكتوب في رخصة العربية. بيخلّي المحل يجيب القطعة الصح." />
         </View>
       </Section>
+      <CarPicker open={picking} onClose={() => setPicking(false)}
+        onDone={(c) => { setPicking(false); setF((x) => ({ ...x, make: c.make, model: c.model, year: c.year, powertrain: c.powertrain })); }} />
     </Screen>
   );
 }

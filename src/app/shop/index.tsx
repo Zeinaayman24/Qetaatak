@@ -9,6 +9,7 @@ import { OrderRow, RowList, StatusTabs, bucketOf, type Bucket } from '@/componen
 import { Btn, Empty, Icon, Labeled, Loading, Muted, Notice, Pill, Press, Row, Screen, Seg, Select, T } from '@/components/ui';
 import { Pressable, TextInput } from 'react-native';
 import { InstallCard } from '@/components/InstallCard';
+import { ptShort } from '@/lib/catalogue';
 import { useAuth } from '@/lib/auth';
 import { WANTED, ar, elapsed, minutesSince, money, orderActive, partsLabel, reqNo, type Order, type Quote, type Request } from '@/lib/data';
 import { must, useLive, useNow } from '@/lib/live';
@@ -194,7 +195,7 @@ export default function ShopInbox() {
                     ) : null}
                   </Row>
                   <Row gap={8}>
-                    <Muted size={12.5} numberOfLines={1} style={{ flex: 1 }}>{r.car_make} {r.car_model} {ar(r.car_year)} · {WANTED[r.wanted_condition]} · {r.area}</Muted>
+                    <Muted size={12.5} numberOfLines={1} style={{ flex: 1 }}>{r.car_make} {r.car_model} {ar(r.car_year)}{r.powertrain && r.powertrain !== 'petrol' ? ` · ${ptShort(r.powertrain)}` : ''} · {WANTED[r.wanted_condition]} · {r.area}</Muted>
                     {g.some((x) => x.r.photo_path) ? <Pill label="فيه صورة" tone="plain" /> : null}
                     {shop.brands.includes(r.car_make) ? <Pill label="في تخصصك" tone="good" /> : null}
                     {open && closesIn(r.created_at, now) ? <Pill label={`بيقفل بعد ${closesIn(r.created_at, now)}`} tone="wait" /> : null}

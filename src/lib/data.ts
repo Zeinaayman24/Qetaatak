@@ -69,7 +69,7 @@ export const toLatin = (s: string) => s.replace(/[٠-٩]/g, (d) => String('٠١�
 
 export type Profile = {
   id: string; full_name: string; phone: string; area: string;
-  car_make: string | null; car_model: string | null; car_year: number | null; car_vin: string;
+  car_make: string | null; car_model: string | null; car_year: number | null; car_vin: string; car_powertrain?: string;
   is_customer: boolean; is_shop: boolean; is_admin: boolean;
   email: string; country: string; governorate: string; street: string; building: string;
   floor: string; apartment: string; landmark: string; postal_code: string;
@@ -99,7 +99,7 @@ export const WEEKDAYS = ['الحد', 'الاتنين', 'التلات', 'الأر
 export const addressLine = (a: { street?: string; building?: string; floor?: string; apartment?: string; area?: string; governorate?: string }) =>
   [a.street, a.building && 'عمارة ' + a.building, a.floor && 'دور ' + a.floor, a.apartment && 'شقة ' + a.apartment, a.area, a.governorate].filter(Boolean).join('، ');
 export type Request = {
-  id: string; num: number; customer_id: string; part: string; car_make: string; car_model: string; car_year: number;
+  id: string; num: number; customer_id: string; part: string; car_make: string; car_model: string; car_year: number; powertrain?: string; part_number?: string;
   wanted_condition: 'used' | 'new' | 'any'; area: string; notes: string; photo_path: string | null;
   status: 'open' | 'chosen' | 'done' | 'cancelled' | 'expired'; chosen_quote_id: string | null; delivery_mode: 'delivery' | 'pickup' | null;
   rating: number | null; created_at: string;
@@ -107,7 +107,7 @@ export type Request = {
   order_status: 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | null; review: string; done_at?: string | null;
   batch_id: string | null; qty: number; order_id: string | null;
 };
-export type Car = { id: string; make: string; model: string; year: number; vin: string };
+export type Car = { id: string; make: string; model: string; year: number; vin: string; powertrain?: string };
 export type Message = { id: string; request_id: string; shop_id: string; sender_id: string; body: string; photo_path: string | null; flagged?: boolean; created_at: string };
 export type Notification = { id: string; title: string; body: string; link: string; read_at: string | null; created_at: string };
 export type Report = { id: string; ticket_no: number; reporter_id: string; request_id: string | null; category: string; body: string; status: 'bot' | 'open' | 'in_progress' | 'resolved'; admin_reply: string; created_at: string; updated_at: string };

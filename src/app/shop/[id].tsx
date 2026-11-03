@@ -4,6 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { ConfirmSheet } from '@/components/Confirm';
 import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
+import { ptLabel } from '@/lib/catalogue';
 import { useAuth } from '@/lib/auth';
 import { CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel, elapsed, minutesSince } from '@/lib/data';
 import { must, useLive, useNow } from '@/lib/live';
@@ -234,7 +235,8 @@ export default function ShopRequest() {
         <Photo uri={photoUrl(r.photo_path)} size={64} />
         <View style={{ flex: 1 }}>
           <T w="bold" size={18}>{r.part}{r.qty > 1 ? ` × ${ar(r.qty)}` : ''}</T>
-          <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}</Muted>
+          <Muted>{r.car_make} {r.car_model} {ar(r.car_year)}{r.powertrain ? ` · ${ptLabel(r.powertrain)}` : ''}</Muted>
+          {r.part_number ? <Muted style={{ writingDirection: 'ltr', textAlign: 'right' }}>رقم القطعة: {r.part_number}</Muted> : null}
           <Muted>{line}</Muted>
         </View>
       </Row>

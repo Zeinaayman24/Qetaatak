@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 // Deep navy carries the brand and the text; sky blue is the call to action; lime marks a "tap" / success moment.
 // Taken from the brand mark (gear + pressing finger + speed lines).
 export const brand = {
-  navy: '#0B1B33',
+  navy: '#041D3F',
   sky: '#0AABFE',
   lime: '#7CD035',
 };
@@ -13,19 +13,20 @@ export const colors = {
   surface: '#FFFFFF',    // cards, sheets, bars
   card: '#FFFFFF',
   soft: '#F2F4F7',       // tags, inner wells
-  ink: '#0B1B33',        // navy: text, headings, strong surfaces
+  ink: '#041D3F',        // the logo's navy: text, headings, strong surfaces
   muted: '#5B6676',      // secondary text (passes AA on white)
   faint: '#6B7484',      // hints and inactive icons (passes AA on white)
   line: '#E6E9EE',       // hairlines and card borders
-  brand: '#0B1B33',
+  brand: '#041D3F',
   brandInk: '#FFFFFF',
-  primary: '#0A6CDB',    // the one action colour: main buttons, links, selection
+  primary: '#006BB3',    // the logo's sky, deepened so white text reads on it: the one action colour: main buttons, links, selection
   primaryInk: '#FFFFFF',
-  primarySoft: '#F0F5FD',
-  accent: '#0A6CDB',     // kept for older screens: same as the action blue now
-  accentDeep: '#0856AF',
+  primarySoft: '#EAF4FB',
+  accent: '#006BB3',     // kept for older screens: same as the action colour
+  sky: '#0AABFE',        // the logo's sky: small touches only (selected tab, new dot, progress), never text on white
+  accentDeep: '#00588F',
   accentInk: '#FFFFFF',
-  accentSoft: '#F0F5FD',
+  accentSoft: '#EAF4FB',
   lime: '#12805C',       // retired: older screens fall back to the "good" green
   good: '#12805C',       // ready, done, guarantee
   goodSoft: '#E7F5EF',
@@ -34,7 +35,7 @@ export const colors = {
   warn: '#8A4B00',       // preparing, waiting
   warnSoft: '#FDF1E2',
   plate: '#7DB4EA',      // the light-blue band of an Egyptian private-car plate
-  shadow: '#0B1B33',
+  shadow: '#041D3F',
 };
 
 // Arabic text: Times New Roman where the device has it (Windows, Mac, iPhone), otherwise Noto Naskh Arabic,
