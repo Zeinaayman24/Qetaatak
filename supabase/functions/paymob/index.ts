@@ -24,7 +24,7 @@ const SECRET = env('PAYMOB_SECRET_KEY');
 const PUBLIC = env('PAYMOB_PUBLIC_KEY');
 const HMAC = env('PAYMOB_HMAC');
 const INTEGRATIONS = env('PAYMOB_INTEGRATION_IDS').split(',').map((s) => Number(s.trim())).filter(Boolean);
-const APP_URL = env('APP_URL') || 'https://zeinaayman24.github.io/Qetaatak';
+const APP_URL = env('APP_URL') || 'https://zeinaayman24.github.io/daghta';
 const configured = !!(SECRET && PUBLIC && HMAC && INTEGRATIONS.length);
 
 const admin = () => createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } });

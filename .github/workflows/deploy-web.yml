@@ -29,7 +29,7 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npx expo export -p web
-      # management system (separate web app) served at /Qetaatak/manage/
+      # management system (separate web app) served at /daghta/manage/
       - run: npm ci && npm run build
         working-directory: manage
       - run: mkdir -p dist/manage && cp -r manage/dist/. dist/manage/

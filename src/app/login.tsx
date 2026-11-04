@@ -29,7 +29,7 @@ export default function Login() {
     setBusy(true);
     try {
       if (mode === 'signup') {
-        const emailRedirectTo = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin + '/Qetaatak/' : undefined;
+        const emailRedirectTo = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin + '/daghta/' : undefined;
         const { data, error } = await supabase.auth.signUp({ email: e, password, options: { emailRedirectTo } });
         if (error) throw error;
         if (!data.session) setSent(true);

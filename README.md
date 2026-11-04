@@ -41,7 +41,7 @@ supabase/migrations database schema and security rules
 
 ## Management system (`manage/`)
 
-A separate desktop web app for the ضغطة team, served at `/Qetaatak/manage/` and using the same Supabase project.
+A separate desktop web app for the ضغطة team, served at `/daghta/manage/` and using the same Supabase project.
 
 - **Customers** with unique IDs (`C-10001`), full details, cars, orders and complaints; admins can block
 - **Shops** with unique IDs (`S-10002`), full details, sales, ratings; admins approve, suspend or block

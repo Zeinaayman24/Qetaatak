@@ -3,7 +3,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const MANAGE_URL = 'https://zeinaayman24.github.io/Qetaatak/manage/';
+const MANAGE_URL = 'https://zeinaayman24.github.io/daghta/manage/';
 const ROLES = ['admin', 'support', 'review', 'finance'];
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });

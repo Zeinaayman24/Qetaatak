@@ -1,7 +1,7 @@
 // ضغطة service worker: makes the site installable and keeps the app shell available when the network drops.
 // Data always comes live from the server; only the page shell and built files are cached.
-const CACHE = 'daghta-shell-v2';
-const SHELL = '/Qetaatak/';
+const CACHE = 'daghta-shell-v3';
+const SHELL = '/daghta/';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.add(SHELL)).then(() => self.skipWaiting()));

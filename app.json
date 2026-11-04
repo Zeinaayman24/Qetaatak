@@ -39,7 +39,7 @@
     "scheme": "qetaatak",
     "experiments": {
       "typedRoutes": false,
-      "baseUrl": "/Qetaatak"
+      "baseUrl": "/daghta"
     },
     "extra": {
       "supportsRTL": true,
