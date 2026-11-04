@@ -16,7 +16,7 @@ import {
   type Order, type PayMethod, type Quote, type Request, type Shop, type ShopCard,
 } from '@/lib/data';
 import { partIsSided } from '@/lib/assistant';
-import { payByCard } from '@/lib/payments';
+import { depositFor, depositRules, payByCard, type DepositRules } from '@/lib/payments';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { must, useLive, useNow } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -48,6 +48,8 @@ export default function PriceRequest() {
   const [guarantee, setGuarantee] = useState(false);
   const [editing, setEditing] = useState<Request | null>(null);
   const now = useNow(60000);
+  const [rules, setRules] = useState<DepositRules | null>(null);
+  useEffect(() => { depositRules().then(setRules); }, []);
 
   // while any part is still waiting for offers, also check every 12 seconds in case the live connection dropped
   const waitingRef = useRef(true);
@@ -126,6 +128,11 @@ export default function PriceRequest() {
   const modeOf = (sid: string): Mode => (!canDeliver(sid) ? 'pickup' : modes[sid] ?? 'delivery');
   const partsTotal = chosen.reduce((s, c) => s + c.quote.price * (c.part.qty || 1), 0);
   const deliveryTotal = byShop.filter((g) => modeOf(g[0].quote.shop_id) === 'delivery').reduce((s, g) => s + feeOf(g[0].quote.shop_id), 0);
+  // pickup deposit (change 1.33): each pickup shop is reserved with a small deposit, the rest is paid at the counter
+  const depOn = !!rules?.on;
+  const shopTotal = (sid: string) => groupOf(sid).reduce((s, c) => s + c.quote.price * (c.part.qty || 1), 0);
+  const depositOf = (sid: string) => (depOn && rules && modeOf(sid) === 'pickup' ? depositFor(shopTotal(sid), rules) : 0);
+  const depositTotal = byShop.reduce((s, g) => s + depositOf(g[0].quote.shop_id), 0);
   const bundle = open.length > 1
     ? [...new Set(d.quotes.map((q) => q.shop_id))]
         .filter((sid) => open.every((p) => quotesOf(p).some((q) => q.shop_id === sid && !expiredQ(q))))
@@ -147,7 +154,8 @@ export default function PriceRequest() {
   const transferOk = byShop.length > 0 && byShop.every((g) => d.transfer[g[0].quote.shop_id]);
   const allowed = payOptions(handover).filter((v) => (v !== 'card' || card) && (v !== 'instapay' || transferOk));
   // keep the person's choice when it still fits; otherwise fall back to cash (on delivery or at the shop)
-  const method: PayMethod = allowed.includes(pay) ? pay : pay === 'cash' && allowed.includes('shop') ? 'shop' : pay === 'shop' && allowed.includes('cash') ? 'cash' : allowed[0];
+  const method: PayMethod = depOn && allPickup ? 'shop'
+    : allowed.includes(pay) ? pay : pay === 'cash' && allowed.includes('shop') ? 'shop' : pay === 'shop' && allowed.includes('cash') ? 'cash' : allowed[0];
 
   async function accept() {
     setBusy(true);
@@ -171,7 +179,7 @@ export default function PriceRequest() {
       return;
     }
     setBusy(false);
-    toast(method === 'instapay' ? t('الأوردر اتسجّل. فاضل تحوّل وترفع صورة الإيصال.') : method === 'card' ? t('اتعمل {0} أوردرات، ادفع كل واحد من صفحته', ar(ids.length)) : ids.length > 1 ? t('اتعمل {0} أوردرات.', ar(ids.length)) : t('الأوردر اتأكد. المحل بدأ يجهّزه.'));
+    toast(depositTotal > 0 ? t('فاضل تدفع العربون عشان المحل يحجز القطعة باسمك.') : method === 'instapay' ? t('الأوردر اتسجّل. فاضل تحوّل وترفع صورة الإيصال.') : method === 'card' ? t('اتعمل {0} أوردرات، ادفع كل واحد من صفحته', ar(ids.length)) : ids.length > 1 ? t('اتعمل {0} أوردرات.', ar(ids.length)) : t('الأوردر اتأكد. المحل بدأ يجهّزه.'));
     if (ids.length === 1) router.push({ pathname: '/order/[id]', params: { id: ids[0], done: '1' } });
     else router.push('/customer/requests');
   }
@@ -296,7 +304,7 @@ export default function PriceRequest() {
       accept();
     };
     const footer = (
-      <Btn title={t('{0} · {1} ج.م', method === 'card' ? 'كمّل للدفع' : 'أكّد الأوردر', money(grand))} loading={busy} onPress={confirm} />
+      <Btn title={depOn && allPickup ? t('احجز بعربون {0} ج.م', money(depositTotal)) : t('{0} · {1} ج.م', method === 'card' ? 'كمّل للدفع' : 'أكّد الأوردر', money(grand))} loading={busy} onPress={confirm} />
     );
     return (
       <Screen footer={footer}>
@@ -315,17 +323,32 @@ export default function PriceRequest() {
                 {byShop.length > 1 ? <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={[`${ar(g.length)} ${g.length > 1 ? t('قطع') : t('قطعة')}`, shop?.area].filter(Boolean).join(' · ')} /> : null}
                 <Seg options={opts} value={modeOf(sid)} onPick={(v) => setModes((m) => ({ ...m, [sid]: v }))} />
                 {!canDeliver(sid) ? <Muted size={12.5}>{!shop?.offers_delivery ? t('المحل ده مش بيوصّل') : g.length > 1 && g.some((c) => d.fees[c.quote.id] != null) ? t('قطعة من دول استلام من المحل بس') : t('المحل مش بيوصّل لمنطقتك')}</Muted>
-                  : modeOf(sid) === 'pickup' ? <Muted size={12.5}>{t('عنوان المحل ومواعيده هيظهروا بعد التأكيد.')}</Muted> : null}
+                  : modeOf(sid) === 'pickup' ? <Muted size={12.5}>{depOn ? t('رقم المحل وعنوانه هيظهروا بعد دفع العربون.') : t('عنوان المحل ومواعيده هيظهروا بعد التأكيد.')}</Muted> : null}
               </View>
             );
           })}
           {!allPickup && profile ? <AddressPicker profile={profile} value={addr} onChange={setAddr} /> : null}
         </View>
 
-        <View style={{ gap: 10 }}>
-          <T w="bold" size={16}>{t('هتدفع إزاي؟')}</T>
-          <PaymentPicker value={method} onPick={setPay} card={card} instapay={transferOk} handover={handover} />
-        </View>
+        {depositTotal > 0 ? (
+          <View style={{ gap: 10 }}>
+            <T w="bold" size={16}>{t('عربون الحجز')}</T>
+            <View style={{ backgroundColor: colors.primarySoft, borderRadius: 16, padding: 16, gap: 8 }}>
+              <Row gap={10} style={{ alignItems: 'flex-start' }}>
+                <Icon name="bookmark" size={20} color={colors.primary} />
+                <T size={14} style={{ flex: 1 }}>{t('هتدفع لضغطة عربون')}{' '}<T w="bold" size={14}>{money(depositTotal)} {t('ج.م')}</T>{' '}{t('عشان المحل يحجز القطعة باسمك. الباقي تدفعه كاش في المحل وانت بتستلم.')}</T>
+              </Row>
+              <Muted size={12.5}>{t('القطعة بتفضل محجوزة {0} ساعة من ما تجهز. لو ماجيتش، أو لغيت بعد الدفع، العربون مش بيرجع. لو المحل لغى أو القطعة طلعت مش زي العرض، بيرجعلك.', ar(rules?.holdHours ?? 48))}</Muted>
+            </View>
+          </View>
+        ) : null}
+
+        {!(depOn && allPickup) ? (
+          <View style={{ gap: 10 }}>
+            <T w="bold" size={16}>{depositTotal > 0 ? t('هتدفع التوصيل إزاي؟') : t('هتدفع إزاي؟')}</T>
+            <PaymentPicker value={method} onPick={setPay} card={card} instapay={transferOk} handover={depositTotal > 0 ? 'delivery' : handover} />
+          </View>
+        ) : null}
 
         <View style={{ gap: 10 }}>
           <T w="bold" size={16}>{t('الأوردر')}</T>
@@ -348,6 +371,9 @@ export default function PriceRequest() {
             })}
             <View style={{ padding: 16, gap: 8, borderTopWidth: 1, borderColor: '#EEF0F3' }}>
               <Lines rows={[[t('التوصيل'), deliveryTotal ? money(deliveryTotal) + t(' ج.م') : t('مجاناً')]]} total={[t('الإجمالي'), money(grand) + t(' ج.م')]} />
+              {depositTotal > 0 ? (
+                <Lines rows={[[t('العربون دلوقتي (لضغطة)'), money(depositTotal) + t(' ج.م')]]} total={[t('الباقي وانت بتستلم'), money(grand - depositTotal) + t(' ج.م')]} />
+              ) : null}
             </View>
           </View>
           {byShop.length > 1 ? <Muted size={12.5}>{t('هيتعمل')}{' '}{ar(byShop.length)} {t('أوردرات، واحد لكل محل.')}</Muted> : null}

@@ -2,7 +2,7 @@
 //
 // Three entry points on one URL:
 //   POST {mode:"ping"}                      -> {configured}            (is card payment switched on?)
-//   POST {mode:"create", order} + user JWT  -> {url}                   (Paymob unified checkout for that order)
+//   POST {mode:"create", order} + user JWT  -> {url}                   (Paymob unified checkout: the order, or its pickup deposit)
 //   POST ?hmac=...  (Paymob webhook)        -> marks the order paid / failed after checking the HMAC
 //
 // Switched off until these secrets are set (Supabase > Edge Functions > Secrets):
@@ -81,11 +81,13 @@ async function create(req: Request, orderId: string) {
 
   const { data: o } = await db.from('orders').select('*').eq('id', orderId).maybeSingle();
   if (!o || o.customer_id !== user.id) return json({ error: 'not allowed' }, 403);
-  if (o.payment_method !== 'card' || !['awaiting', 'failed'].includes(o.payment_status) || o.status === 'cancelled') {
+  // a pickup order with an open deposit pays only the deposit here; the rest is paid at the shop
+  const deposit = ['awaiting', 'failed'].includes(o.deposit_status) && o.status !== 'cancelled';
+  if (!deposit && (o.payment_method !== 'card' || !['awaiting', 'failed'].includes(o.payment_status) || o.status === 'cancelled')) {
     return json({ error: 'nothing to pay' }, 409);
   }
   const { data: p } = await db.from('profiles').select('*').eq('id', user.id).maybeSingle();
-  const cents = Math.round((Number(o.items_total) + Number(o.delivery_fee)) * 100);
+  const cents = deposit ? Math.round(Number(o.deposit) * 100) : Math.round((Number(o.items_total) + Number(o.delivery_fee)) * 100);
   const [first, ...rest] = String(p?.full_name || 'عميل').trim().split(/\s+/);
   const na = (v: unknown) => (v ? String(v) : 'NA');
 
@@ -96,7 +98,7 @@ async function create(req: Request, orderId: string) {
       amount: cents,
       currency: 'EGP',
       payment_methods: INTEGRATIONS,
-      items: [{ name: `Daghta order #${o.order_no}`, amount: cents, description: 'Car parts', quantity: 1 }],
+      items: [{ name: deposit ? `Daghta deposit, order #${o.order_no}` : `Daghta order #${o.order_no}`, amount: cents, description: deposit ? 'Part reservation deposit' : 'Car parts', quantity: 1 }],
       billing_data: {
         first_name: first || 'Customer', last_name: rest.join(' ') || 'Daghta', email: user.email || 'customer@daghta.app',
         phone_number: na(p?.phone), street: na(p?.street), building: na(p?.building), floor: na(p?.floor), apartment: na(p?.apartment),

@@ -37,7 +37,16 @@ export type Message = { id: string; request_id: string; shop_id: string; sender_
 export type Order = { id: string; order_no: number; customer_id: string; shop_id: string; delivery_mode: string; status: string; items_total: number; delivery_fee: number; rating: number | null; review: string; created_at: string; received_at: string | null;
   payment_method: string; payment_status: string; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null; updated_at: string;
   refused_at?: string | null; refusal_reason?: string; refusal_photo?: string | null; cancel_reason?: string; cancelled_by?: string | null; refund_due_at?: string | null;
-  dispute_note?: string; dispute_at?: string | null; dispute_decision?: string | null; dispute_message?: string; delivery_address?: Record<string, string> | null; returned_at?: string | null };
+  dispute_note?: string; dispute_at?: string | null; dispute_decision?: string | null; dispute_message?: string; delivery_address?: Record<string, string> | null; returned_at?: string | null;
+  // pickup deposit (change 1.33)
+  deposit?: number; deposit_status?: string; deposit_method?: string; deposit_proof?: string | null; deposit_ref?: string; deposit_note?: string;
+  deposit_paid_at?: string | null; deposit_closed_at?: string | null; hold_until?: string | null; refusal_answer_due?: string | null; shop_comp?: number; shop_comp_paid_at?: string | null };
+export const DEPOSIT_STATE: Record<string, { label: string; tone: 'plain' | 'good' | 'wait' | 'bad' | 'dark' }> = {
+  awaiting: { label: 'مستني الدفع', tone: 'wait' }, review: { label: 'إيصال محتاج مراجعة', tone: 'dark' }, failed: { label: 'ماوصلش', tone: 'bad' },
+  paid: { label: 'اتدفع · القطعة محجوزة', tone: 'good' }, used: { label: 'اتخصم (رسوم ضغطة)', tone: 'good' }, forfeited: { label: 'مارجعش (العميل ماجاش)', tone: 'plain' },
+  refund_check: { label: 'العميل رفض · مستني المحل', tone: 'wait' }, disputed: { label: 'خلاف', tone: 'bad' }, refund_due: { label: 'لازم يرجع', tone: 'bad' },
+  refunded: { label: 'رجع', tone: 'plain' }, void: { label: 'اتلغى قبل الدفع', tone: 'plain' },
+};
 export const PAY_METHOD: Record<string, string> = { cash: 'كاش عند الاستلام', shop: 'في المحل', instapay: 'InstaPay / محفظة (للمحل)', card: 'بطاقة (Paymob)' };
 export const PAY_STATE: Record<string, { label: string; tone: 'plain' | 'good' | 'wait' | 'bad' | 'dark' }> = {
   unpaid: { label: 'يدفع عند الاستلام', tone: 'plain' }, awaiting: { label: 'مستني الدفع', tone: 'wait' }, review: { label: 'المحل بيراجع الإيصال', tone: 'dark' },

@@ -36,6 +36,13 @@ export default function ShopBalance() {
     if (error) throw error;
     return data as Balance;
   }, ['orders', 'shop_settlements'], [uid]);
+  // kept deposits: Daghta owes the shop its share when a customer doesn't come (change 1.33)
+  const { data: share } = useLive(async () => {
+    if (!uid) return null;
+    const { data, error } = await supabase.rpc('my_deposit_share');
+    if (error) return null;
+    return data as { owed: number; paid: number; rows: { id: string; order_no: number; at: string; amount: number; paid_at: string | null; parts: string | null }[] };
+  }, ['orders'], [uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
   const back = () => (router.canGoBack() ? router.back() : router.replace('/account'));
@@ -103,6 +110,30 @@ export default function ShopBalance() {
         ))}
       </Card>
 
+      {share && share.rows.length ? (
+        <Section title="تعويض العربون">
+          <Card>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <View><Muted size={12.5}>ضغطة هتحوّلك</Muted><T w="bold" size={22}>{money(share.owed)} ج.م</T></View>
+              {share.paid ? <Muted size={12.5}>اتحوّلك قبل كده {money(share.paid)} ج.م</Muted> : null}
+            </Row>
+            <Muted size={12.5}>لما عميل يدفع عربون ومايجيش يستلم، ليك نص العربون تعويض عن حجز القطعة.</Muted>
+            {share.rows.map((r) => (
+              <Row key={r.id} gap={12} style={{ paddingTop: 10, borderTopWidth: 1, borderColor: colors.line }}>
+                <View style={{ flex: 1 }}>
+                  <T w="semibold" size={14} numberOfLines={1}>{r.parts || 'أوردر'}</T>
+                  <Muted size={12}>أوردر {orderNo(r.order_no)}{r.at ? ` · ${ago(r.at)}` : ''}</Muted>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <T w="bold" size={14}>{money(r.amount)} ج.م</T>
+                  <Muted size={11.5}>{r.paid_at ? 'اتحوّل' : 'هيتحوّل'}</Muted>
+                </View>
+              </Row>
+            ))}
+          </Card>
+        </Section>
+      ) : null}
+
       <Section title={`الأوردرات اللي اتباعت (${ar(b.orders.length)})`}>
         {b.orders.length ? (
           <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 14 }}>
@@ -113,8 +144,8 @@ export default function ShopBalance() {
                   <Muted size={12}>أوردر {orderNo(o.order_no)}، {money(o.total)} ج.م{o.at ? ` · ${ago(o.at)}` : ''}</Muted>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  {o.state === 'fee' ? <T w="bold" size={14}>{money(o.fee)} ج.م</T> : null}
-                  <Muted size={11.5}>{o.state === 'fee' ? 'عمولة' : o.state === 'free' ? 'مجاناً' : 'اتشالت (مرتجع)'}</Muted>
+                  {o.state === 'fee' && o.fee > 0 ? <T w="bold" size={14}>{money(o.fee)} ج.م</T> : null}
+                  <Muted size={11.5}>{o.state === 'fee' ? (o.fee > 0 ? 'عمولة' : 'بعربون، بدون عمولة') : o.state === 'free' ? 'مجاناً' : 'اتشالت (مرتجع)'}</Muted>
                 </View>
               </Row>
             ))}

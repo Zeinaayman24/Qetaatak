@@ -164,6 +164,8 @@ export function friendlyError(e: any): string {
   if (/too many offers/i.test(msg)) return t('وصلت لأقصى عدد عروض (٥) على القطعة دي.');
   if (/balance due/i.test(msg)) return t('عليك عمولة وصلت للحد. سدّد من «حسابك مع ضغطة» عشان تبعت عروض جديدة.');
   if (/payment pending/i.test(msg)) return t('لسه الدفع ماتأكدش.');
+  if (/deposit pending/i.test(msg)) return t('لسه العربون ماتدفعش.');
+  if (/payment already settled/i.test(msg)) return t('الدفع ده اتسجّل خلاص.');
   if (/no transfer details/i.test(msg)) return t('المحل ده مش مفعّل الدفع بالتحويل.');
   if (/warranty_days/i.test(msg)) return t('مدة الضمان لازم تكون من ١ لـ ٧٣٠ يوم.');
   if (/network|fetch/i.test(msg)) return t('مفيش اتصال بالإنترنت. جرّب تاني.');
@@ -210,7 +212,12 @@ export type Order = {
   created_at: string; updated_at: string; received_at: string | null;
   delivery_address?: DeliveryAddress | null; refused_at?: string | null; refund_due_at?: string | null; refusal_reason?: string; cancel_reason?: string;
   payment_method: PayMethod; payment_status: PayStatus; payment_ref: string; payment_proof: string | null; payment_note: string; paid_at: string | null;
+  // pickup deposit (change 1.33): 'none' on delivery orders and on orders from before deposits
+  deposit?: number; deposit_status?: DepositStatus; deposit_method?: '' | 'card' | 'instapay'; deposit_ref?: string; deposit_note?: string;
+  deposit_proof?: string | null; deposit_paid_at?: string | null; hold_until?: string | null; refusal_answer_due?: string | null;
+  shop_comp?: number; shop_comp_paid_at?: string | null;
 };
+export type DepositStatus = 'none' | 'awaiting' | 'review' | 'failed' | 'paid' | 'used' | 'forfeited' | 'refund_check' | 'disputed' | 'refund_due' | 'refunded' | 'void';
 export type DeliveryAddress = { governorate: string; area: string; street: string; building: string; floor: string; apartment: string; landmark: string; contact_phone: string };
 export type SavedAddress = DeliveryAddress & { id: string; label: string; used_at: string };
 export type PayMethod = 'cash' | 'shop' | 'instapay' | 'card';

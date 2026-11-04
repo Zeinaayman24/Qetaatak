@@ -1,5 +1,6 @@
 import { Logo } from './Logo';
 import Payments from './pages/Payments';
+import Deposits from './pages/Deposits';
 import Ads from './pages/Ads';
 import SpeedPage from './pages/Speed';
 import Cars from './pages/Cars';
@@ -98,6 +99,7 @@ function Shell({ me, role }: { me: Profile; role: Role }) {
               <Nav to="/customers" icon="users" label="العملاء" />
               <Nav to="/orders" icon="receipt" label="الطلبات والأوردرات" />
               <Nav to="/payments" icon="card" label="الفلوس" badge={data.orders.filter((o) => o.payment_status === 'review' || o.payment_status === 'refund_due').length} />
+              <Nav to="/deposits" icon="card" label="العربون" badge={data.orders.filter((o) => ['review', 'refund_due', 'disputed'].includes(o.deposit_status ?? '')).length} />
               <Nav to="/reports-chat" icon="flag" label="البلاغات" />
               <Nav to="/ads" icon="megaphone" label="الإعلانات" />
               <Nav to="/cars" icon="car" label="العربيات" />
@@ -126,6 +128,7 @@ function Shell({ me, role }: { me: Profile; role: Role }) {
               <Route path="/orders" element={<Orders />} />
               <Route path="/orders/:id" element={<OrderDetail />} />
               <Route path="/payments" element={<Payments />} />
+              <Route path="/deposits" element={<Deposits />} />
               <Route path="/ads" element={<Ads />} />
               <Route path="/cars" element={<Cars />} />
               <Route path="/speed" element={<SpeedPage />} />

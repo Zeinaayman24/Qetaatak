@@ -11,6 +11,7 @@ import {
 import { must, useLive } from '@/lib/live';
 import { PAY_NAME, PAY_STATUS } from '@/lib/payments';
 import { ShopPaymentReview } from '@/components/Payment';
+import { ShopDepositCard } from '@/components/Deposit';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 
@@ -46,7 +47,10 @@ export default function ShopOrder() {
   const next = o.status === 'preparing' ? 'ready' : null;
   const nextLabel = o.delivery_mode === 'delivery' ? 'الأوردر جاهز، خارج للعميل' : 'الأوردر جاهز، العميل ييجي يستلم';
   const total = Number(o.items_total);
-  const waitPay = (o.payment_method === 'instapay' || o.payment_method === 'card') && o.payment_status !== 'paid' && o.status !== 'cancelled';
+  const depositWait = ['awaiting', 'review', 'failed'].includes(o.deposit_status ?? '') && o.status !== 'cancelled';
+  const hasDeposit = (o.deposit_status ?? 'none') !== 'none';
+  const dep = Number(o.deposit ?? 0);
+  const waitPay = depositWait || ((o.payment_method === 'instapay' || o.payment_method === 'card') && o.payment_status !== 'paid' && o.status !== 'cancelled');
 
   async function closeWithCode() {
     if (!code.trim()) return toast('اكتب الكود اللي العميل ادّاهولك.');
@@ -86,7 +90,9 @@ export default function ShopOrder() {
   })();
   const byShop = (o.cancel_reason ?? '').startsWith('shop: ');
 
-  const footer = waitPay && o.payment_method === 'card'
+  const footer = depositWait
+    ? <Row gap={10} style={{ backgroundColor: colors.warnSoft, borderRadius: 14, padding: 14 }}><Icon name="hourglass" size={20} color={colors.warn} /><T size={14} w="semibold" color={colors.warn} style={{ flex: 1 }}>مستنيين العميل يدفع العربون. هنبلّغك أول ما يوصل.</T></Row>
+    : waitPay && o.payment_method === 'card'
     ? <Row gap={10} style={{ backgroundColor: colors.warnSoft, borderRadius: 14, padding: 14 }}><Icon name="hourglass" size={20} color={colors.warn} /><T size={14} w="semibold" color={colors.warn} style={{ flex: 1 }}>مستنيين العميل يدفع أونلاين. هنبلّغك أول ما الدفع يتأكد.</T></Row>
     : waitPay ? undefined
     : next && o.status !== 'cancelled' ? <Btn icon="arrow-back-circle" title={nextLabel} loading={busy} onPress={move} /> : undefined;
@@ -106,7 +112,8 @@ export default function ShopOrder() {
             <T size={12.5} color="rgba(255,255,255,.65)">{ago(o.created_at)}</T>
           </View>
         </Row>
-        {free ? <T size={12.5} color="rgba(255,255,255,.75)">عمولة ضغطة: مجاناً في الفترة دي</T> : null}
+        {hasDeposit ? <T size={12.5} color="rgba(255,255,255,.75)">أوردر بعربون: مفيش عمولة عليك، حصّل {money(total - dep)} ج.م في المحل</T>
+          : free ? <T size={12.5} color="rgba(255,255,255,.75)">عمولة ضغطة: مجاناً في الفترة دي</T> : null}
         {o.status !== 'cancelled' ? (
           <Row gap={6}>
             {steps.map((s, i) => (
@@ -126,10 +133,11 @@ export default function ShopOrder() {
           {(o as Order & { refusal_photo?: string | null }).refusal_photo ? <Photo uri={photoUrl((o as Order & { refusal_photo?: string | null }).refusal_photo!)} size={96} /> : null}
           {o.payment_status === 'refund_due' ? <Muted size={13}>لو العميل كان حوّل، رجّع {money(total + Number(o.delivery_fee))} ج.م خلال {refundLeft}.</Muted> : null}
           {(o as Order & { dispute_note?: string }).dispute_note ? <Muted size={13}>اعتراضك: {(o as Order & { dispute_note?: string }).dispute_note}</Muted>
-            : <Row gap={6}><Muted size={13}>لو شايف الرفض مش في محله</Muted><Btn kind="link" title="اعترض" onPress={() => setDisputing(true)} /></Row>}
+            : hasDeposit ? null : <Row gap={6}><Muted size={13}>لو شايف الرفض مش في محله</Muted><Btn kind="link" title="اعترض" onPress={() => setDisputing(true)} /></Row>}
         </Card>
       ) : null}
 
+      <ShopDepositCard order={o} />
       <ShopPaymentReview order={o} />
 
       {!waitPay && o.status !== 'received' && o.status !== 'cancelled' ? (
@@ -159,10 +167,12 @@ export default function ShopOrder() {
           );
         })}
         <View style={{ height: 1, backgroundColor: colors.line }} />
-        <Lines rows={[['القطع', money(total) + ' ج.م'], ['التوصيل', Number(o.delivery_fee) ? money(Number(o.delivery_fee)) + ' ج.م' : 'استلام من المحل']]} total={['الإجمالي من العميل', money(total + Number(o.delivery_fee)) + ' ج.م']} />
+        {hasDeposit
+          ? <Lines rows={[['القطع', money(total) + ' ج.م'], ['العربون (اتدفع لضغطة)', '− ' + money(dep) + ' ج.م']]} total={['تحصّله من العميل', money(total - dep) + ' ج.م']} />
+          : <Lines rows={[['القطع', money(total) + ' ج.م'], ['التوصيل', Number(o.delivery_fee) ? money(Number(o.delivery_fee)) + ' ج.م' : 'استلام من المحل']]} total={['الإجمالي من العميل', money(total + Number(o.delivery_fee)) + ' ج.م']} />}
         <Row style={{ justifyContent: 'space-between' }}>
           <Muted size={13}>الدفع: {PAY_NAME[o.payment_method]}</Muted>
-          <Pill label={o.payment_method === 'cash' && o.payment_status === 'unpaid' ? 'حصّل كاش عند التسليم' : o.payment_method === 'shop' && o.payment_status === 'unpaid' ? 'هيدفع في المحل' : o.payment_status === 'review' ? 'محتاج تأكيدك' : PAY_STATUS[o.payment_status].label} tone={PAY_STATUS[o.payment_status].tone} />
+          <Pill label={o.payment_method === 'cash' && o.payment_status === 'unpaid' ? 'حصّل كاش عند التسليم' : o.payment_method === 'shop' && o.payment_status === 'unpaid' ? (hasDeposit ? `هيدفع ${money(total - dep)} في المحل` : 'هيدفع في المحل') : o.payment_status === 'review' ? 'محتاج تأكيدك' : PAY_STATUS[o.payment_status].label} tone={PAY_STATUS[o.payment_status].tone} />
         </Row>
         <Muted size={12}>اكتب رقم الأوردر {orderNo(o.order_no)} على الكيس.</Muted>
       </Card>
@@ -211,7 +221,7 @@ export default function ShopOrder() {
         <View style={{ gap: 14 }}>
           <Chips options={['القطعة اتباعت', 'لقيت فيها عيب', 'سبب تاني'].map((v) => ({ v, label: v }))} selected={[reason]} onPick={setReason} />
           {reason === 'سبب تاني' ? <Field value={other} onChangeText={setOther} placeholder="سبب تاني" /> : null}
-          <Muted size={13}>الإلغاء بيأثر على تقييم محلك، ولو العميل حوّل لازم ترجّع المبلغ.</Muted>
+          <Muted size={13}>{hasDeposit ? 'الإلغاء بيأثر على تقييم محلك، والعربون بيرجع للعميل.' : 'الإلغاء بيأثر على تقييم محلك، ولو العميل حوّل لازم ترجّع المبلغ.'}</Muted>
           <Row gap={10}>
             <Btn kind="danger" title="ألغي الأوردر" loading={busy} disabled={!reason} onPress={shopCancel} style={{ flex: 1 }} />
             <Btn kind="secondary" title="لأ" onPress={() => setCancelling(false)} style={{ flex: 1 }} />

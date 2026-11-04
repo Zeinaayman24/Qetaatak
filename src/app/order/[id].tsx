@@ -2,6 +2,7 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Linking, View } from 'react-native';
 import { ConfirmSheet } from '@/components/Confirm';
+import { DepositPanel } from '@/components/Deposit';
 import { PaymentPanel } from '@/components/Payment';
 import { ReceiptButton } from '@/components/ReceiptButton';
 import { BackBar, Btn, Card, Chips, Empty, Field, Icon, IconButton, Lines, Loading, Muted, Photo, Press, Row, Screen, Sheet, T, toast } from '@/components/ui';
@@ -11,13 +12,13 @@ import {
   type Order, type Quote, type Request, type Shop, type ShopPrivate,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
-import { needsPayment } from '@/lib/payments';
+import { depositOpen, needsPayment } from '@/lib/payments';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors, lift } from '@/lib/theme';
 import { t } from '@/lib/i18n';
 
-type Data = { order: Order | null; parts: Request[]; quotes: Quote[]; shop: Shop | null; priv: ShopPrivate | null; code: string | null };
+type Data = { order: Order | null; parts: Request[]; quotes: Quote[]; shop: Shop | null; priv: ShopPrivate | null; code: string | null; shopName: string | null };
 
 /** One order with one shop: live status, the shop, the parts, the receipt and the warranty. */
 export default function OrderPage() {
@@ -32,16 +33,19 @@ export default function OrderPage() {
   const [refPhoto, setRefPhoto] = useState<string | null>(null);
   const { data, loading } = useLive<Data>(async () => {
     const order = must(await supabase.from('orders').select('*').eq('id', id).maybeSingle()) as Order | null;
-    if (!order) return { order: null, parts: [], quotes: [], shop: null, priv: null, code: null };
+    if (!order) return { order: null, parts: [], quotes: [], shop: null, priv: null, code: null, shopName: null };
     const parts = must(await supabase.from('requests').select('*').eq('order_id', id).order('num')) as Request[];
     const qids = parts.map((p) => p.chosen_quote_id).filter(Boolean) as string[];
-    const [quotes, shop, priv, code] = await Promise.all([
+    const [quotes, shop, priv, code, card] = await Promise.all([
       qids.length ? supabase.from('quotes').select('*').in('id', qids) : Promise.resolve({ data: [], error: null }),
       supabase.from('shops').select('*').eq('id', order.shop_id).maybeSingle(),
+      // the shop's phone and address: hidden until the pickup deposit is paid (the server decides)
       supabase.from('shop_private').select('*').eq('id', order.shop_id).maybeSingle(),
       supabase.from('order_codes').select('code').eq('order_id', order.id).maybeSingle(),
+      supabase.rpc('shop_cards', { p_shops: [order.shop_id] }),
     ]);
-    return { order, parts, quotes: must(quotes as any) as Quote[], shop: shop.data as Shop | null, priv: priv.data as ShopPrivate | null, code: (code.data as { code: string } | null)?.code ?? null };
+    return { order, parts, quotes: must(quotes as any) as Quote[], shop: shop.data as Shop | null, priv: priv.data as ShopPrivate | null,
+      code: (code.data as { code: string } | null)?.code ?? null, shopName: ((card.data ?? []) as { name: string }[])[0]?.name ?? null };
   }, ['orders', 'requests'], [id]);
 
   if (ready && !session) return <Redirect href="/login" />;
@@ -58,6 +62,9 @@ export default function OrderPage() {
   const warrantyEnd = o.received_at && warrantyDays > 0 ? new Date(new Date(o.received_at).getTime() + warrantyDays * 86400000) : null;
   const firstPart = parts[0];
   const unpaid = needsPayment(o);
+  const hasDeposit = (o.deposit_status ?? 'none') !== 'none';
+  const dep = Number(o.deposit ?? 0);
+  const depositPaid = ['paid', 'used'].includes(o.deposit_status ?? '');
 
   async function rpc(fn: string, args: Record<string, unknown>, ok: string) {
     setBusy(true);
@@ -77,7 +84,8 @@ export default function OrderPage() {
       const { error } = await supabase.rpc('refuse_order', { p_order: o!.id, p_reason: why, p_photo: path });
       if (error) throw error;
       setAsk(null);
-      toast(o!.payment_status === 'paid' ? t('اتسجّل إنك رفضت القطعة. المحل لازم يرجّعلك {0} ج.م، وهنتابع معاه.', money(total)) : t('اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.'));
+      toast(hasDeposit ? t('اتسجّل إنك رفضت القطعة. هنأكد مع المحل ونرجّعلك العربون.')
+        : o!.payment_status === 'paid' ? t('اتسجّل إنك رفضت القطعة. المحل لازم يرجّعلك {0} ج.م، وهنتابع معاه.', money(total)) : t('اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.'));
     } catch (e) { toast(friendlyError(e)); }
     setBusy(false);
   }
@@ -102,7 +110,7 @@ export default function OrderPage() {
       {/* live status: light, one line of what is happening, a simple progress bar */}
       <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 18, gap: 16 }}>
         <View style={{ gap: 2 }}>
-          <T w="bold" size={22} style={{ lineHeight: 32 }} color={o.status === 'cancelled' ? colors.bad : colors.ink}>{unpaid ? t('فاضل خطوة الدفع') : orderTitle(o)}</T>
+          <T w="bold" size={22} style={{ lineHeight: 32 }} color={o.status === 'cancelled' ? colors.bad : colors.ink}>{unpaid ? (depositOpen(o) ? t('ادفع العربون عشان تحجز القطعة') : t('فاضل خطوة الدفع')) : orderTitle(o)}</T>
           <Muted size={14}>{o.delivery_mode === 'delivery' ? t('توصيل لعنوانك') : t('استلام من المحل')} {t('· آخر تحديث')}{' '}{ago(o.updated_at)}</Muted>
         </View>
         {o.status !== 'cancelled' ? (
@@ -127,7 +135,7 @@ export default function OrderPage() {
         </Row>
       ) : null}
 
-      {data!.code && o.status !== 'received' && o.status !== 'cancelled' ? (
+      {data!.code && !unpaid && o.status !== 'received' && o.status !== 'cancelled' ? (
         <View style={{ backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 20, gap: 8, alignItems: 'center' }}>
           <Muted size={14}>{t('كود الاستلام')}</Muted>
           <T w="bold" size={44} style={{ letterSpacing: 10, lineHeight: 56, writingDirection: 'ltr' }} selectable>{ar(data!.code)}</T>
@@ -140,23 +148,27 @@ export default function OrderPage() {
           <Icon name="hand-left" size={20} color={colors.muted} />
           <View style={{ flex: 1 }}>
             <T w="semibold" size={14}>{t('رفضت القطعة:')}{' '}{o.refusal_reason}</T>
-            {o.payment_status === 'unpaid' ? <Muted size={12.5}>{t('اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.')}</Muted> : null}
+            {o.payment_status === 'unpaid' && !hasDeposit ? <Muted size={12.5}>{t('اتسجّل إنك رفضت القطعة، ومش هتدفع حاجة. تقدر تختار عرض تاني.')}</Muted> : null}
           </View>
         </Row>
       ) : null}
-      <PaymentPanel order={o} shop={priv} />
+      {hasDeposit ? <DepositPanel order={o} /> : <PaymentPanel order={o} shop={priv} />}
 
       {/* the shop */}
       {o.status !== 'cancelled' ? (
         <Card>
           <Row gap={10}>
             <Press onPress={() => router.push(`/shop-profile/${o.shop_id}`)} label={t('صفحة المحل')} role="link" style={{ flex: 1 }}>
-              <T w="semibold" size={16}>{priv?.name ?? t('المحل')}</T>
+              <T w="semibold" size={16}>{priv?.name ?? data!.shopName ?? t('المحل')}</T>
               <Muted size={13}>{shop?.area}{t('،')}{' '}{shop?.governorate}</Muted>
             </Press>
             {firstPart ? <IconButton name="chatbubble-ellipses" label={t('رسالة للمحل')} size={44} onPress={() => router.push(`/chat/${firstPart.id}/${o.shop_id}`)} /> : null}
             {priv?.phone ? <IconButton name="call" label={t('اتصل بالمحل')} size={44} onPress={() => Linking.openURL('tel:' + priv.phone)} /> : null}
           </Row>
+          {o.delivery_mode === 'pickup' && !priv && hasDeposit ? (
+            <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="lock-closed" size={16} color={colors.muted} />
+              <Muted size={13} style={{ flex: 1 }}>{t('رقم المحل وعنوانه بالظبط هيظهروا بعد دفع العربون.')}</Muted></Row>
+          ) : null}
           {o.delivery_mode === 'pickup' && priv ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />
               <Muted size={13} style={{ flex: 1 }}>{addressLine({ street: priv.street, building: priv.building, area: shop?.area, governorate: shop?.governorate })}{priv.landmark ? ` (${priv.landmark})` : ''} {t('· قول للمحل رقم الأوردر')}{' '}{orderNo(o.order_no)}</Muted></Row>
@@ -185,7 +197,12 @@ export default function OrderPage() {
           );
         })}
         <View style={{ height: 1, backgroundColor: colors.line }} />
-        <Lines rows={[[t('القطع'), money(o.items_total) + t(' ج.م')], [t('التوصيل'), o.delivery_fee ? money(o.delivery_fee) + t(' ج.م') : t('مجاناً')]]} total={[t('الإجمالي'), money(Number(o.items_total) + Number(o.delivery_fee)) + t(' ج.م')]} />
+        {hasDeposit ? (
+          <Lines rows={[[t('القطع'), money(o.items_total) + t(' ج.م')], [depositPaid ? t('العربون (اتدفع لضغطة)') : t('العربون (لضغطة)'), '− ' + money(dep) + t(' ج.م')]]}
+            total={[t('تدفعه في المحل'), money(Number(o.items_total) - dep) + t(' ج.م')]} />
+        ) : (
+          <Lines rows={[[t('القطع'), money(o.items_total) + t(' ج.م')], [t('التوصيل'), o.delivery_fee ? money(o.delivery_fee) + t(' ج.م') : t('مجاناً')]]} total={[t('الإجمالي'), money(Number(o.items_total) + Number(o.delivery_fee)) + t(' ج.م')]} />
+        )}
       </Card>
 
       {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
@@ -228,7 +245,10 @@ export default function OrderPage() {
 
       <ConfirmSheet open={ask === 'received'} title={t('اتأكدت إن القطعة زي العرض؟')} body={t('بعد التأكيد، الاسترجاع بيكون مع المحل حسب القانون.')} yes={t('أيوه، استلمت')} busy={busy}
         onYes={() => rpc('receive_order', { p_order: o.id }, t('تمام. إيه رأيك في المحل؟'))} onClose={() => setAsk(null)} />
-      <ConfirmSheet open={ask === 'cancel'} title={t('تلغي الأوردر؟')} body={t('القطع هترجع للطلب وتقدر تختار عرض تاني.')} yes={t('أيوه، الغي')} danger busy={busy}
+      <ConfirmSheet open={ask === 'cancel'} title={t('تلغي الأوردر؟')}
+        body={o.deposit_status === 'paid' ? t('العربون ({0} ج.م) مش هيرجع لو لغيت دلوقتي، لأن المحل حجز القطعة ليك.', money(dep))
+          : o.deposit_status === 'review' ? t('لو كنت حوّلت العربون، هنراجعه ونرجّعهولك. القطع هترجع للطلب.')
+          : t('القطع هترجع للطلب وتقدر تختار عرض تاني.')} yes={t('أيوه، الغي')} danger busy={busy}
         onYes={() => rpc('cancel_order', { p_order: o.id }, t('الأوردر اتلغى. تقدر تختار عرض تاني.'))} onClose={() => setAsk(null)} />
       <Sheet open={ask === 'refuse'} onClose={() => setAsk(null)} title={t('ليه رفضتها؟')}>
         <View style={{ gap: 14 }}>

@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, I18nManager, Image, Linking, Platform, View } from 'react-native';
+import { Animated, Easing, Image, Linking, Platform, View } from 'react-native';
 import { Icon, Press, T } from '@/components/ui';
 import { must, useLive } from '@/lib/live';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
-import { t } from '@/lib/i18n';
+import { dir, t } from '@/lib/i18n';
 
 export type Ad = {
   id: string; title: string; subtitle: string; image_path: string | null; link: string; advertiser: string;
@@ -21,8 +21,8 @@ const RATIO = 500 / 1200;  // ad pictures are uploaded at 1200×500
 // each ad is counted once per app session, however often the home screen re-renders
 const seen = new Set<string>();
 
-// The app reads right to left, so the next card sits to the left (dir = -1), like turning a page in an Arabic book.
-const rtl = Platform.OS === 'web' ? (typeof document !== 'undefined' && document.documentElement.dir !== 'ltr') : I18nManager.isRTL;
+// In Arabic the next card sits to the left (DIR = -1), like turning a page in an Arabic book; in English, to the right.
+const rtl = dir() === 'rtl';
 const DIR = rtl ? -1 : 1;
 
 /**
@@ -126,7 +126,7 @@ export function AdCarousel({ ads }: { ads: Ad[] }) {
                   </View>
                   {a.link ? (
                     <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={rtl ? 'chevron-back' : 'chevron-forward'} size={22} color={colors.primary} />
+                      <Icon name="chevron-back" size={22} color={colors.primary} />
                     </View>
                   ) : null}
                 </View>
