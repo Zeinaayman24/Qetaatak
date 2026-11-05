@@ -22,7 +22,7 @@ type Balance = {
  * commission is owed only after a sale (no top-up), with a monthly statement, settled here.
  */
 export default function ShopBalance() {
-  const { ready, session } = useAuth();
+  const { ready, session, shop } = useAuth();
   const uid = session?.user.id;
   const [pay, setPay] = useState(false);
   const [amount, setAmount] = useState('');
@@ -36,6 +36,7 @@ export default function ShopBalance() {
     if (error) throw error;
     return data as Balance;
   }, ['orders', 'shop_settlements'], [uid]);
+  const { data: visiblePrice } = useLive(async () => Number((await supabase.from('app_settings').select('value').eq('key', 'visible_price').maybeSingle()).data?.value ?? 1000), [], []);
   // kept deposits: Daghta owes the shop its share when a customer doesn't come (change 1.33)
   const { data: share } = useLive(async () => {
     if (!uid) return null;
@@ -109,6 +110,26 @@ export default function ShopBalance() {
           <Row key={t} gap={10} style={{ alignItems: 'flex-start' }}><Icon name={icon} size={18} color={colors.primary} /><T size={13.5} style={{ flex: 1 }}>{t}</T></Row>
         ))}
       </Card>
+
+      {/* hidden (free) or visible (subscription), change 1.35 */}
+      {(() => {
+        const visible = !!shop?.public_until && new Date(shop.public_until) > new Date();
+        return (
+          <Section title="ظهور محلك">
+            <Card>
+              <Row gap={10}>
+                <Icon name={visible ? 'eye' : 'eye-off'} size={22} color={visible ? colors.good : colors.muted} />
+                <T w="bold" size={16} style={{ flex: 1 }}>{visible ? `محلك ظاهر للعملاء لحد ${new Date(shop!.public_until!).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}` : 'محلك مخفي (مجاناً)'}</T>
+              </Row>
+              {visible
+                ? <Muted size={13}>اسمك وصورتك ورقمك بيظهروا على كل عروضك، والعميل مش بيدفع عربون على أوردرات الاستلام منك.</Muted>
+                : <Muted size={13}>العميل بيشوف «محل في منطقتك» بس. اسمك ورقمك وعنوانك بيظهروا بعد ما يدفع العربون، ومفيش عمولة عليك في أوردرات العربون.</Muted>}
+              <Muted size={13}>{visible ? 'تجديد' : 'عايز اسمك يظهر على كل عروضك؟'} الاشتراك {money(visiblePrice ?? 1000)} ج.م في الشهر. كلّم فريق ضغطة وهنفعّلهولك.</Muted>
+              <Btn kind="secondary" icon="chatbubbles" title={visible ? 'جدّد الاشتراك' : 'اشترك وخلّي محلك ظاهر'} onPress={() => router.push('/support')} />
+            </Card>
+          </Section>
+        );
+      })()}
 
       {share && share.rows.length ? (
         <Section title="تعويض العربون">

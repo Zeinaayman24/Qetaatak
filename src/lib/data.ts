@@ -70,7 +70,12 @@ export const replyLabel = (min: number | null | undefined) =>
   min == null ? t('محل جديد') : min <= 1 ? t('بيرد في دقيقة') : min < 60 ? t('بيرد في {0} د', ar(min)) : t('بيرد في {0} س', ar(Math.round(min / 60)));
 
 /** What the customer sees about a shop that sent an offer. */
-export type ShopCard = { id: string; name: string; area: string; rating: number | null; ratings: number; sales: number; reply_min: number | null; photo_path?: string | null };
+export type ShopCard = { id: string; name: string; area: string; rating: number | null; ratings: number; sales: number; reply_min: number | null; photo_path?: string | null;
+  /** the shop subscribes to be visible: name and contact show, no pickup deposit (change 1.35) */
+  visible?: boolean };
+/** The shops columns anyone signed in may read. Location, storefront photo and internal notes come only through
+ *  my_shop() (the shop itself), staff_shops() (the team) or shop_cards()/shop_profile() (hidden until allowed). */
+export const SHOP_COLS = 'id, area, brands, status, created_at, governorate, shop_type, specialties, offers_delivery, fee_area, fee_city, fee_far, featured_until, hours, accepting, approved_at, submitted_at, public_until';
 
 export const validPhone = (p: string) => /^01\d{9}$/.test(p.replace(/\s/g, ''));
 export const validPostal = (p: string) => p.trim() === '' || /^\d{5}$/.test(toLatin(p.trim()));
@@ -92,6 +97,8 @@ export type Shop = {
   fee_area: number | null; fee_city: number | null; fee_far: number | null;
   /** paid visibility: listed first with a badge until this date */
   featured_until?: string | null;
+  /** visible to customers (paid subscription) until this date; otherwise hidden until the deposit (change 1.35) */
+  public_until?: string | null;
   accepting?: boolean; suspend_reason?: string; reopen_step?: string; suspended_at?: string | null; lat?: number | null; lng?: number | null; hours?: ShopHours; photo_path?: string | null; review_note?: string;
   agreement_version?: string | null; agreement_at?: string | null; approved_at?: string | null;
 };

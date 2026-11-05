@@ -938,4 +938,5 @@ export const EN: Record<string, string> = {
   "الباقي وانت بتستلم": "Rest when you collect",
   "لسه العربون ماتدفعش.": "The deposit hasn't been paid yet.",
   "الدفع ده اتسجّل خلاص.": "This payment is already recorded.",
+  "اسم المحل ورقمه وعنوانه هيظهروا بعد دفع العربون.": "The shop's name, number and address appear after you pay the deposit.",
 };

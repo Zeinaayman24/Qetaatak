@@ -13,7 +13,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import {
   CONDITIONS, warrantyLabel, ORDER_LABEL, SIDES, WANTED, ar, elapsed, friendlyError, money, orderNo, replyLabel, reqNo,
-  type Order, type PayMethod, type Quote, type Request, type Shop, type ShopCard,
+  type Order, type PayMethod, type Quote, type Request, type Shop, type ShopCard, SHOP_COLS,
 } from '@/lib/data';
 import { partIsSided } from '@/lib/assistant';
 import { depositFor, depositRules, payByCard, type DepositRules } from '@/lib/payments';
@@ -61,7 +61,7 @@ export default function PriceRequest() {
     const orderIds = [...new Set(parts.map((p) => p.order_id).filter(Boolean))] as string[];
     const [quotes, shopRows, orderRows, dec] = await Promise.all([
       supabase.from('quotes').select('*').in('request_id', ids).order('price'),
-      supabase.from('shops').select('*'),
+      supabase.from('shops').select(SHOP_COLS),
       orderIds.length ? supabase.from('orders').select('*').in('id', orderIds) : Promise.resolve({ data: [], error: null }),
       supabase.rpc('decline_counts', { p_requests: ids }),
     ]);
@@ -131,7 +131,8 @@ export default function PriceRequest() {
   // pickup deposit (change 1.33): each pickup shop is reserved with a small deposit, the rest is paid at the counter
   const depOn = !!rules?.on;
   const shopTotal = (sid: string) => groupOf(sid).reduce((s, c) => s + c.quote.price * (c.part.qty || 1), 0);
-  const depositOf = (sid: string) => (depOn && rules && modeOf(sid) === 'pickup' ? depositFor(shopTotal(sid), rules) : 0);
+  // shops that subscribe to be visible take no deposit (change 1.35)
+  const depositOf = (sid: string) => (depOn && rules && modeOf(sid) === 'pickup' && !d.cards[sid]?.visible ? depositFor(shopTotal(sid), rules) : 0);
   const depositTotal = byShop.reduce((s, g) => s + depositOf(g[0].quote.shop_id), 0);
   const bundle = open.length > 1
     ? [...new Set(d.quotes.map((q) => q.shop_id))]
@@ -323,7 +324,7 @@ export default function PriceRequest() {
                 {byShop.length > 1 ? <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={[`${ar(g.length)} ${g.length > 1 ? t('قطع') : t('قطعة')}`, shop?.area].filter(Boolean).join(' · ')} /> : null}
                 <Seg options={opts} value={modeOf(sid)} onPick={(v) => setModes((m) => ({ ...m, [sid]: v }))} />
                 {!canDeliver(sid) ? <Muted size={12.5}>{!shop?.offers_delivery ? t('المحل ده مش بيوصّل') : g.length > 1 && g.some((c) => d.fees[c.quote.id] != null) ? t('قطعة من دول استلام من المحل بس') : t('المحل مش بيوصّل لمنطقتك')}</Muted>
-                  : modeOf(sid) === 'pickup' ? <Muted size={12.5}>{depOn ? t('رقم المحل وعنوانه هيظهروا بعد دفع العربون.') : t('عنوان المحل ومواعيده هيظهروا بعد التأكيد.')}</Muted> : null}
+                  : modeOf(sid) === 'pickup' ? <Muted size={12.5}>{depositOf(sid) ? t('اسم المحل ورقمه وعنوانه هيظهروا بعد دفع العربون.') : t('عنوان المحل ومواعيده هيظهروا بعد التأكيد.')}</Muted> : null}
               </View>
             );
           })}

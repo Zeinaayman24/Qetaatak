@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { CONDITIONS, addressLine, ar, money, orderNo, warrantyLabel, type Order, type Profile, type Quote, type Request, type Shop, type ShopPrivate } from './data';
+import { CONDITIONS, addressLine, ar, money, orderNo, warrantyLabel, type Order, type Profile, type Quote, type Request, type Shop, type ShopPrivate, SHOP_COLS } from './data';
 import { PAY_NAME, PAY_STATUS } from './payments';
 import { supabase } from './supabase';
 
@@ -93,7 +93,7 @@ export async function downloadReceipt(orderId: string): Promise<string | null> {
   const qids = parts.map((p) => p.chosen_quote_id).filter(Boolean) as string[];
   const [quotes, shop, priv, customer] = await Promise.all([
     qids.length ? supabase.from('quotes').select('*').in('id', qids) : Promise.resolve({ data: [] }),
-    supabase.from('shops').select('*').eq('id', order.shop_id).maybeSingle(),
+    supabase.from('shops').select(SHOP_COLS).eq('id', order.shop_id).maybeSingle(),
     supabase.from('shop_private').select('*').eq('id', order.shop_id).maybeSingle(),
     supabase.from('profiles').select('*').eq('id', order.customer_id).maybeSingle(),
   ]);

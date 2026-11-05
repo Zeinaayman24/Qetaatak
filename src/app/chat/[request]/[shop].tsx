@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, ScrollView, TextInput, View } from 'react-native';
 import { BackBar, Empty, Icon, Loading, Muted, Photo, Pill, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { ago, ar, friendlyError, money, type Message, type Request, type Shop } from '@/lib/data';
+import { ago, ar, friendlyError, money, type Message, type Request, type Shop, SHOP_COLS } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -20,7 +20,7 @@ export default function Chat() {
 
   const { data, loading } = useLive(async () => {
     const req = must(await supabase.from('requests').select('*').eq('id', request).maybeSingle()) as Request | null;
-    const sh = must(await supabase.from('shops').select('*').eq('id', shop).maybeSingle()) as Shop | null;
+    const sh = must(await supabase.from('shops').select(SHOP_COLS).eq('id', shop).maybeSingle()) as Shop | null;
     const name = ((await supabase.rpc('shop_cards', { p_shops: [shop] })).data as { name: string }[] | null)?.[0]?.name ?? null;
     const msgs = must(await supabase.from('messages').select('*').eq('request_id', request).eq('shop_id', shop).order('created_at')) as Message[];
     const offers = ((await supabase.from('quotes').select('id, price').eq('request_id', request).eq('shop_id', shop).order('price')).data ?? []) as { id: string; price: number }[];

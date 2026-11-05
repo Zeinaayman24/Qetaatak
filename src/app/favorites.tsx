@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { BottomNav } from '@/components/AppHeader';
 import { BackBar, Empty, Icon, ListRow, Loading, Screen } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { SHOP_TYPES, type Shop } from '@/lib/data';
+import { SHOP_TYPES, type Shop, SHOP_COLS } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
@@ -17,7 +17,7 @@ export default function Favorites() {
     const favs = must(await supabase.from('favorites').select('shop_id').eq('customer_id', uid)) as { shop_id: string }[];
     if (!favs.length) return [] as (Shop & { name?: string })[];
     const ids = favs.map((f) => f.shop_id);
-    const shops = must(await supabase.from('shops').select('*').in('id', ids)) as Shop[];
+    const shops = must(await supabase.from('shops').select(SHOP_COLS).in('id', ids)) as Shop[];
     const names = Object.fromEntries((((await supabase.rpc('shop_cards', { p_shops: ids })).data ?? []) as { id: string; name: string }[]).map((c) => [c.id, c.name]));
     return shops.map((s) => ({ ...s, name: names[s.id] as string | undefined }));
   }, ['shops'], [uid]);

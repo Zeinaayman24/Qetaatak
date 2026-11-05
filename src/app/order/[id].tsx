@@ -9,7 +9,7 @@ import { BackBar, Btn, Card, Chips, Empty, Field, Icon, IconButton, Lines, Loadi
 import { useAuth } from '@/lib/auth';
 import {
   CONDITIONS, ORDER_LABEL, ORDER_STEP_NAME, warrantyLabel, orderStep, orderTitle, addressLine, ago, ar, friendlyError, money, orderNo, orderSteps,
-  type Order, type Quote, type Request, type Shop, type ShopPrivate,
+  type Order, type Quote, type Request, type Shop, type ShopPrivate, SHOP_COLS,
 } from '@/lib/data';
 import { must, useLive } from '@/lib/live';
 import { depositOpen, needsPayment } from '@/lib/payments';
@@ -38,7 +38,7 @@ export default function OrderPage() {
     const qids = parts.map((p) => p.chosen_quote_id).filter(Boolean) as string[];
     const [quotes, shop, priv, code, card] = await Promise.all([
       qids.length ? supabase.from('quotes').select('*').in('id', qids) : Promise.resolve({ data: [], error: null }),
-      supabase.from('shops').select('*').eq('id', order.shop_id).maybeSingle(),
+      supabase.from('shops').select(SHOP_COLS).eq('id', order.shop_id).maybeSingle(),
       // the shop's phone and address: hidden until the pickup deposit is paid (the server decides)
       supabase.from('shop_private').select('*').eq('id', order.shop_id).maybeSingle(),
       supabase.from('order_codes').select('code').eq('order_id', order.id).maybeSingle(),
@@ -167,7 +167,7 @@ export default function OrderPage() {
           </Row>
           {o.delivery_mode === 'pickup' && !priv && hasDeposit ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="lock-closed" size={16} color={colors.muted} />
-              <Muted size={13} style={{ flex: 1 }}>{t('رقم المحل وعنوانه بالظبط هيظهروا بعد دفع العربون.')}</Muted></Row>
+              <Muted size={13} style={{ flex: 1 }}>{t('اسم المحل ورقمه وعنوانه هيظهروا بعد دفع العربون.')}</Muted></Row>
           ) : null}
           {o.delivery_mode === 'pickup' && priv ? (
             <Row gap={8} style={{ alignItems: 'flex-start' }}><Icon name="location" size={16} color={colors.muted} />

@@ -15,7 +15,7 @@ export type Profile = {
   car_make: string | null; car_model: string | null; car_year: number | null; car_vin: string;
   is_customer: boolean; is_shop: boolean; is_admin: boolean; is_support: boolean; is_blocked: boolean; created_at: string; staff_role?: string | null;
 };
-export type Shop = { id: string; area: string; governorate: string; brands: string[]; specialties: string[]; shop_type: string; offers_delivery: boolean; status: 'draft' | 'pending' | 'changes' | 'approved' | 'suspended' | 'closed'; created_at: string; featured_until?: string | null;
+export type Shop = { id: string; area: string; governorate: string; brands: string[]; specialties: string[]; shop_type: string; offers_delivery: boolean; status: 'draft' | 'pending' | 'changes' | 'approved' | 'suspended' | 'closed'; created_at: string; featured_until?: string | null; public_until?: string | null;
   lat?: number | null; lng?: number | null; photo_path?: string | null; agreement_version?: string | null; suspend_reason?: string; reopen_step?: string; review_note?: string; accepting?: boolean; perf_warned_at?: string | null };
 export type ShopPrivate = { id: string; name: string; owner_name: string; phone: string; phone2: string; street: string; building: string; landmark: string; postal_code: string; commercial_register: string };
 export type Request = {
@@ -126,7 +126,7 @@ export function must<T>(res: { data: T | null; error: any }): T {
 export async function loadAll() {
   const [profiles, shops, priv, requests, quotes, tickets, orders] = await Promise.all([
     supabase.rpc('staff_people'), // phones come masked; «اعرض الرقم» uses staff_show_phone (recorded)
-    supabase.from('shops').select('*'),
+    supabase.rpc('staff_shops'),
     supabase.from('shop_private').select('*'),
     supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(1000),
     supabase.from('quotes').select('*').limit(5000),

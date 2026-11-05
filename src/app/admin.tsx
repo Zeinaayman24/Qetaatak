@@ -15,7 +15,7 @@ export default function Admin() {
   const [replies, setReplies] = useState<Record<string, string>>({});
   const { data, loading, reload } = useLive(async () => {
     const [shops, priv, reqs, quotes, people, reports] = await Promise.all([
-      supabase.from('shops').select('*').order('created_at', { ascending: false }),
+      supabase.rpc('staff_shops'),
       supabase.from('shop_private').select('*'),
       supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(200),
       supabase.from('quotes').select('*'),

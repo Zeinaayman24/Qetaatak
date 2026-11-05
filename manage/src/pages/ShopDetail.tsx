@@ -42,6 +42,20 @@ export default function ShopDetail() {
   const quotes = all.quotes.filter((q) => q.shop_id === s.id);
   const tickets = all.tickets.filter((t) => t.reporter_id === s.id || (t.request_id && all.requests.some((r) => r.id === t.request_id && quotes.some((q) => q.id === r.chosen_quote_id))));
   const featured = !!s.featured_until && new Date(s.featured_until) > new Date();
+  // visible shops (paid subscription): name, photo and contact show on every offer, no pickup deposit (change 1.35)
+  const visible = !!s.public_until && new Date(s.public_until) > new Date();
+  async function setVisible(on: boolean) {
+    let days = 0;
+    if (on) {
+      const v = prompt('المحل دفع اشتراك الظهور؟ ظاهر كام يوم؟ (بيتزوّد على المدة الحالية)', '30');
+      if (!v) return;
+      days = Math.round(Number(v));
+      if (!(days > 0)) return alert('اكتب عدد أيام.');
+    } else if (!confirm('ترجّع المحل مخفي دلوقتي؟')) return;
+    const note = on ? (prompt('رقم عملية الدفع أو ملاحظة (اختياري)') ?? '') : '';
+    const { error } = await supabase.rpc('set_shop_public', { p_shop: s!.id, p_days: days, p_note: note });
+    if (error) alert(/not allowed/.test(error.message) ? 'مش مسموح.' : 'حصلت مشكلة. جرّب تاني.'); else reload();
+  }
   const close = () => { setBox(null); setReason(''); setStep(''); setPick(''); setErr(''); };
 
   async function run(fn: string, args: Record<string, unknown>) {
@@ -64,7 +78,7 @@ export default function ShopDetail() {
 
   return (
     <Page title={<>{p?.name} <span className="mono muted">{memberId(pr)}</span></>}
-      sub={<><Pill tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'bad'}>{SHOP_STATUS[s.status]}</Pill>{featured ? <> <Pill tone="dark">محل مميّز لحد {date(s.featured_until!)}</Pill></> : null} · من {date(s.created_at)}</>}
+      sub={<><Pill tone={s.status === 'approved' ? 'good' : s.status === 'pending' ? 'wait' : 'bad'}>{SHOP_STATUS[s.status]}</Pill>{featured ? <> <Pill tone="dark">محل مميّز لحد {date(s.featured_until!)}</Pill></> : null} <Pill tone={visible ? 'good' : 'plain'}>{visible ? `ظاهر للعملاء لحد ${date(s.public_until!)}` : 'مخفي (الاسم والرقم بعد العربون)'}</Pill> · من {date(s.created_at)}</>}
       actions={
         <>
           {s.status === 'pending' || s.status === 'changes' ? (
@@ -80,6 +94,8 @@ export default function ShopDetail() {
           </> : null}
           {s.status === 'suspended' ? <button className="btn" disabled={!review} onClick={() => setBox('reopen')}>رجّع المحل</button> : null}
           {s.status === 'approved' ? <button className="btn ghost" disabled={!can(role, 'finance')} onClick={() => setBox('featured')}>محل مميّز</button> : null}
+          {s.status === 'approved' ? <button className="btn ghost" disabled={!can(role, 'finance')} onClick={() => setVisible(true)}>{visible ? 'مدّ الظهور' : 'اشتراك ظهور'}</button> : null}
+          {visible ? <button className="btn ghost" disabled={!can(role, 'finance')} onClick={() => setVisible(false)}>رجّعه مخفي</button> : null}
           {role === 'admin' && s.status !== 'closed' ? <button className="btn danger" onClick={() => setBox('close')}>قفل المحل نهائياً</button> : null}
           {role === 'admin' ? <button className={'btn ' + (pr?.is_blocked ? 'ghost' : 'danger')} onClick={toggleBlock}>{pr?.is_blocked ? 'إلغاء الحظر' : 'حظر الحساب'}</button> : null}
         </>
