@@ -12,6 +12,10 @@ import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { t } from '@/lib/i18n';
 import { carLabel } from '@/lib/catalogue';
+import { whenLabel } from '@/components/Appointment';
+import { BOOKING_STATUS, type Booking } from '@/components/BookingView';
+import type { InstallRequest } from '@/lib/install';
+import { serviceName, useInstallServices } from '@/lib/shops';
 
 type Tab = 'active' | 'done';
 
@@ -23,17 +27,23 @@ export default function MyRequests() {
   // older links still say quotes / preparing / ready: they all open the «شغّالة» tab
   const [picked, setTab] = useState<Tab | null>(params.tab === 'done' ? 'done' : params.tab ? 'active' : null);
   const now = useNow(60000);
+  const services = useInstallServices(true);
   const { data, loading } = useLive(async () => {
-    if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[], orders: [] as Order[] };
-    const [reqs, orders] = await Promise.all([
+    if (!uid) return { reqs: [] as Request[], quotes: [] as Pick<Quote, 'id' | 'request_id'>[], orders: [] as Order[], ireqs: [] as InstallRequest[], iq: [] as { request_id: string }[], bookings: [] as Booking[] };
+    const [reqs, orders, ir, bk] = await Promise.all([
       supabase.from('requests').select('*').eq('customer_id', uid).order('created_at', { ascending: false }).limit(200),
       supabase.from('orders').select('*').eq('customer_id', uid).order('created_at', { ascending: false }).limit(100),
+      supabase.from('install_requests').select('*').eq('customer_id', uid).order('created_at', { ascending: false }).limit(50),
+      supabase.from('bookings').select('*').eq('customer_id', uid).order('created_at', { ascending: false }).limit(50),
     ]);
+    const ireqs = (ir.data ?? []) as InstallRequest[];
+    const openIds = ireqs.filter((x) => x.status === 'open').map((x) => x.id);
+    const iq = openIds.length ? ((await supabase.from('install_quotes').select('request_id').in('request_id', openIds)).data ?? []) as { request_id: string }[] : [];
     const rs = must(reqs) as Request[];
     const ids = rs.filter((r) => r.status === 'open').map((r) => r.id);
     const quotes = ids.length ? (must(await supabase.from('quotes').select('id, request_id').in('request_id', ids)) as Pick<Quote, 'id' | 'request_id'>[]) : [];
-    return { reqs: rs, quotes, orders: must(orders) as Order[] };
-  }, ['requests', 'quotes', 'orders'], [uid]);
+    return { reqs: rs, quotes, orders: must(orders) as Order[], ireqs, iq, bookings: (bk.data ?? []) as Booking[] };
+  }, ['requests', 'quotes', 'orders', 'install_requests', 'install_quotes', 'bookings'], [uid]);
 
   if (ready && !session) return <Redirect href="/login" />;
   const reqs = data?.reqs ?? [];
@@ -42,11 +52,16 @@ export default function MyRequests() {
   const offersOf = (g: (typeof openGroups)[number]) => data!.quotes.filter((q) => g.items.some((r) => r.id === q.request_id && r.status === 'open')).length;
   const inTab = (b: Bucket) => orders.filter((o) => bucketOf(o) === b);
   const live = [...inTab('ready'), ...inTab('preparing')];
-  const tab: Tab = picked ?? (openGroups.length || live.length ? 'active' : 'done');
+  const tab: Tab = picked ?? (openGroups.length || live.length || (data?.ireqs ?? []).some((x) => x.status === 'open') || (data?.bookings ?? []).some((b) => !['done', 'cancelled'].includes(b.status)) ? 'active' : 'done');
   const partsOf = (o: Order) => reqs.filter((r) => r.order_id === o.id);
   // requests that closed after 7 days with no order (A16)
   const expired = groupRequests(reqs).filter((g) => g.items.some((r) => r.status === 'expired') && g.items.every((r) => r.status === 'expired' || r.status === 'cancelled'));
   const finished = inTab('done');
+  const openInstalls = (data?.ireqs ?? []).filter((x) => x.status === 'open');
+  const liveBookings = (data?.bookings ?? []).filter((b) => !['done', 'cancelled'].includes(b.status) || (b.status === 'done' && !b.rated_at));
+  const pastBookings = (data?.bookings ?? []).filter((b) => (b.status === 'done' && b.rated_at) || b.status === 'cancelled');
+  const activeCount = openGroups.length + live.length + openInstalls.length + liveBookings.length;
+  const svcName = (id: string) => serviceName(services.find((x) => x.id === id)) || t('تركيب');
 
   /** One card: what it is, its status, and the next step on the bottom line. */
   const card = (key: string, title: string, sub: string, status: string, tone: [string, string], when: string, next: string, go: () => void) => (
@@ -73,13 +88,26 @@ export default function MyRequests() {
     <Screen nav={<BottomNav role="customer" />}>
       <Row style={{ justifyContent: 'space-between' }}>
         <T w="bold" size={24} style={{ lineHeight: 36 }}>{t('طلباتي')}</T>
-        <Btn kind="small" icon="add" title={t('طلب جديد')} onPress={() => router.push('/customer/new')} />
+        <Row gap={8}>
+          <Btn kind="small" icon="construct-outline" title={t('تركيب')} onPress={() => router.push('/install/new')} />
+          <Btn kind="small" icon="add" title={t('طلب جديد')} onPress={() => router.push('/customer/new')} />
+        </Row>
       </Row>
-      <Seg options={[{ v: 'active', label: openGroups.length + live.length ? t('شغّالة ({0})', ar(openGroups.length + live.length)) : t('شغّالة') }, { v: 'done', label: t('خلصت') }]} value={tab} onPick={(v) => setTab(v as Tab)} />
+      <Seg options={[{ v: 'active', label: activeCount ? t('شغّالة ({0})', ar(activeCount)) : t('شغّالة') }, { v: 'done', label: t('خلصت') }]} value={tab} onPick={(v) => setTab(v as Tab)} />
 
       {loading && !data ? <Loading /> : tab === 'active' ? (
-        groupsSorted.length || live.length ? (
+        activeCount ? (
           <View style={{ gap: 10 }}>
+            {liveBookings.map((b) => card(b.id, t('حجز تركيب #{0}', ar(b.num)), whenLabel(b.appointment_at), BOOKING_STATUS[b.status].label,
+              b.status === 'ready' || (b.status === 'done' && !b.rated_at) ? green : b.status === 'disputed' ? red : b.price_change != null ? orange : blue,
+              b.price != null ? t('{0} ج.م', money(Number(b.price))) : t('السعر بعد المعاينة'),
+              b.price_change != null ? t('ردّ على السعر') : b.status === 'ready' ? t('أكّد إنه تمام') : b.status === 'done' ? t('قيّم المحل') : t('تابع الحجز'),
+              () => router.push({ pathname: '/booking/[id]', params: { id: b.id } })))}
+            {openInstalls.map((r) => {
+              const n = (data?.iq ?? []).filter((q) => q.request_id === r.id).length;
+              return card(r.id, svcName(r.service_id), t('طلب تركيب #{0} · {1}', ar(r.num), carLabel(r.car_make, r.car_model)), n ? (n > 1 ? t('{0} عروض', ar(n)) : t('عرض')) : t('بندوّر'),
+                n ? blue : grey, t('من {0}', elapsed(r.created_at, now)), n ? t('قارن واحجز') : '', () => router.push({ pathname: '/install/[id]', params: { id: r.id } }));
+            })}
             {groupsSorted.filter((g) => offersOf(g) > 0).map((g) => {
               const open = g.items.filter((r) => r.status === 'open'); const n = offersOf(g);
               return card(g.key, partsLabel(open), t('طلب {0} · {1}', reqNo(g.first.num), carLabel(g.first.car_make, g.first.car_model)), n > 1 ? t('{0} عروض', ar(n)) : t('عرض'), blue, t('من {0}', elapsed(g.first.created_at, now)), t('قارن العروض'), () => router.push(`/customer/${g.first.id}`));
@@ -96,8 +124,10 @@ export default function MyRequests() {
             })}
           </View>
         ) : <Empty icon="pricetags-outline" text={t('مفيش طلبات شغّالة دلوقتي.')} action={{ label: t('اطلب قطعة'), onPress: () => router.push('/customer/new') }} />
-      ) : finished.length || expired.length ? (
+      ) : finished.length || expired.length || pastBookings.length ? (
         <View style={{ gap: 10 }}>
+          {pastBookings.map((b) => card(b.id, t('حجز تركيب #{0}', ar(b.num)), whenLabel(b.appointment_at), BOOKING_STATUS[b.status].label, b.status === 'cancelled' ? red : grey,
+            b.rating ? t('قيّمت {0} ★', ar(b.rating)) : '', '', () => router.push({ pathname: '/booking/[id]', params: { id: b.id } })))}
           {finished.map((o) => {
             const ps = partsOf(o);
             return card(o.id, ps.length ? partsLabel(ps) : t('أوردر'), t('أوردر {0} · {1} ج.م', orderNo(o.order_no), money(Number(o.items_total) + Number(o.delivery_fee))),

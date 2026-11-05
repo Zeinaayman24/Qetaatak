@@ -1,3 +1,4 @@
+import { AppointmentPicker } from '@/components/Appointment';
 import { AddressPicker, addressProblem, rememberAddress, type AddressChoice } from '@/components/AddressPicker';
 import { ConfirmSheet, GuaranteeSheet } from '@/components/Confirm';
 import { PushPrompt } from '@/components/PushPrompt';
@@ -38,6 +39,8 @@ export default function PriceRequest() {
   const [tab, setTab] = useState<string | null>(null);
   const [sel, setSel] = useState<Record<string, string>>({}); // part id → quote id
   const [modes, setModes] = useState<Record<string, Mode>>({});
+  const [inst, setInst] = useState<Record<string, boolean>>({}); // shop id → install at the shop
+  const [instAt, setInstAt] = useState<Record<string, string>>({}); // shop id → appointment (ISO)
   const [step, setStep] = useState<Step>('offers'); // checkout is one page: handover, payment and the summary together
   const [sort, setSort] = useState<Sort>('best');
   const [pay, setPay] = useState<PayMethod>('cash');
@@ -125,7 +128,11 @@ export default function PriceRequest() {
   const groupOf = (sid: string) => chosen.filter((c) => c.quote.shop_id === sid);
   const canDeliver = (sid: string) => groupOf(sid).length > 0 && groupOf(sid).every((c) => d.fees[c.quote.id] != null);
   const feeOf = (sid: string) => Math.max(0, ...groupOf(sid).map((c) => d.fees[c.quote.id] ?? 0));
-  const modeOf = (sid: string): Mode => (!canDeliver(sid) ? 'pickup' : modes[sid] ?? 'delivery');
+  const canInstall = (sid: string) => groupOf(sid).some((c) => c.quote.install_available);
+  const installing = (sid: string) => canInstall(sid) && !!inst[sid];
+  const modeOf = (sid: string): Mode => (!canDeliver(sid) || installing(sid) ? 'pickup' : modes[sid] ?? 'delivery');
+  const installFeeOf = (sid: string) => installing(sid) ? groupOf(sid).filter((c) => c.quote.install_available).reduce((s, c) => s + Number(c.quote.install_fee ?? 0), 0) : 0;
+  const installInspect = (sid: string) => installing(sid) && groupOf(sid).some((c) => c.quote.install_available && c.quote.install_fee == null);
   const partsTotal = chosen.reduce((s, c) => s + c.quote.price * (c.part.qty || 1), 0);
   const deliveryTotal = byShop.filter((g) => modeOf(g[0].quote.shop_id) === 'delivery').reduce((s, g) => s + feeOf(g[0].quote.shop_id), 0);
   // pickup deposit (change 1.33): each pickup shop is reserved with a small deposit, the rest is paid at the counter
@@ -161,7 +168,10 @@ export default function PriceRequest() {
   async function accept() {
     setBusy(true);
     const { data: made, error } = await supabase.rpc('place_order', {
-      p_choices: chosen.map((c) => ({ request: c.part.id, quote: c.quote.id, mode: modeOf(c.quote.shop_id) })), p_payment: method,
+      p_choices: chosen.map((c) => {
+        const sid = c.quote.shop_id, withI = installing(sid) && !!c.quote.install_available;
+        return { request: c.part.id, quote: c.quote.id, mode: modeOf(sid), install: withI, install_at: withI ? instAt[sid] : null };
+      }), p_payment: method,
       p_address: !allPickup && addr ? addr.address : null,
     });
     if (error) {
@@ -300,7 +310,9 @@ export default function PriceRequest() {
   if (step === 'checkout' && chosen.length) {
     const grand = partsTotal + deliveryTotal;
     const shopName = (sid: string) => d.cards[sid]?.name ?? t('المحل');
+    const installTotal = byShop.reduce((s, g) => s + installFeeOf(g[0].quote.shop_id), 0);
     const confirm = () => {
+      if (byShop.some((g) => installing(g[0].quote.shop_id) && !instAt[g[0].quote.shop_id])) return toast(t('اختار معاد التركيب.'));
       if (!allPickup) { const bad = addressProblem(addr); if (bad) return toast(bad); }
       accept();
     };
@@ -322,7 +334,20 @@ export default function PriceRequest() {
             return (
               <View key={sid} style={{ gap: 8 }}>
                 {byShop.length > 1 ? <ShopLine name={shopName(sid)} card={d.cards[sid]} sub={[`${ar(g.length)} ${g.length > 1 ? t('قطع') : t('قطعة')}`, shop?.area].filter(Boolean).join(' · ')} /> : null}
-                <Seg options={opts} value={modeOf(sid)} onPick={(v) => setModes((m) => ({ ...m, [sid]: v }))} />
+                {canInstall(sid) ? (
+                  <View style={{ gap: 8 }}>
+                    <Seg options={[{ v: 'no', label: t('القطعة بس') }, { v: 'yes', label: t('مع التركيب في المحل') }]} value={installing(sid) ? 'yes' : 'no'}
+                      onPick={(v) => setInst((m) => ({ ...m, [sid]: v === 'yes' }))} />
+                    {installing(sid) ? (
+                      <View style={{ gap: 8, backgroundColor: colors.primarySoft, borderRadius: 14, padding: 12 }}>
+                        <T w="semibold" size={14}>{t('معاد التركيب')}</T>
+                        <AppointmentPicker hours={shop?.hours} value={instAt[sid] ?? ''} onPick={(v) => setInstAt((m) => ({ ...m, [sid]: v }))} />
+                        <Muted size={12.5}>{installInspect(sid) ? t('سعر التركيب هيتحدد في المحل بعد المعاينة، وبيتدفع هناك.') : t('سعر التركيب {0} ج.م، وبيتدفع في المحل.', money(installFeeOf(sid)))}</Muted>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+                {!installing(sid) ? <Seg options={opts} value={modeOf(sid)} onPick={(v) => setModes((m) => ({ ...m, [sid]: v }))} /> : null}
                 {!canDeliver(sid) ? <Muted size={12.5}>{!shop?.offers_delivery ? t('المحل ده مش بيوصّل') : g.length > 1 && g.some((c) => d.fees[c.quote.id] != null) ? t('قطعة من دول استلام من المحل بس') : t('المحل مش بيوصّل لمنطقتك')}</Muted>
                   : modeOf(sid) === 'pickup' ? <Muted size={12.5}>{depositOf(sid) ? t('اسم المحل ورقمه وعنوانه هيظهروا بعد دفع العربون.') : t('عنوان المحل ومواعيده هيظهروا بعد التأكيد.')}</Muted> : null}
               </View>
@@ -371,9 +396,12 @@ export default function PriceRequest() {
               );
             })}
             <View style={{ padding: 16, gap: 8, borderTopWidth: 1, borderColor: '#EEF0F3' }}>
-              <Lines rows={[[t('التوصيل'), deliveryTotal ? money(deliveryTotal) + t(' ج.م') : t('مجاناً')]]} total={[t('الإجمالي'), money(grand) + t(' ج.م')]} />
+              <Lines rows={[[t('القطع'), money(partsTotal) + t(' ج.م')], [t('التوصيل'), deliveryTotal ? money(deliveryTotal) + t(' ج.م') : t('مجاناً')]]} total={[t('الإجمالي'), money(grand) + t(' ج.م')]} />
               {depositTotal > 0 ? (
                 <Lines rows={[[t('العربون دلوقتي (لضغطة)'), money(depositTotal) + t(' ج.م')]]} total={[t('الباقي وانت بتستلم'), money(grand - depositTotal) + t(' ج.م')]} />
+                ) : null}
+              {byShop.some((g) => installing(g[0].quote.shop_id)) ? (
+                <Lines rows={[[t('التركيب (بيتدفع في المحل)'), installTotal ? money(installTotal) + t(' ج.م') + (byShop.some((g) => installInspect(g[0].quote.shop_id)) ? t(' + بعد المعاينة') : '') : t('بعد المعاينة')]]} />
               ) : null}
             </View>
           </View>
@@ -459,7 +487,8 @@ function OfferRow({ q, card, fee, on, cheapest, featured, expired, now, qty, onP
   q: Quote; shop?: Shop; card?: ShopCard; fee?: number | null; on: boolean; cheapest: boolean; featured: boolean; expired: boolean; now: number; qty: number;
   onPick: () => void; onChat: () => void;
 }) {
-  const tags = [[q.brand, CONDITIONS[q.condition]].filter(Boolean).join(' · '), warrantyLabel(q.warranty_days), fee != null ? t('توصيل {0} ج.م', money(fee)) : t('استلام من المحل بس')];
+  const tags = [[q.brand, CONDITIONS[q.condition]].filter(Boolean).join(' · '), warrantyLabel(q.warranty_days), fee != null ? t('توصيل {0} ج.م', money(fee)) : t('استلام من المحل بس'),
+    q.install_available ? (q.install_fee != null ? t('+ تركيب {0} ج.م', money(q.install_fee)) : t('تركيب متاح · السعر بعد المعاينة')) : ''];
   const left = new Date(q.expires_at).getTime() - now;
   const soon = !expired && left < 6 * 3600000;
   const leftText = left >= 3600000 ? t('{0} ساعة', ar(Math.floor(left / 3600000))) : t('{0} دقيقة', ar(Math.max(1, Math.ceil(left / 60000))));

@@ -1,3 +1,4 @@
+import { InstallBox } from '@/components/InstallBox';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Linking, View } from 'react-native';
@@ -205,6 +206,7 @@ export default function OrderPage() {
         )}
       </Card>
 
+      <InstallBox o={o} />
       {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
 
       {warrantyEnd ? (

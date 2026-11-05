@@ -11,6 +11,8 @@ import { MERCHANT_VERSION } from '@/lib/legal';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
+import { MAP_AVAILABLE, ShopMap } from '@/components/ShopMap';
+import { CAIRO, inEgypt } from '@/lib/shops';
 
 /** The five sign-up steps (Product Register B01, B02, B13, B14, B23). Each step is saved on «التالي». */
 const STEPS = ['المحل', 'المكان والمواعيد', 'الشغل والتوصيل', 'الدفع', 'المستندات والاتفاقية'];
@@ -35,7 +37,8 @@ export default function ShopSetup() {
   const params = useLocalSearchParams<{ step?: string }>();
   const [step, setStep] = useState(() => Math.min(4, Math.max(0, parseInt(String(params.step ?? '0'), 10) || 0)));
   const [f, setF] = useState({
-    name: '', owner: '', phone2: '', photo: null as string | null, photoPath: null as string | null,
+    name: '', owner: '', phone2: '', photo: null as string | null, photoPath: null as string | null, about: '', photos: [] as string[],
+    sells: true, installs: false,
     governorate: 'القاهرة', area: '', street: '', building: '', landmark: '', lat: null as number | null, lng: null as number | null,
     hours: { open: '10:00', close: '22:00', off: [5] } as ShopHours,
     type: 'used' as 'used' | 'new' | 'both', specialties: [] as string[], brands: [] as string[], delivery: false, feeArea: '', feeCity: '', feeFar: '',
@@ -60,7 +63,7 @@ export default function ShopSetup() {
       ...(shop ? {
         governorate: shop.governorate || 'القاهرة', area: shop.area, type: shop.shop_type || 'used', specialties: shop.specialties || [],
         brands: shop.brands, delivery: !!shop.offers_delivery, lat: shop.lat ?? null, lng: shop.lng ?? null, photoPath: shop.photo_path ?? null,
-        hours: shop.hours ?? x.hours, agreed: shop.agreement_version === MERCHANT_VERSION,
+        hours: shop.hours ?? x.hours, about: shop.about ?? '', photos: shop.photos ?? [], sells: shop.sells ?? true, installs: !!shop.installs, agreed: shop.agreement_version === MERCHANT_VERSION,
         feeArea: shop.fee_area != null ? String(Number(shop.fee_area)) : '', feeCity: shop.fee_city != null ? String(Number(shop.fee_city)) : '', feeFar: shop.fee_far != null ? String(Number(shop.fee_far)) : '',
       } : {}),
     }));
@@ -78,14 +81,16 @@ export default function ShopSetup() {
       if (!f.name.trim()) return 'اكتب اسم المحل.';
       if (f.owner.trim().split(/\s+/).length < 2) return 'اكتب اسم صاحب المحل بالكامل.';
       if (f.phone2.trim() && !validPhone(toLatin(f.phone2))) return 'الرقم التاني لازم يكون ١١ رقم ويبدأ بـ٠١.';
+      if (f.about.length > 600) return 'النبذة طويلة. خليها أقل من ٦٠٠ حرف.';
     }
     if (i === 1) {
       if (!f.area.trim() || !f.street.trim()) return 'اكتب المنطقة والشارع.';
       if (f.lat == null) return 'حدّد المحل على الخريطة.';
     }
     if (i === 2) {
-      if (!f.specialties.length) return 'اختار تخصص واحد على الأقل.';
-      if (!f.brands.length) return 'اختار ماركة واحدة على الأقل.';
+      if (!f.sells && !f.installs) return 'اختار بتبيع قطع ولا بتركّب ولا الاتنين.';
+      if (f.sells && !f.specialties.length) return 'اختار تخصص واحد على الأقل.';
+      if (f.sells && !f.brands.length) return 'اختار ماركة واحدة على الأقل.';
       if (f.delivery && (!f.feeArea.trim() || !f.feeCity.trim())) return 'اكتب سعر التوصيل لنفس المنطقة ونفس المحافظة.';
     }
     if (i === 3 && (f.instapay.trim() || f.wallet.trim()) && !f.payoutName.trim()) return 'اكتب اسم صاحب حساب التحويل.';
@@ -112,7 +117,7 @@ export default function ShopSetup() {
     if (i === 0) {
       let photo_path = f.photoPath;
       if (f.photo) { photo_path = await uploadPhoto(f.photo, uid); setF((x) => ({ ...x, photo: null, photoPath: photo_path })); }
-      pub = { photo_path };
+      pub = { photo_path, about: f.about.trim(), photos: f.photos };
       priv = { name: f.name.trim(), owner_name: f.owner.trim(), phone: profile!.phone || '', phone2: toLatin(f.phone2).replace(/\s/g, '') };
     }
     if (i === 1) {
@@ -120,7 +125,7 @@ export default function ShopSetup() {
       priv = { street: f.street.trim(), building: f.building.trim(), landmark: f.landmark.trim() };
     }
     if (i === 2) {
-      pub = { shop_type: f.type, specialties: f.specialties, brands: f.brands, offers_delivery: f.delivery,
+      pub = { sells: f.sells, installs: f.installs, shop_type: f.type, specialties: f.specialties, brands: f.brands, offers_delivery: f.delivery,
         fee_area: f.delivery ? fee(f.feeArea) : null, fee_city: f.delivery ? fee(f.feeCity) : null, fee_far: f.delivery ? fee(f.feeFar) : null };
     }
     if (i === 3) priv = { instapay_address: f.instapay.trim(), wallet_number: toLatin(f.wallet).replace(/\s/g, ''), payout_name: f.payoutName.trim() };
@@ -168,6 +173,17 @@ export default function ShopSetup() {
       if (lat < 21 || lat > 32.5 || lng < 24 || lng > 37.5) toast('المكان ده بره مصر. جرّب تاني وانت في المحل.');
       else setF((x) => ({ ...x, lat, lng }));
     } catch { toast('ماقدرناش نعرف مكانك. جرّب تاني وانت في المحل.'); }
+    setBusy(null);
+  }
+
+  async function addPhoto() {
+    try {
+      const uri = await pickPhoto();
+      if (!uri) return;
+      setBusy('photos');
+      const path = await uploadPhoto(uri, uid);
+      setF((x) => ({ ...x, photos: [...x.photos, path].slice(0, 8) }));
+    } catch { toast('الصورة دي مش مدعومة. اختار صورة JPG أو PNG.'); }
     setBusy(null);
   }
 
@@ -233,6 +249,24 @@ export default function ShopSetup() {
             )}
             <T size={14} w="medium" style={{ flex: 1 }}>{f.photo || f.photoPath ? 'الصورة اتضافت · تغيير' : 'صورة واجهة المحل أو اللوجو'}</T>
           </Press>
+          <Field label="نبذة عن المحل (اختياري)" value={f.about} onChangeText={set('about')} multiline
+            placeholder="مثلاً: متخصصين في قطع هيونداي وكيا من ٢٠ سنة، وعندنا ورشة تركيب جنب المحل." hint={`${ar(f.about.length)} / ٦٠٠ · بتظهر للعملاء في صفحة المحل`} />
+          <Labeled label={`صور المحل من جوه وبره (اختياري، لحد ${ar(8)} صور)`}>
+            <Row gap={8} style={{ flexWrap: 'wrap' }}>
+              {f.photos.map((p) => (
+                <Press key={p} onPress={() => set('photos')(f.photos.filter((x) => x !== p))} label="شيل الصورة">
+                  <Image source={{ uri: photoUrl(p)! }} style={{ width: 76, height: 76, borderRadius: 12 }} />
+                  <View style={{ position: 'absolute', top: 4, left: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(4,29,63,.75)', alignItems: 'center', justifyContent: 'center' }}><Icon name="close" size={14} color="#fff" /></View>
+                </Press>
+              ))}
+              {f.photos.length < 8 ? (
+                <Press onPress={addPhoto} label="أضف صورة"
+                  style={{ width: 76, height: 76, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.line, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={busy === 'photos' ? 'hourglass-outline' : 'add'} size={24} color={colors.muted} />
+                </Press>
+              ) : null}
+            </Row>
+          </Labeled>
         </View>
       ) : step === 1 ? (
         <View style={{ gap: 14 }}>
@@ -251,6 +285,14 @@ export default function ShopSetup() {
               </Row>
             ) : null}
             <Btn kind="secondary" icon="locate" title="استخدم مكاني الحالي" loading={busy === 'map'} onPress={locate} />
+            {MAP_AVAILABLE ? (
+              <View style={{ gap: 6 }}>
+                <Muted size={12.5}>أو دوس على مكان المحل على الخريطة. قرّب الخريطة الأول عشان المكان يبقى مظبوط.</Muted>
+                <ShopMap center={f.lat != null && f.lng != null ? { lat: f.lat, lng: f.lng } : CAIRO} zoom={f.lat != null ? 16 : 11} height={260}
+                  pins={f.lat != null && f.lng != null ? [{ id: 'me', lat: f.lat, lng: f.lng, title: f.name || 'المحل' }] : []} selected="me"
+                  onTap={(p) => { if (inEgypt(p)) setF((x) => ({ ...x, lat: p.lat, lng: p.lng })); else toast('المكان ده بره مصر.'); }} />
+              </View>
+            ) : null}
           </Labeled>
           <Labeled label="مواعيد العمل">
             <Row gap={10}>
@@ -267,11 +309,20 @@ export default function ShopSetup() {
         </View>
       ) : step === 2 ? (
         <View style={{ gap: 18 }}>
+          <Labeled label="المحل بيقدّم إيه؟">
+            <Chips options={[{ v: 'sells', label: 'بيع قطع غيار', icon: 'pricetag-outline' }, { v: 'installs', label: 'تركيب قطع غيار', icon: 'construct-outline' }]}
+              selected={[f.sells ? 'sells' : '', f.installs ? 'installs' : ''].filter(Boolean)}
+              onPick={(v) => setF((x) => ({ ...x, [v]: !x[v as 'sells' | 'installs'] }))} />
+            <Muted size={12.5}>تقدر تختار الاتنين. محلات التركيب بيوصلها طلبات تركيب من العملاء اللي معاهم القطعة.</Muted>
+            {f.installs && shop ? <Btn kind="link" title="حدّد خدمات التركيب وأسعارها" onPress={() => router.push('/shop/services')} /> : null}
+          </Labeled>
+          {f.sells ? (<>
           <Labeled label="نوع القطع">
             <Seg options={Object.entries(SHOP_TYPES).map(([v, label]) => ({ v: v as 'used' | 'new' | 'both', label }))} value={f.type} onPick={set('type')} />
           </Labeled>
           <Labeled label="التخصص"><Chips options={SPECIALTIES.map((s) => ({ v: s, label: s }))} selected={f.specialties} onPick={toggle('specialties')} /></Labeled>
           <Labeled label="الماركات اللي بتشتغل فيها"><Chips options={MAKES.map((m) => ({ v: m, label: m }))} selected={f.brands} onPick={toggle('brands')} /></Labeled>
+          </>) : null}
           <Labeled label="التوصيل">
             <Seg options={[{ v: 'yes', label: 'بنوصّل' }, { v: 'no', label: 'استلام من المحل بس' }]} value={f.delivery ? 'yes' : 'no'} onPick={(v) => set('delivery')(v === 'yes')} />
             {f.delivery ? (

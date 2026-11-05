@@ -4,6 +4,7 @@ import Deposits from './pages/Deposits';
 import Ads from './pages/Ads';
 import SpeedPage from './pages/Speed';
 import Cars from './pages/Cars';
+import Install from './pages/Install';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { HashRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
@@ -102,6 +103,7 @@ function Shell({ me, role }: { me: Profile; role: Role }) {
               <Nav to="/deposits" icon="card" label="العربون" badge={data.orders.filter((o) => ['review', 'refund_due', 'disputed'].includes(o.deposit_status ?? '')).length} />
               <Nav to="/reports-chat" icon="flag" label="البلاغات" />
               <Nav to="/ads" icon="megaphone" label="الإعلانات" />
+              <Nav to="/install" icon="wrench" label="التركيب" />
               <Nav to="/cars" icon="car" label="العربيات" />
               <Nav to="/reports" icon="chart" label="التقارير" />
               {role === 'admin' ? <Nav to="/staff" icon="shield" label="فريق العمل" /> : null}
@@ -130,6 +132,8 @@ function Shell({ me, role }: { me: Profile; role: Role }) {
               <Route path="/payments" element={<Payments />} />
               <Route path="/deposits" element={<Deposits />} />
               <Route path="/ads" element={<Ads />} />
+              <Route path="/install" element={<Install />} />
+              <Route path="/bookings/:id" element={<Install />} />
               <Route path="/cars" element={<Cars />} />
               <Route path="/speed" element={<SpeedPage />} />
               <Route path="/staff" element={role === 'admin' ? <Staff /> : <Navigate to="/" />} />
@@ -163,6 +167,7 @@ const GLYPHS: Record<string, string> = {
   card: 'M3 6h18v12H3z M3 10h18 M7 15h4',
   clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2',
   megaphone: 'M3 10v4h3l7 5V5L6 10z M16 8.5a5 5 0 0 1 0 7 M18.5 6a8.5 8.5 0 0 1 0 12',
+  wrench: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z',
   car: 'M5 17h14M6 17l1.5-6h9L18 17M7 17v2M17 17v2M8 14h.01M16 14h.01',
   flag: 'M5 21V4 M5 4h11l-2 4 2 4H5',
   chart: 'M4 20V10 M10 20V4 M16 20v-7 M3 20h18',

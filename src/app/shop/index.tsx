@@ -15,8 +15,12 @@ import { WANTED, ar, elapsed, minutesSince, money, orderActive, partsLabel, reqN
 import { must, useLive, useNow } from '@/lib/live';
 import { supabase } from '@/lib/supabase';
 import { colors, fonts, lift } from '@/lib/theme';
+import { whenLabel } from '@/components/Appointment';
+import { BOOKING_STATUS, type Booking } from '@/components/BookingView';
+import type { InstallRequest } from '@/lib/install';
+import { serviceName, useInstallServices } from '@/lib/shops';
 
-type Tab = 'open' | 'quoted' | 'preparing' | 'ready' | 'done';
+type Tab = 'open' | 'quoted' | 'preparing' | 'ready' | 'done' | 'install';
 const SLOW_MIN = 15; // after this, an unanswered request turns red
 
 export default function ShopInbox() {
@@ -32,13 +36,21 @@ export default function ShopInbox() {
   useEffect(() => { rememberRole('shop'); }, []);
 
   const { data, loading } = useLive(async () => {
-    if (!uid) return { reqs: [] as Request[], mine: [] as Quote[], declined: new Set<string>(), orders: [] as Order[] };
+    if (!uid) return { reqs: [] as Request[], mine: [] as Quote[], declined: new Set<string>(), orders: [] as Order[], ireqs: [] as InstallRequest[], iquoted: new Set<string>(), bookings: [] as Booking[] };
+    const [ir, iq, bk] = await Promise.all([
+      supabase.from('install_requests').select('*').order('created_at', { ascending: false }).limit(100),
+      supabase.from('install_quotes').select('request_id').eq('shop_id', uid),
+      supabase.from('bookings').select('*').eq('shop_id', uid).order('appointment_at', { ascending: true }).limit(100),
+    ]);
+    const ireqs = ((ir.data ?? []) as InstallRequest[]).filter((x) => x.customer_id !== uid);
+    const iquoted = new Set(((iq.data ?? []) as { request_id: string }[]).map((x) => x.request_id));
+    const bookings = (bk.data ?? []) as Booking[];
     const reqs = must(await supabase.from('requests').select('*').order('created_at', { ascending: false }).limit(200)) as Request[];
     const mine = must(await supabase.from('quotes').select('*').eq('shop_id', uid)) as Quote[];
     const dec = must(await supabase.from('declines').select('request_id').eq('shop_id', uid)) as { request_id: string }[];
     const orders = must(await supabase.from('orders').select('*').eq('shop_id', uid).order('created_at', { ascending: false }).limit(100)) as Order[];
-    return { reqs, mine, declined: new Set(dec.map((d) => d.request_id)), orders };
-  }, ['requests', 'quotes', 'orders'], [uid, shop?.status], { pollMs: 20000 });
+    return { reqs, mine, declined: new Set(dec.map((d) => d.request_id)), orders, ireqs, iquoted, bookings };
+  }, ['requests', 'quotes', 'orders', 'install_requests', 'install_quotes', 'bookings'], [uid, shop?.status], { pollMs: 20000 });
 
   if (ready && !session) return <Redirect href="/login" />;
   if (profile && (!shop || shop.status === 'draft' || shop.status === 'changes')) return <Redirect href="/shop-setup" />;
@@ -77,6 +89,12 @@ export default function ShopInbox() {
   }
   const waiting = rows.filter((x) => x.st === 'open').length;
   const inTab = (b: Bucket) => orders.filter((o) => bucketOf(o) === b);
+  const sells = shop.sells !== false, installs = !!shop.installs;
+  const curTab: Tab = !sells ? 'install' : tab;
+  const liveBookings = (data?.bookings ?? []).filter((b) => ['pending', 'confirmed', 'in_progress', 'ready', 'disputed'].includes(b.status));
+  const newInstalls = (data?.ireqs ?? []).filter((x) => x.status === 'open' && !data!.iquoted.has(x.id));
+  const quotedInstalls = (data?.ireqs ?? []).filter((x) => x.status === 'open' && data!.iquoted.has(x.id));
+  const installHot = newInstalls.length + liveBookings.filter((b) => b.status === 'pending').length;
   const isOrders = tab === 'preparing' || tab === 'ready' || tab === 'done';
   const groups = groupShown(shown).filter((g) => g.some((x) => x.st === tab));
 
@@ -133,15 +151,19 @@ export default function ShopInbox() {
           <Row style={{ justifyContent: 'space-between' }}><Muted size={13}>فاضل {left(o.refund_due_at ?? o.updated_at, 48)}</Muted><T w="semibold" size={13.5} color={colors.primary}>سجّل الاسترجاع</T></Row>
         </Press>
       ))}
-      <StatusTabs<Tab> value={tab} onPick={setTab} items={[
+      <StatusTabs<Tab> value={curTab} onPick={setTab} items={([
         { v: 'open', label: 'جديد', n: waiting, hot: waiting > 0 },
         { v: 'quoted', label: 'عروضي', n: rows.filter((x) => x.st === 'quoted').length },
         { v: 'preparing', label: 'بيتجهّز', n: inTab('preparing').length, hot: inTab('preparing').length > 0 },
         { v: 'ready', label: 'جاهز', n: inTab('ready').length },
         { v: 'done', label: 'السابقة' },
-      ]} />
+        ...(installs ? [{ v: 'install' as Tab, label: 'التركيب', n: installHot, hot: installHot > 0 }] : []),
+      ] as { v: Tab; label: string; n?: number; hot?: boolean }[]).filter((x) => sells || x.v === 'install')} />
       </View>
-      {!isOrders ? <Row gap={8}>
+      {curTab === 'install' ? (
+        <InstallInbox newOnes={newInstalls} quoted={quotedInstalls} bookings={liveBookings} past={(data?.bookings ?? []).filter((b) => b.status === 'done' || b.status === 'cancelled')} now={now} />
+      ) : null}
+      {curTab !== 'install' && !isOrders ? <Row gap={8}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: 16, paddingHorizontal: 12, borderWidth: 1.5, borderColor: colors.line }}>
           <Icon name="search" size={18} color={colors.muted} />
           <TextInput value={q} onChangeText={setQ} placeholder="دوّر: فانوس، سنترا…" placeholderTextColor={colors.faint}
@@ -153,7 +175,7 @@ export default function ShopInbox() {
           {activeFilters ? <T size={13} w="bold" color="#fff">{ar(activeFilters)}</T> : null}
         </Pressable>
       </Row> : null}
-      {showFilters && !isOrders ? (
+      {curTab === 'install' ? null : showFilters && !isOrders ? (
         <View style={[{ gap: 14, backgroundColor: colors.surface, borderRadius: 20, padding: 14 }, lift]}>
           <Labeled label="العميل عايزها">
             <Seg options={[{ v: 'all', label: 'الكل' }, { v: 'used', label: 'مستعمل' }, { v: 'new', label: 'جديد' }] as { v: 'all' | 'used' | 'new'; label: string }[]} value={cond} onPick={setCond} />
@@ -162,7 +184,7 @@ export default function ShopInbox() {
           {activeFilters ? <Btn kind="link" title="امسح الفلاتر" onPress={() => { setCond('all'); setArea('الكل'); }} /> : null}
         </View>
       ) : null}
-      {isOrders ? (
+      {curTab === 'install' ? null : isOrders ? (
         inTab(tab).length ? (
           <RowList>
             {inTab(tab).map((o, i) => {
@@ -207,9 +229,66 @@ export default function ShopInbox() {
           })}
         </RowList>
       ) : <Empty icon="file-tray-outline" text={shop.status !== 'approved' ? 'الطلبات هتظهر هنا بعد الموافقة على المحل.' : tab === 'open' ? 'مفيش طلبات جديدة دلوقتي. أول ما عميل يبعت طلب هيظهر هنا وهيوصلك إشعار.' : 'لسه مابعتش عروض.'} />}
-      {tab === 'open' && waiting ? <Muted center size={12}>العميل بيشوف إنت بترد في قد إيه. المحلات اللي بترد بسرعة بتبيع أكتر.</Muted> : null}
+      {curTab === 'open' && waiting ? <Muted center size={12}>العميل بيشوف إنت بترد في قد إيه. المحلات اللي بترد بسرعة بتبيع أكتر.</Muted> : null}
       <InstallCard />
     </Screen>
+  );
+}
+
+/** The shop's installation work: bookings coming up, new requests to price, and requests already priced. */
+function InstallInbox({ newOnes, quoted, bookings, past, now }: { newOnes: InstallRequest[]; quoted: InstallRequest[]; bookings: Booking[]; past: Booking[]; now: number }) {
+  const services = useInstallServices(true);
+  const name = (id: string) => serviceName(services.find((s) => s.id === id)) || 'تركيب';
+  const reqRow = (r: InstallRequest, i: number, priced: boolean) => (
+    <Press key={r.id} onPress={() => router.push(`/shop/install/${r.id}`)} label={name(r.service_id)}
+      style={{ paddingHorizontal: 14, paddingVertical: 13, gap: 3, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
+      <Row gap={8}>
+        <T w="bold" size={15} style={{ flex: 1 }} numberOfLines={1}>{name(r.service_id)}</T>
+        {priced ? <Pill label="بعت سعر" tone="plain" /> : <T w="bold" size={12.5}>من {elapsed(r.created_at, now)}</T>}
+      </Row>
+      <Muted size={12.5} numberOfLines={1}>{[r.car_make, r.car_model, r.car_year ? ar(r.car_year) : ''].filter(Boolean).join(' ')} · {r.part_desc} · {r.area}</Muted>
+    </Press>
+  );
+  return (
+    <View style={{ gap: 14 }}>
+      <Btn kind="link" title="خدمات التركيب وأسعارها" onPress={() => router.push('/shop/services')} />
+      {bookings.length ? (
+        <View style={{ gap: 8 }}>
+          <T w="bold" size={16}>الحجوزات</T>
+          <RowList>
+            {bookings.map((b, i) => (
+              <Press key={b.id} onPress={() => router.push(`/shop/booking/${b.id}`)} label={`حجز ${b.num}`}
+                style={{ paddingHorizontal: 14, paddingVertical: 13, flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
+                <View style={{ flex: 1 }}>
+                  <T w="bold" size={15}>{whenLabel(b.appointment_at)}</T>
+                  <Muted size={12.5}>حجز #{ar(b.num)}{b.price != null ? ` · ${money(Number(b.price))} ج.م` : ' · بعد المعاينة'}</Muted>
+                </View>
+                <Pill label={BOOKING_STATUS[b.status].label} tone={BOOKING_STATUS[b.status].tone} />
+              </Press>
+            ))}
+          </RowList>
+        </View>
+      ) : null}
+      <View style={{ gap: 8 }}>
+        <T w="bold" size={16}>طلبات تركيب جديدة</T>
+        {newOnes.length ? <RowList>{newOnes.map((r, i) => reqRow(r, i, false))}</RowList>
+          : <Empty icon="construct-outline" text="مفيش طلبات تركيب جديدة دلوقتي. أول ما عميل يطلب تركيب في محافظتك هيوصلك إشعار." />}
+      </View>
+      {quoted.length ? <View style={{ gap: 8 }}><T w="bold" size={16}>بعتّ سعرك</T><RowList>{quoted.map((r, i) => reqRow(r, i, true))}</RowList></View> : null}
+      {past.length ? (
+        <View style={{ gap: 8 }}>
+          <T w="bold" size={16}>حجوزات سابقة</T>
+          <RowList>
+            {past.slice(0, 10).map((b, i) => (
+              <Press key={b.id} onPress={() => router.push(`/shop/booking/${b.id}`)} style={{ paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', gap: 10, borderTopWidth: i ? 1 : 0, borderColor: colors.line }}>
+                <T size={14} style={{ flex: 1 }}>حجز #{ar(b.num)} · {whenLabel(b.appointment_at)}</T>
+                <Pill label={BOOKING_STATUS[b.status].label} tone={BOOKING_STATUS[b.status].tone} />
+              </Press>
+            ))}
+          </RowList>
+        </View>
+      ) : null}
+    </View>
   );
 }
 

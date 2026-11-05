@@ -7,6 +7,7 @@ import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labe
 import { ptLabel } from '@/lib/catalogue';
 import { useAuth } from '@/lib/auth';
 import { CONDITIONS, OFFER_CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel, elapsed, minutesSince } from '@/lib/data';
+import { toLatin } from '@/lib/data';
 import { must, useLive, useNow } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -26,6 +27,8 @@ export default function ShopRequest() {
   const [deliverable, setDeliverable] = useState(true);
   const [partFee, setPartFee] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
+  const [install, setInstall] = useState<'no' | 'fee' | 'inspect'>('no');
+  const [installFee, setInstallFee] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ask, setAsk] = useState(false);
@@ -85,6 +88,8 @@ export default function ShopRequest() {
   async function send() {
     setErr(null);
     if (!p || p < 1) return setErr('اكتب السعر بالجنيه.');
+    const inf = parseFloat(toLatin(installFee).trim());
+    if (install === 'fee' && (isNaN(inf) || inf < 0)) return setErr('اكتب سعر التركيب بالجنيه، أو اختار «بعد المعاينة».');
     if (hasWarranty && (wd < 1 || wd > MAX_WARRANTY_DAYS)) return setErr(`اكتب عدد أيام الضمان (من ١ لـ ${ar(MAX_WARRANTY_DAYS)} يوم).`);
     setBusy(true);
     try {
@@ -92,9 +97,11 @@ export default function ShopRequest() {
       const { error } = await supabase.from('quotes').insert({
         request_id: r!.id, shop_id: uid, price: p, condition: cond, warranty_days: hasWarranty ? wd : 0, photo_path, brand: brand.trim(), note: note.trim(),
         can_deliver: shopDelivers && deliverable, delivery_fee: shopDelivers && deliverable && pf != null && !isNaN(pf) ? pf : null,
+        install_available: !!shop?.installs && install !== 'no', install_fee: shop?.installs && install === 'fee' ? inf : null,
+        install_needs_inspection: !!shop?.installs && install === 'inspect',
       });
       if (error) throw error;
-      setPrice(''); setPhoto(null); setBrand(''); setNote(''); setPartFee(''); setAdding(false);
+      setPrice(''); setPhoto(null); setBrand(''); setNote(''); setPartFee(''); setInstall('no'); setInstallFee(''); setAdding(false);
       const next = !offers.length ? data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open') : undefined;
       if (next) { toast('العرض اتبعت، كمّل القطعة اللي بعدها.'); router.replace(`/shop/${next.r.id}`); }
       else { toast('العرض اتبعت للعميل'); reload(); }
@@ -127,6 +134,7 @@ export default function ShopRequest() {
       <Row gap={6} style={{ flexWrap: 'wrap' }}>
         <Pill label={CONDITIONS[q.condition]} /><Pill label={warrantyLabel(q.warranty_days)} tone={q.warranty_days ? 'good' : 'plain'} />
         <Pill label={!q.can_deliver ? 'استلام من المحل بس' : q.delivery_fee != null ? `توصيل ${money(q.delivery_fee)} ج.م` : 'توصيل حسب المنطقة'} icon={q.can_deliver ? 'bicycle' : 'walk'} />
+        {q.install_available ? <Pill label={q.install_fee != null ? `تركيب ${money(q.install_fee)} ج.م` : 'تركيب بعد المعاينة'} icon="construct" tone="new" /> : null}
         {r.chosen_quote_id === q.id ? <Pill label="العميل اختاره" tone="good" icon="checkmark" /> : null}
         {r.status === 'open' && r.chosen_quote_id !== q.id ? (expiresIn(q) ? <Pill label={`بينتهي بعد ${expiresIn(q)}`} tone="wait" icon="time" /> : <Pill label="العرض ده انتهى" tone="plain" />) : null}
       </Row>
@@ -178,6 +186,13 @@ export default function ShopRequest() {
             </>
           ) : <Muted size={12.5}>محلك مش بيوصّل، فالعميل هيستلم من المحل. تقدر تفعّل التوصيل وأسعاره من بيانات المحل.</Muted>}
         </Labeled>
+        {shop?.installs ? (
+          <Labeled label="تركيب القطعة في المحل">
+            <Seg options={[{ v: 'no', label: 'من غير تركيب' }, { v: 'fee', label: 'بسعر ثابت' }, { v: 'inspect', label: 'بعد المعاينة' }]} value={install} onPick={setInstall} />
+            {install === 'fee' ? <Field value={installFee} onChangeText={setInstallFee} keyboardType="number-pad" ltr icon="construct" placeholder="سعر التركيب (جنيه)" /> : null}
+            {install !== 'no' ? <Muted size={12}>العميل هيشوف سعر القطعة وسعر التركيب منفصلين، والتركيب بيتدفع في المحل.</Muted> : null}
+          </Labeled>
+        ) : null}
         <Field label="ملاحظة للعميل (اختياري)" value={note} onChangeText={setNote} placeholder="مثلاً: فرز أول، متجربة على العربية" multiline />
         <Labeled label="صوّر القطعة نفسها (مش صورة من النت)">
           <PhotoPicker uri={photo} onPick={choosePhoto} hint="العروض اللي فيها صورة بتتباع أكتر، والعميل بيقارن بيها وهو بيستلم." />

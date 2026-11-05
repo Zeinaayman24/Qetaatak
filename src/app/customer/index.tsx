@@ -28,6 +28,14 @@ const CATEGORIES: { key: string; label: string; part: string; icon: string }[] =
   { key: 'صاج', label: t('صاج'), part: 'رفرف', icon: 'car-door' },
 ];
 
+/** The four main services on the home screen. */
+const SERVICES = [
+  { href: '/customer/new', title: t('قطع غيار'), sub: t('اطلب قطعة وقارن عروض المحلات'), icon: 'car-cog' },
+  { href: '/install/new', title: t('تركيب قطع الغيار'), sub: t('معاك القطعة؟ محل قريب يركّبها'), icon: 'wrench' },
+  { href: '/shops', title: t('محلات قريبة منك'), sub: t('شوف المحلات على الخريطة'), icon: 'map-marker-radius' },
+  { href: '/cars', title: t('عربيتك'), sub: t('عربياتك وبياناتها'), icon: 'car-side' },
+];
+
 const EV_CATEGORY = { key: 'كهربا وهايبرد', label: t('كهربا وهايبرد'), part: 'بطارية الجهد العالي', icon: 'car-electric' };
 
 export default function CustomerHome() {
@@ -104,6 +112,22 @@ export default function CustomerHome() {
 
   return (
     <Screen top={hero} topColor={colors.ink} nav={<BottomNav role="customer" />}>
+      {/* the four things ضغطة does */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {SERVICES.map((x) => (
+          <Press key={x.href} onPress={() => router.push(x.href as any)} label={x.title}
+            style={{ width: '48%', flexGrow: 1, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 10 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon set="mci" name={x.icon} size={24} color={colors.primary} />
+            </View>
+            <View style={{ gap: 1 }}>
+              <T w="bold" size={15}>{x.title}</T>
+              <Muted size={12.5} numberOfLines={2}>{x.sub}</Muted>
+            </View>
+          </Press>
+        ))}
+      </View>
+
       {/* ONE card for the thing that needs the customer most: offers to compare */}
       {top1 ? (
         <Press onPress={() => router.push(`/customer/${top1.g.first.id}`)} label={t('قارن العروض')}

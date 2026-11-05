@@ -61,6 +61,7 @@ export default function Account() {
         <Item icon="location-outline" title={t('بياناتي وعنواني')} sub={addressLine(profile)} onPress={() => router.push('/profile')} />
         <Line />
         <Item icon="heart-outline" title={t('المحلات المفضلة')} onPress={() => router.push('/favorites')} />
+        <Line /><Item icon="map-outline" title={t('محلات قريبة منك')} onPress={() => router.push('/shops')} />
       </Group>
 
       <Group>
@@ -131,6 +132,7 @@ function ShopAccount() {
         <Item icon="bicycle-outline" title={t('التوصيل وأسعاره')} onPress={() => setup(2)} />
         <Line />
         <Item icon="wallet-outline" title={t('استلام الفلوس بالتحويل')} onPress={() => setup(3)} />
+        {shop ? (<><Line /><Item icon="construct-outline" title={t('خدمات التركيب وأسعارها')} onPress={() => router.push('/shop/services')} /></>) : null}
         {shop?.status === 'approved' ? (<><Line /><Item icon="eye-outline" title={t('صفحة المحل زي ما العملاء بيشوفوها')} onPress={() => router.push(`/shop-profile/${shop.id}`)} /></>) : null}
       </Group>
 

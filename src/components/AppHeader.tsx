@@ -39,7 +39,7 @@ export function BottomNav({ role }: { role: 'customer' | 'shop' }) {
   const items: Item[] = role === 'customer'
     ? [
         { href: '/customer', label: t('الرئيسية'), icon: 'home', match: (p) => p === '/customer' },
-        { href: '/customer/requests', label: t('طلباتي'), icon: 'receipt', match: (p) => (p.startsWith('/customer/') && p !== '/customer/new') || p.startsWith('/order') },
+        { href: '/customer/requests', label: t('طلباتي'), icon: 'receipt', match: (p) => (p.startsWith('/customer/') && p !== '/customer/new') || p.startsWith('/order') || p.startsWith('/install/') || p.startsWith('/booking') },
         { href: '/messages', label: t('الرسائل'), icon: 'chatbubbles', match: (p) => p === '/messages' || p.startsWith('/chat') || p === '/assistant', badge: unread },
         { href: '/account', label: t('حسابي'), icon: 'person', match: (p) => ['/account', '/profile', '/cars', '/favorites', '/support', '/notifications'].includes(p) },
       ]

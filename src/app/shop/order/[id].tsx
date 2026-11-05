@@ -1,3 +1,4 @@
+import { InstallBox } from '@/components/InstallBox';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
@@ -26,7 +27,7 @@ export default function ShopOrder() {
   const [other, setOther] = useState('');
   const [disputing, setDisputing] = useState(false);
   const [disputeText, setDisputeText] = useState('');
-  const { data, loading } = useLive(async () => {
+  const { data, loading, reload } = useLive(async () => {
     const order = must(await supabase.from('orders').select('*').eq('id', id).maybeSingle()) as Order | null;
     if (!order) return { order: null, parts: [] as Request[], quotes: [] as Quote[], customer: null as Profile | null };
     const parts = must(await supabase.from('requests').select('*').eq('order_id', id).order('num')) as Request[];
@@ -177,6 +178,7 @@ export default function ShopOrder() {
         <Muted size={12}>اكتب رقم الأوردر {orderNo(o.order_no)} على الكيس.</Muted>
       </Card>
 
+      <InstallBox o={o} shop onChange={reload} />
       {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
 
       {c && o.status !== 'cancelled' ? (

@@ -105,6 +105,8 @@ export type Shop = {
   public_until?: string | null;
   accepting?: boolean; suspend_reason?: string; reopen_step?: string; suspended_at?: string | null; lat?: number | null; lng?: number | null; hours?: ShopHours; photo_path?: string | null; review_note?: string;
   agreement_version?: string | null; agreement_at?: string | null; approved_at?: string | null;
+  /** what the shop does: sells parts, installs parts, or both (at least one) */
+  sells?: boolean; installs?: boolean; about?: string; photos?: string[];
 };
 export type ShopPrivate = {
   id: string; name: string; owner_name: string; phone: string; phone2: string;
@@ -150,6 +152,8 @@ export type Quote = {
   /** can THIS part be delivered, and an optional fee for it (heavy parts) instead of the shop's distance fees */
   can_deliver: boolean; delivery_fee: number | null;
   expires_at: string;
+  /** the shop can also install it: a fixed fee, or (fee null + needs inspection) priced at the shop */
+  install_available?: boolean; install_fee?: number | null; install_needs_inspection?: boolean;
 };
 /** A shop can send up to this many offers for one part (different brands / prices). */
 /** No limit on offers per part (change 1.36). */
@@ -228,6 +232,8 @@ export type Order = {
   deposit?: number; deposit_status?: DepositStatus; deposit_method?: '' | 'card' | 'instapay'; deposit_ref?: string; deposit_note?: string;
   deposit_proof?: string | null; deposit_paid_at?: string | null; hold_until?: string | null; refusal_answer_due?: string | null;
   shop_comp?: number; shop_comp_paid_at?: string | null;
+  /** installation at the shop: fee paid at the shop, appointment, progress */
+  install_fee?: number; install_at?: string | null; install_status?: '' | 'requested' | 'confirmed' | 'in_progress' | 'done';
 };
 export type DepositStatus = 'none' | 'awaiting' | 'review' | 'failed' | 'paid' | 'used' | 'forfeited' | 'refund_check' | 'disputed' | 'refund_due' | 'refunded' | 'void';
 export type DeliveryAddress = { governorate: string; area: string; street: string; building: string; floor: string; apartment: string; landmark: string; contact_phone: string };
