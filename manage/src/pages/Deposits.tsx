@@ -13,9 +13,10 @@ export default function Deposits() {
   const review = deps.filter((o) => o.deposit_status === 'review');
   const refunds = deps.filter((o) => o.deposit_status === 'refund_due');
   const disputes = deps.filter((o) => o.deposit_status === 'disputed' || o.deposit_status === 'refund_check');
-  const used = deps.filter((o) => o.deposit_status === 'used').reduce((s, o) => s + Number(o.deposit ?? 0), 0);
-  const kept = deps.filter((o) => o.deposit_status === 'forfeited');
-  const keptNet = kept.reduce((s, o) => s + Number(o.deposit ?? 0) - Number(o.shop_comp ?? 0), 0);
+  // a used deposit is Daghta's fee, except in the shop's free months when it goes to the shop (shop_comp)
+  const used = deps.filter((o) => o.deposit_status === 'used').reduce((s, o) => s + Number(o.deposit ?? 0) - Number(o.shop_comp ?? 0), 0);
+  const kept = deps.filter((o) => o.deposit_status === 'forfeited' || (o.deposit_status === 'used' && Number(o.shop_comp ?? 0) > 0));
+  const keptNet = kept.filter((o) => o.deposit_status === 'forfeited').reduce((s, o) => s + Number(o.deposit ?? 0) - Number(o.shop_comp ?? 0), 0);
   const owedShops = Object.entries(kept.filter((o) => Number(o.shop_comp ?? 0) > 0 && !o.shop_comp_paid_at)
     .reduce<Record<string, { amount: number; n: number }>>((acc, o) => {
       const a = acc[o.shop_id] ?? { amount: 0, n: 0 };
@@ -94,10 +95,6 @@ export default function Deposits() {
 }
 
 const FIELDS: [string, string][] = [
-  ['deposit_flat', 'العربون الثابت (ج.م)'],
-  ['deposit_threshold', 'من سعر كام يبقى نسبة (ج.م)'],
-  ['deposit_pct', 'النسبة ٪'],
-  ['deposit_cap', 'أقصى عربون (ج.م)'],
   ['deposit_hold_hours', 'الحجز بعد ما القطعة تجهز (ساعة)'],
   ['deposit_pay_hours', 'مهلة دفع العربون (ساعة)'],
   ['deposit_shop_share', 'نصيب المحل لو العميل ماجاش ٪'],
@@ -131,16 +128,12 @@ function Settings() {
     try { await set('deposits', on ? 'off' : 'on'); setForm(null); setMsg(on ? 'العربون اتقفل. الاستلام من المحل رجع زي الأول.' : 'العربون اشتغل.'); reload(); } catch (e) { setMsg((e as Error).message); }
   }
 
-  const ex = (total: number) => {
-    const n = (k: string, d: number) => Number(form[k] || d);
-    return total < n('deposit_threshold', 1000) ? Math.min(n('deposit_flat', 50), total) : Math.min(n('deposit_cap', 500), Math.round((total * n('deposit_pct', 5)) / 100));
-  };
 
   return (
     <section className="panel">
       <div className="panel-head"><h2>إعدادات العربون</h2><Pill tone={on ? 'good' : 'plain'}>{on ? 'شغال' : 'مقفول'}</Pill></div>
       <p className="muted small">
-        وهو مقفول، الاستلام من المحل شغال زي الأول. لما يشتغل: العميل يدفع العربون لضغطة، رقم المحل وعنوانه يظهروا بعده، والباقي يتدفع في المحل، ومفيش عمولة على المحل في الأوردر ده. الأوردرات القديمة مش بتتأثر.
+        وهو مقفول، الاستلام من المحل شغال زي الأول. لما يشتغل: العميل يدفع العربون لضغطة، رقم المحل وعنوانه يظهروا بعده، والباقي يتدفع في المحل. العربون هو عمولة ضغطة على الأوردر ده. الأوردرات القديمة مش بتتأثر.
       </p>
       <p className="small">
         طرق الدفع المتاحة للعملاء: {transfer ? 'تحويل InstaPay / محفظة ضغطة ✓' : 'تحويل: مش متظبط (حطه في صفحة «الفلوس»)'} · {card === null ? 'بنشيك على البطاقة…' : card ? 'بطاقة (Paymob) ✓' : 'بطاقة: Paymob لسه مش متفعّل'}
@@ -152,7 +145,7 @@ function Settings() {
               <label key={k} className="input"><span>{label}</span><input dir="ltr" value={form[k] ?? ''} onChange={(e) => setForm({ ...form, [k]: e.target.value })} /></label>
             ))}
           </div>
-          <p className="muted small">مثال بالأرقام دي: قطعة بـ ٤٠٠ ← عربون {money(ex(400))} · قطعة بـ ٤٠٠٠ ← {money(ex(4000))} · قطعة بـ ٢٠٠٠٠ ← {money(ex(20000))}</p>
+          <p className="muted small">العربون = عمولة ضغطة الثابتة ({money(Number(data.order_fee || 100))} ج.م)، وبيتغيّر من صفحة «الفلوس». في الشهور المجانية للمحل العربون بيتحوّل للمحل.</p>
           <div className="row-actions">
             <button className="btn" onClick={save}>احفظ الأرقام</button>
             <button className={'btn ' + (on ? 'danger' : 'accent')} onClick={toggle}>{on ? 'اقفل العربون' : 'شغّل العربون'}</button>

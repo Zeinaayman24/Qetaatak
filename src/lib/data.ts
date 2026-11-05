@@ -152,7 +152,8 @@ export type Quote = {
   expires_at: string;
 };
 /** A shop can send up to this many offers for one part (different brands / prices). */
-export const MAX_OFFERS = 5;
+/** No limit on offers per part (change 1.36). */
+export const MAX_OFFERS = Infinity;
 
 export function friendlyError(e: any): string {
   const msg = String(e?.message || e || '');

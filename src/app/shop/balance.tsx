@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { colors, radius } from '@/lib/theme';
 
 type Balance = {
-  free: boolean; free_until: string; pct: number; limit: number; fees: number; paid: number; owed: number; due_at: string | null;
+  free: boolean; free_until: string; fee: number; limit: number; fees: number; paid: number; owed: number; due_at: string | null;
   orders: { id: string; order_no: number; at: string; total: number; fee: number; state: 'free' | 'fee' | 'returned'; parts: string | null }[];
   statements: { month: string; amount: number }[];
   payments: { id: string; amount: number; ref: string; status: 'pending' | 'confirmed' | 'rejected'; note: string; created_at: string }[];
@@ -82,7 +82,7 @@ export default function ShopBalance() {
           <>
             <T w="bold" size={22} color="#fff">ضغطة مجاناً لحد {day(b.free_until)}</T>
             <T size={14} color="rgba(255,255,255,.8)">انت مش مطالب بأي حاجة دلوقتي.</T>
-            {endingSoon ? <T size={13} color={colors.accent}>الفترة المجانية بتخلص {day(b.free_until)}. بعدها العمولة {ar(b.pct)}٪ من سعر القطع بس.</T> : null}
+            {endingSoon ? <T size={13} color={colors.accent}>الفترة المجانية بتخلص {day(b.free_until)}. بعدها العمولة {money(b.fee)} ج.م ثابتة على كل أوردر.</T> : null}
           </>
         ) : (
           <>
@@ -102,8 +102,9 @@ export default function ShopBalance() {
         <T w="bold" size={15}>إزاي العمولة بتشتغل</T>
         {[
           ['checkmark-circle', 'بتدفع بس لما تبيع: العمولة بتتحسب لما العميل يستلم.'],
-          ['cash', 'الفلوس كلها بتوصلك انت من العميل، مفيش شحن رصيد.'],
-          ['receipt', `العمولة ${ar(b.pct)}٪ من سعر القطع بس، من غير التوصيل.`],
+          ['cash', 'فلوس القطعة بتوصلك انت من العميل، مفيش شحن رصيد.'],
+          ['receipt', `العمولة ${money(b.fee)} ج.م ثابتة على كل أوردر، مهما كان سعره. تقدر تحسبها في سعرك.`],
+          ['bookmark', `لو العميل دفع عربون لضغطة، العربون هو العمولة ومفيش عليك حاجة تانية في الأوردر ده.`],
           ['return-up-back', 'لو العميل رجّع القطعة، العمولة بتتشال.'],
           ['calendar', 'كشف حساب كل شهر، والسداد خلال ٧ أيام.'],
         ].map(([icon, t]) => (
@@ -122,8 +123,8 @@ export default function ShopBalance() {
                 <T w="bold" size={16} style={{ flex: 1 }}>{visible ? `محلك ظاهر للعملاء لحد ${new Date(shop!.public_until!).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}` : 'محلك مخفي (مجاناً)'}</T>
               </Row>
               {visible
-                ? <Muted size={13}>اسمك وصورتك ورقمك بيظهروا على كل عروضك، والعميل مش بيدفع عربون على أوردرات الاستلام منك.</Muted>
-                : <Muted size={13}>العميل بيشوف «محل في منطقتك» بس. اسمك ورقمك وعنوانك بيظهروا بعد ما يدفع العربون، ومفيش عمولة عليك في أوردرات العربون.</Muted>}
+                ? <Muted size={13}>اسمك وصورتك ورقمك وعلامة «محل مميز» بيظهروا على كل عروضك، والعميل مش بيدفع عربون. العمولة الثابتة على كل أوردر زي ما هي.</Muted>
+                : <Muted size={13}>العميل بيشوف «محل في منطقتك» بس. اسمك ورقمك وعنوانك بيظهروا بعد ما يدفع العربون، والعربون هو عمولة ضغطة.</Muted>}
               <Muted size={13}>{visible ? 'تجديد' : 'عايز اسمك يظهر على كل عروضك؟'} الاشتراك {money(visiblePrice ?? 1000)} ج.م في الشهر. كلّم فريق ضغطة وهنفعّلهولك.</Muted>
               <Btn kind="secondary" icon="chatbubbles" title={visible ? 'جدّد الاشتراك' : 'اشترك وخلّي محلك ظاهر'} onPress={() => router.push('/support')} />
             </Card>
@@ -132,13 +133,13 @@ export default function ShopBalance() {
       })()}
 
       {share && share.rows.length ? (
-        <Section title="تعويض العربون">
+        <Section title="فلوس ليك من العربون">
           <Card>
             <Row style={{ justifyContent: 'space-between' }}>
               <View><Muted size={12.5}>ضغطة هتحوّلك</Muted><T w="bold" size={22}>{money(share.owed)} ج.م</T></View>
               {share.paid ? <Muted size={12.5}>اتحوّلك قبل كده {money(share.paid)} ج.م</Muted> : null}
             </Row>
-            <Muted size={12.5}>لما عميل يدفع عربون ومايجيش يستلم، ليك نص العربون تعويض عن حجز القطعة.</Muted>
+            <Muted size={12.5}>في الفترة المجانية العربون كله بيرجعلك. وبعدها، لو العميل مجاش يستلم، ليك نص العربون تعويض عن حجز القطعة.</Muted>
             {share.rows.map((r) => (
               <Row key={r.id} gap={12} style={{ paddingTop: 10, borderTopWidth: 1, borderColor: colors.line }}>
                 <View style={{ flex: 1 }}>

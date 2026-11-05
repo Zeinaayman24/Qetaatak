@@ -48,20 +48,18 @@ export const DEPOSIT_STATUS: Record<DepositStatus, { label: string; tone: 'good'
 };
 
 /** The deposit rules as the app shows them; the server keeps the real values in app_settings. */
-export type DepositRules = { on: boolean; flat: number; threshold: number; pct: number; cap: number; holdHours: number; payHours: number };
+export type DepositRules = { on: boolean; fee: number; holdHours: number; payHours: number };
 let rulesCache: DepositRules | null = null;
 export async function depositRules(): Promise<DepositRules> {
   if (rulesCache) return rulesCache;
-  const { data } = await supabase.from('app_settings').select('key, value').like('key', 'deposit%');
+  const { data } = await supabase.from('app_settings').select('key, value').or('key.like.deposit%,key.eq.order_fee');
   const m = Object.fromEntries(((data ?? []) as { key: string; value: string }[]).map((r) => [r.key, r.value]));
   const n = (k: string, d: number) => (m[k] != null && m[k] !== '' && !Number.isNaN(Number(m[k])) ? Number(m[k]) : d);
-  rulesCache = { on: m.deposits === 'on', flat: n('deposit_flat', 50), threshold: n('deposit_threshold', 1000), pct: n('deposit_pct', 5),
-    cap: n('deposit_cap', 500), holdHours: n('deposit_hold_hours', 48), payHours: n('deposit_pay_hours', 2) };
+  rulesCache = { on: m.deposits === 'on', fee: n('order_fee', 100), holdHours: n('deposit_hold_hours', 48), payHours: n('deposit_pay_hours', 2) };
   return rulesCache;
 }
-/** Same formula as public.deposit_for on the server. */
-export const depositFor = (total: number, r: DepositRules) =>
-  total < r.threshold ? Math.min(r.flat, total) : Math.min(r.cap, Math.round((total * r.pct) / 100));
+/** Same as public.deposit_for on the server: the deposit is Daghta's fixed fee for the order (change 1.36). */
+export const depositFor = (total: number, r: DepositRules) => Math.min(r.fee, total);
 
 let cardCache: boolean | null = null;
 /** Is card payment switched on (Paymob keys set on the server)? Cached for the session. */

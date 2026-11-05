@@ -158,11 +158,11 @@ function Commission({ admin }: { admin: boolean }) {
   async function save() {
     setMsg('');
     // save only what changed, so one field can't block the others
-    for (const k of ['commission_pct', 'owed_limit', 'free_months', 'instapay_address', 'wallet_number', 'account_name']) {
+    for (const k of ['order_fee', 'owed_limit', 'free_months', 'instapay_address', 'wallet_number', 'account_name']) {
       const v = (form![k] ?? '').trim();
       if (v === (data!.s[k] ?? '')) continue;
       const { error } = await supabase.rpc('set_setting', { p_key: k, p_value: v });
-      if (error) return setMsg(/bad number/.test(error.message) ? 'اكتب أرقام بس في خانات النسبة والحد والشهور.' : error.message);
+      if (error) return setMsg(/bad number/.test(error.message) ? 'اكتب أرقام بس في خانات العمولة والحد والشهور.' : error.message);
     }
     setMsg('اتحفظ.'); reload();
   }
@@ -176,13 +176,13 @@ function Commission({ admin }: { admin: boolean }) {
   return (
     <>
       <section className="panel">
-        <div className="panel-head"><h2>عمولة المحلات</h2><Pill tone="dark">{`مجاناً أول ${data.s.free_months || '6'} شهور لكل محل`}</Pill></div>
-        <p className="muted small">المحل بياخد فلوسه كاملة من العميل. العمولة بتتحسب على كل أوردر العميل استلمه، والمحل بيسدّدها بعد البيع (من غير شحن رصيد). في الشهور المجانية المحلات بتشوف بس «وفّرت كام». العربون (لو شغال) بيتحوّل على InstaPay أو محفظة ضغطة اللي هنا.</p>
+        <div className="panel-head"><h2>عمولة المحلات</h2><Pill tone="dark">{`مجاناً أول ${data.s.free_months || '3'} شهور لكل محل`}</Pill></div>
+        <p className="muted small">العمولة مبلغ ثابت على كل أوردر العميل استلمه (مش نسبة). لو العميل دفع عربون، العربون هو العمولة. غير كده العمولة بتتحسب، والمحل بيسدّدها بعد البيع (من غير شحن رصيد). في الشهور المجانية المحلات بتشوف بس «وفّرت كام». العربون (لو شغال) بيتحوّل على InstaPay أو محفظة ضغطة اللي هنا.</p>
         {admin ? (
           <>
             <div className="settings-grid">
-              <label className="input"><span>شهور مجانية لكل محل من الموافقة</span><input dir="ltr" value={form.free_months ?? '6'} onChange={(e) => setForm({ ...form, free_months: e.target.value })} /></label>
-              <label className="input"><span>نسبة العمولة ٪</span><input dir="ltr" value={form.commission_pct ?? '5'} onChange={(e) => setForm({ ...form, commission_pct: e.target.value })} /></label>
+              <label className="input"><span>شهور مجانية لكل محل من الموافقة</span><input dir="ltr" value={form.free_months ?? '3'} onChange={(e) => setForm({ ...form, free_months: e.target.value })} /></label>
+              <label className="input"><span>العمولة على كل أوردر (ج.م) · التغيير يبدأ بعد ١٤ يوم</span><input dir="ltr" value={form.order_fee ?? '100'} onChange={(e) => setForm({ ...form, order_fee: e.target.value })} /></label>
               <label className="input"><span>الحد الأقصى المستحق قبل إيقاف العروض (ج.م)</span><input dir="ltr" value={form.owed_limit ?? '500'} onChange={(e) => setForm({ ...form, owed_limit: e.target.value })} /></label>
               <label className="input"><span>InstaPay ضغطة (للعمولة والعربون)</span><input dir="ltr" value={form.instapay_address ?? ''} onChange={(e) => setForm({ ...form, instapay_address: e.target.value })} /></label>
               <label className="input"><span>محفظة ضغطة</span><input dir="ltr" value={form.wallet_number ?? ''} onChange={(e) => setForm({ ...form, wallet_number: e.target.value })} /></label>
