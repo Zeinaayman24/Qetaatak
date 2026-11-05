@@ -19,24 +19,24 @@
       html,
       body {
         height: 100%;
+        margin: 0;
+        background: #F6F7F9;
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
         overscroll-behavior: none;
       }
-      /* On phones 100% can be taller than what's visible (browser bars); dvh is the visible height. */
-      @supports (height: 100dvh) {
-        html,
-        body {
-          height: 100dvh;
-        }
-      }
-      /* These styles make the root element full-height */
+      /* The app is pinned to the whole screen. A height (100%, 100dvh) is unreliable on iPhones when the app is
+         added to the home screen: it can come out shorter than the screen and the page can shift, leaving empty
+         bands above and below. Pinning all four edges always fills the screen, under the clock too. */
       #root {
         display: flex;
-        height: 100%;
-        flex: 1;
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
       }
     </style>
   </head>

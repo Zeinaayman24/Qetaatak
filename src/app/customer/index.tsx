@@ -56,32 +56,31 @@ export default function CustomerHome() {
   const hot = groups.map((g) => ({ g, n: offersIn(g) })).filter((x) => x.n > 0);
   const waiting = groups.filter((g) => !offersIn(g));
 
-  // the top band: greeting, the car, and one big search bar. Everything else waits below it.
+  // the top band, in the brand navy with a curved bottom: greeting, the car, and one big search bar
   const hero = (
-    <View style={{ backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.line }}>
-      <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 20, gap: 16 }}>
+    <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}>
+      <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 26, gap: 16 }}>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Logo size={20} ground={colors.surface} />
-          <Bell />
+          <Logo size={22} on="dark" />
+          <Bell light />
         </Row>
         <View style={{ gap: 0 }}>
-          <T size={14} color={colors.muted}>{t('أهلاً يا')}{' '}{first}</T>
-          <T w="bold" size={23} style={{ lineHeight: 34 }}>{t('محتاج قطعة إيه؟')}</T>
+          <T size={14.5} color="rgba(255,255,255,.72)">{t('أهلاً يا')}{' '}{first}</T>
+          <T w="bold" size={25} color="#fff" style={{ lineHeight: 36 }}>{t('محتاج قطعة إيه؟')}</T>
         </View>
         <Press onPress={() => router.push('/cars')} label={t('عربيتي')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, paddingEnd: 14, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.ground }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, paddingEnd: 14, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,.14)', backgroundColor: 'rgba(255,255,255,.08)' }}>
           <MakeLogo make={makeByName(makes, profile.car_make) ?? (profile.car_make ? { name_ar: profile.car_make, name_en: profile.car_make, logo_url: '' } : null)} size={44} />
           <View style={{ flex: 1, gap: 1 }}>
-            <Muted size={12}>{t('عربيتي')}</Muted>
-            {profile.car_make ? <T w="semibold" size={15} numberOfLines={1}>{carLabel(profile.car_make, profile.car_model, profile.car_year)}</T>
-              : <T w="semibold" size={15}>{t('ضيف عربيتك عشان العروض تبقى مظبوطة')}</T>}
+            <T size={12} color="rgba(255,255,255,.65)">{t('عربيتي')}</T>
+            {profile.car_make ? <T w="semibold" size={15} color="#fff" numberOfLines={1}>{carLabel(profile.car_make, profile.car_model, profile.car_year)}</T>
+              : <T w="semibold" size={15} color="#fff">{t('ضيف عربيتك عشان العروض تبقى مظبوطة')}</T>}
           </View>
           {profile.car_powertrain && profile.car_powertrain !== 'petrol' ? <Pill label={ptShort(profile.car_powertrain)} tone={isElectrified(profile.car_powertrain) ? 'good' : 'plain'} /> : null}
-          <T size={14} w="medium" color={colors.primary}>{t('غيّر')}</T>
+          <T size={14} w="medium" color={colors.sky}>{t('غيّر')}</T>
         </Press>
         <Press onPress={() => newReq()} label={t('اكتب اسم القطعة')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 16, borderWidth: 1.5, borderColor: colors.ink, paddingStart: 16, paddingEnd: 8, height: 58,
-            shadowColor: colors.shadow, shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } }}>
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderRadius: 16, paddingStart: 16, paddingEnd: 8, height: 58 }}>
           <Icon name="search" size={21} color={colors.ink} stroke={2.2} />
           <T size={15.5} color={colors.faint} style={{ flex: 1 }} numberOfLines={1}>{t('اكتب اسم القطعة، مثلاً فانوس أمامي')}</T>
           <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
@@ -90,11 +89,11 @@ export default function CustomerHome() {
         </Press>
         <View style={{ gap: 6 }}>
           <Btn title={t('اطلب قطعة')} icon="add" onPress={() => newReq()} />
-          <Muted size={13} center>{t('ابعت طلبك وقارن عروض أكتر من محل')}</Muted>
+          <T size={13} center color="rgba(255,255,255,.65)">{t('ابعت طلبك وقارن عروض أكتر من محل')}</T>
         </View>
         <Press onPress={() => router.push('/assistant')} label={t('اوصف القطعة للمساعد')} role="link" style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 }}>
-          <Icon name="sparkles" size={16} color={colors.primary} />
-          <T size={14} w="medium" color={colors.primary}>{t('مش عارف اسمها؟ اوصفها للمساعد')}</T>
+          <Icon name="sparkles" size={16} color={colors.sky} />
+          <T size={14} w="medium" color={colors.sky}>{t('مش عارف اسمها؟ اوصفها للمساعد')}</T>
         </Press>
       </View>
     </View>
@@ -104,7 +103,7 @@ export default function CustomerHome() {
   const nothingYet = !groups.length && !orders.length;
 
   return (
-    <Screen top={hero} nav={<BottomNav role="customer" />}>
+    <Screen top={hero} topColor={colors.ink} nav={<BottomNav role="customer" />}>
       {/* ONE card for the thing that needs the customer most: offers to compare */}
       {top1 ? (
         <Press onPress={() => router.push(`/customer/${top1.g.first.id}`)} label={t('قارن العروض')}

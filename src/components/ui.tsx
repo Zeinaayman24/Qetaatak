@@ -61,7 +61,7 @@ export function Press({ children, onPress, style, disabled, label, role = 'butto
  * A screen: optional full-width `top` (heroes), scrolling content in a centred column,
  * and either a pinned action bar (`footer`) or the floating tab bar (`nav`).
  */
-export function Screen({ children, header, footer, nav, top }: { children: ReactNode; header?: ReactNode; footer?: ReactNode; nav?: ReactNode; top?: ReactNode }) {
+export function Screen({ children, header, footer, nav, top, topColor }: { children: ReactNode; header?: ReactNode; footer?: ReactNode; nav?: ReactNode; top?: ReactNode; topColor?: string }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
@@ -71,7 +71,8 @@ export function Screen({ children, header, footer, nav, top }: { children: React
         </View>
       ) : null}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        {top ? <View style={{ paddingTop: insets.top }}>{top}</View> : null}
+        {/* the space under the clock takes the hero's colour, so the hero starts at the very top of the screen */}
+        {top ? <View style={{ paddingTop: insets.top, backgroundColor: topColor, borderBottomLeftRadius: topColor ? 28 : 0, borderBottomRightRadius: topColor ? 28 : 0 }}>{top}</View> : null}
         <View style={[s.column, s.body, { paddingBottom: nav ? 36 : footer ? 28 : insets.bottom + 40 }]}>{children}</View>
       </ScrollView>
       {footer ? (
