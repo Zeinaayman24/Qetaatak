@@ -129,7 +129,20 @@ function Settings() {
   }
 
 
+  const hiding = data.hide_shops === 'on';
+  async function toggleHiding() {
+    setMsg('');
+    if (!hiding && !confirm('تخبّي المحلات المجانية؟ العملاء هيشوفوا «محل في منطقتك» بدل الاسم والرقم لحد ما يدفعوا العربون أو المحل يشترك.')) return;
+    try { await set('hide_shops', hiding ? 'off' : 'on'); setForm(null); setMsg(hiding ? 'كل المحلات بقت ظاهرة.' : 'المحلات المجانية بقت مخفية.'); reload(); } catch (e) { setMsg((e as Error).message); }
+  }
+
   return (
+    <>
+    <section className="panel">
+      <div className="panel-head"><h2>إخفاء المحلات</h2><Pill tone={hiding ? 'wait' : 'plain'}>{hiding ? 'المجانية مخفية' : 'كل المحلات ظاهرة'}</Pill></div>
+      <p className="muted small">وهو مقفول، اسم كل محل وصورته ورقمه بيظهروا على عروضه. لو اشتغل، المحل اللي مش مشترك بيظهر «محل في منطقتك» لحد ما العميل يدفع العربون. «محلات قريبة منك» بتعرض كل المحلات في الحالتين.</p>
+      {admin ? <div className="row-actions"><button className={'btn ' + (hiding ? 'accent' : 'ghost')} onClick={toggleHiding}>{hiding ? 'اظهر كل المحلات' : 'خبّي المحلات المجانية'}</button></div> : null}
+    </section>
     <section className="panel">
       <div className="panel-head"><h2>إعدادات العربون</h2><Pill tone={on ? 'good' : 'plain'}>{on ? 'شغال' : 'مقفول'}</Pill></div>
       <p className="muted small">
@@ -154,6 +167,7 @@ function Settings() {
         </>
       ) : <p className="muted small">الأدمن بس يقدر يغيّر الإعدادات.</p>}
     </section>
+    </>
   );
 }
 

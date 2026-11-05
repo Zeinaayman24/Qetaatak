@@ -37,6 +37,8 @@ export default function ShopBalance() {
     return data as Balance;
   }, ['orders', 'shop_settlements'], [uid]);
   const { data: visiblePrice } = useLive(async () => Number((await supabase.from('app_settings').select('value').eq('key', 'visible_price').maybeSingle()).data?.value ?? 1000), [], []);
+  // hiding shops (change 1.35) is a setting; while it is off every shop shows by name and there is nothing to subscribe to
+  const { data: hiding } = useLive(async () => (await supabase.from('app_settings').select('value').eq('key', 'hide_shops').maybeSingle()).data?.value === 'on', [], []);
   // kept deposits: Daghta owes the shop its share when a customer doesn't come (change 1.33)
   const { data: share } = useLive(async () => {
     if (!uid) return null;
@@ -50,7 +52,8 @@ export default function ShopBalance() {
   if (loading && !data) return <Screen><BackBar title="حسابك مع ضغطة" onBack={back} /><Loading /></Screen>;
   const b = data;
   if (!b) return <Screen><BackBar title="حسابك مع ضغطة" onBack={back} /><Empty text="مقدرناش نحمّل الحساب." /></Screen>;
-  const free = b.free && b.owed <= 0;
+  const noFee = Number(b.fee) === 0;
+  const free = (b.free || noFee) && b.owed <= 0;
   const over = b.owed >= b.limit;
   const day = (iso: string) => new Date(iso).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
   const endingSoon = b.free && new Date(b.free_until).getTime() - Date.now() < 30 * 86400000;
@@ -80,9 +83,9 @@ export default function ShopBalance() {
       <View style={{ backgroundColor: colors.ink, borderRadius: 20, padding: 18, gap: 12 }}>
         {free ? (
           <>
-            <T w="bold" size={22} color="#fff">ضغطة مجاناً لحد {day(b.free_until)}</T>
-            <T size={14} color="rgba(255,255,255,.8)">انت مش مطالب بأي حاجة دلوقتي.</T>
-            {endingSoon ? <T size={13} color={colors.accent}>الفترة المجانية بتخلص {day(b.free_until)}. بعدها العمولة {money(b.fee)} ج.م ثابتة على كل أوردر.</T> : null}
+            <T w="bold" size={22} color="#fff">{noFee ? 'ضغطة مجانية للمحلات دلوقتي' : `ضغطة مجاناً لحد ${day(b.free_until)}`}</T>
+            <T size={14} color="rgba(255,255,255,.8)">{noFee ? 'مفيش عمولة ولا رسوم على أوردراتك وحجوزاتك. لو ده اتغيّر هنبلّغك قبلها بـ ١٤ يوم على الأقل.' : 'انت مش مطالب بأي حاجة دلوقتي.'}</T>
+            {endingSoon && !noFee ? <T size={13} color={colors.accent}>الفترة المجانية بتخلص {day(b.free_until)}. بعدها العمولة {money(b.fee)} ج.م ثابتة على كل أوردر.</T> : null}
           </>
         ) : (
           <>
@@ -98,7 +101,7 @@ export default function ShopBalance() {
         )}
       </View>
 
-      <Card>
+      {noFee ? null : <Card>
         <T w="bold" size={15}>إزاي العمولة بتشتغل</T>
         {[
           ['checkmark-circle', 'بتدفع بس لما تبيع: العمولة بتتحسب لما العميل يستلم.'],
@@ -110,10 +113,10 @@ export default function ShopBalance() {
         ].map(([icon, t]) => (
           <Row key={t} gap={10} style={{ alignItems: 'flex-start' }}><Icon name={icon} size={18} color={colors.primary} /><T size={13.5} style={{ flex: 1 }}>{t}</T></Row>
         ))}
-      </Card>
+      </Card>}
 
       {/* hidden (free) or visible (subscription), change 1.35 */}
-      {(() => {
+      {hiding && (() => {
         const visible = !!shop?.public_until && new Date(shop.public_until) > new Date();
         return (
           <Section title="ظهور محلك">

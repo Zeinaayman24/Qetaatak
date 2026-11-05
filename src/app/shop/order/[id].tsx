@@ -81,9 +81,6 @@ export default function ShopOrder() {
     setCancelling(false); toast('الأوردر اتلغى.');
   }
   // free for shops for 6 months from approval (B16; final length still to be decided)
-  const freeUntil = new Date(shop?.approved_at ?? shop?.created_at ?? Date.now());
-  freeUntil.setMonth(freeUntil.getMonth() + 6);
-  const free = new Date(o.created_at) < freeUntil;
   const addr = o.delivery_address;
   const refundLeft = (() => {
     const ms = Math.max(0, new Date(o.refund_due_at ?? o.updated_at).getTime() + 48 * 3600000 - Date.now());
@@ -114,7 +111,7 @@ export default function ShopOrder() {
           </View>
         </Row>
         {hasDeposit ? <T size={12.5} color="rgba(255,255,255,.75)">أوردر بعربون: مفيش عمولة عليك، حصّل {money(total - dep)} ج.م في المحل</T>
-          : free ? <T size={12.5} color="rgba(255,255,255,.75)">عمولة ضغطة: مجاناً في الفترة دي</T> : null}
+          : null}
         {o.status !== 'cancelled' ? (
           <Row gap={6}>
             {steps.map((s, i) => (

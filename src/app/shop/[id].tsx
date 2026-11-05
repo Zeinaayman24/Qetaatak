@@ -73,8 +73,6 @@ export default function ShopRequest() {
   const approved = shop?.status === 'approved';
   const line = ['عايزها ' + WANTED[r.wanted_condition], r.side ? 'الجهة: ' + SIDES[r.side] : '', r.vin ? 'شاسيه ' + r.vin : '', r.area, ago(r.created_at)].filter(Boolean).join(' · ');
   // free for shops for 6 months from approval (Register B16; final length still to be decided)
-  const freeUntil = new Date(shop?.approved_at ?? shop?.created_at ?? Date.now());
-  freeUntil.setMonth(freeUntil.getMonth() + 6);
   const expiresIn = (q: Quote) => {
     const ms = new Date(q.expires_at).getTime() - now;
     if (ms <= 0) return null;
@@ -164,7 +162,7 @@ export default function ShopRequest() {
         <T w="bold" size={17}>{offers.length ? 'عرض جديد بماركة أو سعر تاني' : 'ابعت عرضك'}</T>
         <Field label="الماركة / النوع" value={brand} onChangeText={setBrand} placeholder="مثلاً: أصلي هيونداي، Bosch، Valeo، صيني" icon="pricetag"
           hint="لو عندك أكتر من ماركة، ابعت كل واحدة كعرض لوحدها." />
-        <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0" hint={`السعر ده نهائي ومينفعش يتغيّر عند الاستلام. ضغطة مجاناً للمحلات لحد ${freeUntil.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}.`} />
+        <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0" hint="السعر ده نهائي ومينفعش يتغيّر عند الاستلام." />
         <Labeled label="حالة القطعة">
           <Chips options={OFFER_CONDITIONS.map((v) => ({ v, label: CONDITIONS[v] }))} selected={[cond]} onPick={setCond} />
         </Labeled>
