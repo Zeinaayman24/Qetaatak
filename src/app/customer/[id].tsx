@@ -129,7 +129,8 @@ export default function PriceRequest() {
   const canDeliver = (sid: string) => groupOf(sid).length > 0 && groupOf(sid).every((c) => d.fees[c.quote.id] != null);
   const feeOf = (sid: string) => Math.max(0, ...groupOf(sid).map((c) => d.fees[c.quote.id] ?? 0));
   const canInstall = (sid: string) => groupOf(sid).some((c) => c.quote.install_available);
-  const installing = (sid: string) => canInstall(sid) && !!inst[sid];
+  const askedInstall = (sid: string) => groupOf(sid).some((c) => c.part.wants_install);
+  const installing = (sid: string) => canInstall(sid) && (inst[sid] ?? askedInstall(sid));
   const modeOf = (sid: string): Mode => (!canDeliver(sid) || installing(sid) ? 'pickup' : modes[sid] ?? 'delivery');
   const installFeeOf = (sid: string) => installing(sid) ? groupOf(sid).filter((c) => c.quote.install_available).reduce((s, c) => s + Number(c.quote.install_fee ?? 0), 0) : 0;
   const installInspect = (sid: string) => installing(sid) && groupOf(sid).some((c) => c.quote.install_available && c.quote.install_fee == null);

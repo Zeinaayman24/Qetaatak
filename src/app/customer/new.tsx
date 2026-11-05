@@ -60,7 +60,8 @@ const SIDE_OPTS = [{ v: 'right', label: t('يمين') }, { v: 'left', label: t('
 /** New price request, one step per screen: parts → details → car and timing → review. */
 export default function NewRequest() {
   const { ready, session, profile } = useAuth();
-  const params = useLocalSearchParams<{ part?: string; cond?: string; notes?: string; side?: string; cat?: string }>();
+  const params = useLocalSearchParams<{ part?: string; cond?: string; notes?: string; side?: string; cat?: string; install?: string }>();
+  const [wantsInstall, setWantsInstall] = useState(params.install === '1');
   const str = (v: unknown) => (typeof v === 'string' ? v : '');
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
@@ -143,7 +144,7 @@ export default function NewRequest() {
         rows.push({
           customer_id: profile!.id, part: it.part, qty: it.qty, car_make: car.make, car_model: car.model, car_year: car.year, vin: car.vin, powertrain: car.powertrain, part_number: (it.pn ?? '').trim().toUpperCase(),
           wanted_condition: it.cond, side: partIsSided(it.part) ? it.side : '', urgency, budget: null,
-          area: profile!.area, notes: it.notes.trim(), photo_path, batch_id: batch,
+          area: profile!.area, notes: it.notes.trim(), photo_path, batch_id: batch, wants_install: wantsInstall,
         });
       }
       const { data, error } = await supabase.from('requests').insert(rows).select('id, num');
@@ -315,6 +316,14 @@ export default function NewRequest() {
                     </View>
                   </View>
                 ))}
+              </View>
+              <View style={[{ backgroundColor: colors.surface, borderRadius: 18, padding: 14, gap: 10 }, lift]}>
+                <Row gap={10}>
+                  <Icon name="construct-outline" size={20} color={colors.primary} />
+                  <T w="semibold" size={15} style={{ flex: 1 }}>{t('عايز المحل يركّبها كمان؟')}</T>
+                </Row>
+                <Seg options={[{ v: 'no', label: t('القطعة بس') }, { v: 'yes', label: t('القطعة + التركيب') }]} value={wantsInstall ? 'yes' : 'no'} onPick={(v) => setWantsInstall(v === 'yes')} />
+                <Muted size={12.5}>{wantsInstall ? t('المحلات اللي بتركّب هتبعتلك سعر القطعة وسعر التركيب منفصلين، وتختار معاد التركيب لما تأكّد.') : t('تقدر تضيف التركيب بعدين لو المحل بيركّب.')}</Muted>
               </View>
               <Row gap={10} style={{ alignItems: 'flex-start', backgroundColor: colors.accentSoft, borderRadius: 18, padding: 14 }}>
                 <Icon name="shield-checkmark" size={20} color={colors.accentDeep} />

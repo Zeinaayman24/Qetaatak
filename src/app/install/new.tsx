@@ -1,7 +1,7 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { BackBar, Btn, Chips, ErrorText, Field, Labeled, Loading, Muted, Notice, PhotoPicker, Press, Row, Screen, T, toast } from '@/components/ui';
+import { BackBar, Btn, Chips, ErrorText, Field, Icon, Labeled, Loading, Muted, Notice, PhotoPicker, Press, Row, Screen, T, toast } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { carLabel } from '@/lib/catalogue';
 import { friendlyError, type Car } from '@/lib/data';
@@ -66,6 +66,18 @@ export default function NewInstall() {
       <BackBar title={t('تركيب قطعة معاك')} onBack={back} />
       {data?.target ? <Notice>{t('الطلب هيروح لـ {0} بس.', data.target.name)}</Notice>
         : <Muted size={14}>{t('معاك القطعة؟ قولنا محتاج تركّب إيه، ومحلات التركيب في محافظتك هتبعتلك أسعارها. تختار المحل والمعاد.')}</Muted>}
+
+      {!params.shop ? (
+        <Press onPress={() => router.replace({ pathname: '/customer/new', params: { install: '1' } })} role="link"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 14, backgroundColor: colors.primarySoft }}>
+          <Icon name="cart-outline" size={20} color={colors.primary} />
+          <View style={{ flex: 1 }}>
+            <T w="semibold" size={14.5}>{t('مش معاك القطعة؟')}</T>
+            <Muted size={12.5}>{t('اطلب القطعة والتركيب مع بعض من نفس المحل')}</Muted>
+          </View>
+          <Icon name="chevron-back" size={18} color={colors.primary} />
+        </Press>
+      ) : null}
 
       <Labeled label={t('محتاج تركّب إيه؟')}>
         <Chips options={services.map((s) => ({ v: s.id, label: serviceName(s) }))} selected={[service]} onPick={setService} />

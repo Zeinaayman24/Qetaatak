@@ -1187,4 +1187,10 @@ export const EN: Record<string, string> = {
   "الجمعة": "Fri",
   "السبت": "Sat",
   "اسم المحل ورقمه وعنوانه بالظبط بيظهروا بعد ما تطلب منه.": "The shop's name, number and exact address appear after you order from it.",
+  "عايز المحل يركّبها كمان؟": "Want the shop to install it too?",
+  "القطعة + التركيب": "Part + installation",
+  "المحلات اللي بتركّب هتبعتلك سعر القطعة وسعر التركيب منفصلين، وتختار معاد التركيب لما تأكّد.": "Shops that install will send the part price and the installation price separately. You pick the installation time when you confirm.",
+  "تقدر تضيف التركيب بعدين لو المحل بيركّب.": "You can add installation later if the shop installs.",
+  "مش معاك القطعة؟": "Don't have the part?",
+  "اطلب القطعة والتركيب مع بعض من نفس المحل": "Order the part and installation together from the same shop",
 };

@@ -124,6 +124,8 @@ export const addressLine = (a: { street?: string; building?: string; floor?: str
 export type Request = {
   id: string; num: number; customer_id: string; part: string; car_make: string; car_model: string; car_year: number; powertrain?: string; part_number?: string;
   wanted_condition: 'used' | 'new' | 'any'; area: string; notes: string; photo_path: string | null;
+  /** the customer asked for installation at the shop too */
+  wants_install?: boolean;
   status: 'open' | 'chosen' | 'done' | 'cancelled' | 'expired'; chosen_quote_id: string | null; delivery_mode: 'delivery' | 'pickup' | null;
   rating: number | null; created_at: string;
   vin: string; side: '' | 'right' | 'left' | 'both' | 'front' | 'rear'; urgency: 'normal' | 'today' | 'urgent'; budget: number | null;

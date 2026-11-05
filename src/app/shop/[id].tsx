@@ -1,5 +1,5 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { ConfirmSheet } from '@/components/Confirm';
 import { shopState } from '@/components/status';
@@ -56,6 +56,8 @@ export default function ShopRequest() {
     return { req, mine, offers, declined: dec.length > 0, customer, sibs };
   }, ['requests', 'quotes'], [id, uid]);
 
+  // the customer asked for installation: start the offer form on "with installation"
+  useEffect(() => { if (data?.req?.wants_install && shop?.installs) setInstall((v) => (v === 'no' ? 'fee' : v)); }, [data?.req?.id, data?.req?.wants_install, shop?.installs]);
   if (ready && !session) return <Redirect href="/login" />;
   const header = undefined;
   const back = () => router.replace('/shop');
@@ -99,7 +101,7 @@ export default function ShopRequest() {
         install_needs_inspection: !!shop?.installs && install === 'inspect',
       });
       if (error) throw error;
-      setPrice(''); setPhoto(null); setBrand(''); setNote(''); setPartFee(''); setInstall('no'); setInstallFee(''); setAdding(false);
+      setPrice(''); setPhoto(null); setBrand(''); setNote(''); setPartFee(''); setInstall(r?.wants_install && shop?.installs ? 'fee' : 'no'); setInstallFee(''); setAdding(false);
       const next = !offers.length ? data!.sibs.find((x) => x.r.id !== r!.id && !x.quoted && !x.declined && x.r.status === 'open') : undefined;
       if (next) { toast('العرض اتبعت، كمّل القطعة اللي بعدها.'); router.replace(`/shop/${next.r.id}`); }
       else { toast('العرض اتبعت للعميل'); reload(); }
@@ -253,6 +255,12 @@ export default function ShopRequest() {
           <Muted>{line}</Muted>
         </View>
       </Row>
+      {r.wants_install ? (
+        <View style={{ backgroundColor: colors.primarySoft, borderRadius: 16, padding: 12, flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <Icon name="construct" size={20} color={colors.primary} />
+          <T size={14} w="semibold" style={{ flex: 1 }}>{shop?.installs ? 'العميل عايز تركيب كمان. حط سعر التركيب في عرضك.' : 'العميل عايز تركيب كمان. محلك مش متسجّل إنه بيركّب، فعرضك هيبقى للقطعة بس.'}</T>
+        </View>
+      ) : null}
       {r.notes ? <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.line }}><Muted size={12}>ملاحظة العميل</Muted><T size={14}>{r.notes}</T></View> : null}
       {approved && (st === 'open' || st === 'quoted' || st === 'declined' || st === 'sold') ? (
         <Btn kind="secondary" title="رسالة للعميل" onPress={() => router.push(`/chat/${r.id}/${uid}`)} />
