@@ -151,14 +151,18 @@ function Commission({ admin }: { admin: boolean }) {
   const [msg, setMsg] = useState('');
   useEffect(() => { if (data && !form) setForm(data.s); }, [data, form]);
   if (!data || !form) return null;
-  const owedMode = data.s.billing_mode === 'owed';
+  // commission is charged after each shop's free months (from its approval); the old free/owed switch is gone
+  const owedMode = true;
   const pending = data.settlements.filter((x) => x.status === 'pending');
 
   async function save() {
     setMsg('');
-    for (const k of ['billing_mode', 'commission_pct', 'owed_limit', 'instapay_address', 'wallet_number', 'account_name']) {
-      const { error } = await supabase.rpc('set_setting', { p_key: k, p_value: (form![k] ?? '').trim() });
-      if (error) return setMsg(error.message);
+    // save only what changed, so one field can't block the others
+    for (const k of ['commission_pct', 'owed_limit', 'free_months', 'instapay_address', 'wallet_number', 'account_name']) {
+      const v = (form![k] ?? '').trim();
+      if (v === (data!.s[k] ?? '')) continue;
+      const { error } = await supabase.rpc('set_setting', { p_key: k, p_value: v });
+      if (error) return setMsg(/bad number/.test(error.message) ? 'اكتب أرقام بس في خانات النسبة والحد والشهور.' : error.message);
     }
     setMsg('اتحفظ.'); reload();
   }
@@ -172,20 +176,15 @@ function Commission({ admin }: { admin: boolean }) {
   return (
     <>
       <section className="panel">
-        <div className="panel-head"><h2>عمولة المحلات</h2><Pill tone={owedMode ? 'dark' : 'good'}>{owedMode ? 'العمولة شغالة' : 'مجاناً دلوقتي'}</Pill></div>
-        <p className="muted small">المحل بياخد فلوسه كاملة من العميل. العمولة بتتحسب على كل أوردر العميل استلمه، والمحل بيسدّدها بعد البيع (من غير شحن رصيد). في الوضع المجاني المحلات بتشوف بس «وفّرت كام».</p>
+        <div className="panel-head"><h2>عمولة المحلات</h2><Pill tone="dark">{`مجاناً أول ${data.s.free_months || '6'} شهور لكل محل`}</Pill></div>
+        <p className="muted small">المحل بياخد فلوسه كاملة من العميل. العمولة بتتحسب على كل أوردر العميل استلمه، والمحل بيسدّدها بعد البيع (من غير شحن رصيد). في الشهور المجانية المحلات بتشوف بس «وفّرت كام». العربون (لو شغال) بيتحوّل على InstaPay أو محفظة ضغطة اللي هنا.</p>
         {admin ? (
           <>
             <div className="settings-grid">
-              <label className="input"><span>الوضع</span>
-                <select value={form.billing_mode ?? 'free'} onChange={(e) => setForm({ ...form, billing_mode: e.target.value })}>
-                  <option value="free">مجاناً (المحلات بتشوف اللي وفّروه)</option>
-                  <option value="owed">العمولة شغالة (المحلات بتسدّد بعد البيع)</option>
-                </select>
-              </label>
+              <label className="input"><span>شهور مجانية لكل محل من الموافقة</span><input dir="ltr" value={form.free_months ?? '6'} onChange={(e) => setForm({ ...form, free_months: e.target.value })} /></label>
               <label className="input"><span>نسبة العمولة ٪</span><input dir="ltr" value={form.commission_pct ?? '5'} onChange={(e) => setForm({ ...form, commission_pct: e.target.value })} /></label>
               <label className="input"><span>الحد الأقصى المستحق قبل إيقاف العروض (ج.م)</span><input dir="ltr" value={form.owed_limit ?? '500'} onChange={(e) => setForm({ ...form, owed_limit: e.target.value })} /></label>
-              <label className="input"><span>InstaPay ضغطة (المحلات بتسدّد عليه)</span><input dir="ltr" value={form.instapay_address ?? ''} onChange={(e) => setForm({ ...form, instapay_address: e.target.value })} /></label>
+              <label className="input"><span>InstaPay ضغطة (للعمولة والعربون)</span><input dir="ltr" value={form.instapay_address ?? ''} onChange={(e) => setForm({ ...form, instapay_address: e.target.value })} /></label>
               <label className="input"><span>محفظة ضغطة</span><input dir="ltr" value={form.wallet_number ?? ''} onChange={(e) => setForm({ ...form, wallet_number: e.target.value })} /></label>
               <label className="input"><span>اسم الحساب</span><input value={form.account_name ?? ''} onChange={(e) => setForm({ ...form, account_name: e.target.value })} /></label>
             </div>
