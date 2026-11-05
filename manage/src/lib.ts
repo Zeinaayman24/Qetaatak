@@ -74,7 +74,7 @@ export const RESOLVED_BY: Record<string, string> = { bot: 'المساعد حلّ
 export const needsPeople = (t: { status: string }) => t.status === 'open' || t.status === 'in_progress';
 export const PRIORITY: Record<string, string> = { low: 'منخفضة', normal: 'عادية', high: 'عاجلة' };
 export const CATEGORY: Record<string, string> = { order: 'مشكلة في طلب', shop: 'شكوى من محل', customer: 'شكوى من عميل', app: 'مشكلة في التطبيق', other: 'حاجة تانية' };
-export const CONDITION: Record<string, string> = { used_original: 'مستعمل أصلي', used_clean: 'مستعمل بحالة ممتازة', new_aftermarket: 'جديد تجاري', new_original: 'جديد أصلي' };
+export const CONDITION: Record<string, string> = { used_original: 'مستعملة', used_clean: 'مستعملة', new_original: 'جديدة أصلي', new_aftermarket: 'جديدة ماركة تانية', imported: 'استيراد' };
 export const WANTED: Record<string, string> = { any: 'جديد أو مستعمل', used: 'مستعمل بس', new: 'جديد بس' };
 export const SHOP_TYPE: Record<string, string> = { used: 'قطع مستعملة', new: 'قطع جديدة', both: 'مستعمل وجديد' };
 export const SIDE: Record<string, string> = { '': '', right: 'يمين', left: 'شمال', both: 'الاتنين', front: 'أمامي', rear: 'خلفي' };

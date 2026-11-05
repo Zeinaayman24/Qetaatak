@@ -6,7 +6,7 @@ import { shopState } from '@/components/status';
 import { BackBar, Btn, Card, Chips, CopyBox, Empty, ErrorText, Field, Icon, Labeled, Lines, Loading, Muted, Notice, Photo, PhotoPicker, Pill, Press, Row, Screen, Seg, Sheet, T, toast } from '@/components/ui';
 import { ptLabel } from '@/lib/catalogue';
 import { useAuth } from '@/lib/auth';
-import { CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel, elapsed, minutesSince } from '@/lib/data';
+import { CONDITIONS, OFFER_CONDITIONS, MAX_OFFERS, MAX_WARRANTY_DAYS, SIDES, WANTED, ago, ar, friendlyError, money, reqNo, type Profile, type Quote, type Request, warrantyLabel, elapsed, minutesSince } from '@/lib/data';
 import { must, useLive, useNow } from '@/lib/live';
 import { pickPhoto, uploadPhoto } from '@/lib/photos';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -158,7 +158,7 @@ export default function ShopRequest() {
           hint="لو عندك أكتر من ماركة، ابعت كل واحدة كعرض لوحدها." />
         <Field big label={r.qty > 1 ? `سعر القطعة الواحدة (العميل طالب ${ar(r.qty)})` : "سعرك (جنيه)"} value={price} onChangeText={setPrice} keyboardType="number-pad" ltr placeholder="0" hint={`السعر ده نهائي ومينفعش يتغيّر عند الاستلام. ضغطة مجاناً للمحلات لحد ${freeUntil.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}.`} />
         <Labeled label="حالة القطعة">
-          <Chips options={Object.entries(CONDITIONS).map(([v, label]) => ({ v, label }))} selected={[cond]} onPick={setCond} />
+          <Chips options={OFFER_CONDITIONS.map((v) => ({ v, label: CONDITIONS[v] }))} selected={[cond]} onPick={setCond} />
         </Labeled>
         <Labeled label="فيه ضمان على القطعة؟">
           <Seg options={[{ v: 'no', label: 'لأ، من غير ضمان' }, { v: 'yes', label: 'أيوه، فيه ضمان' }]} value={hasWarranty ? 'yes' : 'no'} onPick={(v) => setHasWarranty(v === 'yes')} />

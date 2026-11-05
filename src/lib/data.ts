@@ -17,12 +17,16 @@ export const YEARS = Array.from({ length: 36 }, (_, i) => new Date().getFullYear
 
 export const WANTED: Record<string, string> = { any: t('جديد أو مستعمل'), used: t('مستعمل بس'), new: t('جديد بس') };
 
+/** Labels for every condition an offer can carry (used_clean is from older offers and reads as used). */
 export const CONDITIONS: Record<string, string> = {
-  used_original: t('مستعمل أصلي'),
-  used_clean: t('مستعمل بحالة ممتازة'),
-  new_aftermarket: t('جديد تجاري'),
-  new_original: t('جديد أصلي'),
+  used_original: t('مستعملة'),
+  used_clean: t('مستعملة'),
+  new_original: t('جديدة أصلي'),
+  new_aftermarket: t('جديدة ماركة تانية'),
+  imported: t('استيراد'),
 };
+/** The choices a shop picks from when sending an offer, in the order shops say them. */
+export const OFFER_CONDITIONS = ['used_original', 'new_original', 'new_aftermarket', 'imported'] as const;
 
 /** Warranty is optional: most shops sell parts without one. 0 = no warranty; otherwise the shop types the days. */
 export const MAX_WARRANTY_DAYS = 730;
