@@ -24,11 +24,11 @@ export function Greeter() {
       done.current = true;
       const parts = greetParts(first);
       if (Platform.OS !== 'web') { speakGreeting(parts); markGreeted(); return; }
-      // browsers only allow sound inside a tap: greet on the first one
-      const onTap = () => { off.current(); speakGreeting(parts); markGreeted(); };
-      window.addEventListener('pointerup', onTap, { capture: true });
-      window.addEventListener('keydown', onTap, { capture: true });
-      off.current = () => { window.removeEventListener('pointerup', onTap, { capture: true }); window.removeEventListener('keydown', onTap, { capture: true }); };
+      // browsers only allow sound inside a tap: try on each tap until the voice really starts
+      const EVENTS = ['touchend', 'click', 'keydown'] as const;
+      const onTap = () => speakGreeting(parts, () => { off.current(); markGreeted(); });
+      EVENTS.forEach((e) => window.addEventListener(e, onTap, { capture: true }));
+      off.current = () => EVENTS.forEach((e) => window.removeEventListener(e, onTap, { capture: true }));
     })();
     return () => { cancelled = true; };
   }, [ready, profile, playing, first]);

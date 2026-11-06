@@ -7,7 +7,7 @@ import { isEn } from './i18n';
  * Browsers only allow sound after a tap, so in the web app it plays on the first tap after opening.
  */
 
-const ON = 'daghta-greet', DAY = 'daghta-greet-day';
+const ON = 'daghta-greet', DAY = 'daghta-greet-day2';
 
 async function store() {
   if (Platform.OS === 'web') {
@@ -62,22 +62,26 @@ function webVoice(lang: 'ar' | 'en') {
   return undefined;
 }
 
-/** Say it. On the web this must run inside a tap. */
-export function speakGreeting(parts: { text: string; lang: 'ar' | 'en' }[]) {
+/** Say it. On the web this must run inside a tap. `onStart` runs when the voice really starts. */
+export function speakGreeting(parts: { text: string; lang: 'ar' | 'en' }[], onStart?: () => void) {
   if (Platform.OS === 'web') {
     const synth = typeof window !== 'undefined' ? window.speechSynthesis : undefined;
     if (!synth) return;
     synth.cancel();
-    for (const p of parts) {
+    if (!webVoices.length) webVoices = synth.getVoices();
+    parts.forEach((p, i) => {
       const u = new SpeechSynthesisUtterance(p.text);
       const v = webVoice(p.lang);
       if (v) u.voice = v;
-      u.lang = v?.lang ?? (p.lang === 'ar' ? 'ar-EG' : 'en-US');
+      u.lang = v?.lang ?? (p.lang === 'ar' ? 'ar-SA' : 'en-US');
       u.rate = 0.95;
+      if (i === 0 && onStart) u.onstart = onStart;
       synth.speak(u);
-    }
+    });
+    // iPhone sometimes leaves speech paused
+    try { synth.resume(); } catch { /* fine */ }
     return;
   }
   Speech.stop();
-  for (const p of parts) Speech.speak(p.text, { language: p.lang === 'ar' ? 'ar-EG' : 'en-US', rate: 0.95 });
+  parts.forEach((p, i) => Speech.speak(p.text, { language: p.lang === 'ar' ? 'ar-SA' : 'en-US', rate: 0.95, onStart: i === 0 ? onStart : undefined }));
 }
