@@ -48,13 +48,20 @@
         function fit() {
           var root = document.getElementById('root');
           if (!root) return;
-          var portrait = window.innerHeight > window.innerWidth;
-          var gap = portrait ? window.screen.height - window.innerHeight : 0;
+          // measure the box the app really gets (iOS can report a full window height while giving less)
+          root.style.bottom = '0px';
+          var h = root.getBoundingClientRect().height;
+          var portrait = h > window.innerWidth;
+          var gap = portrait ? window.screen.height - h : 0;
           root.style.bottom = gap > 0 && gap < 120 ? -gap + 'px' : '0px';
         }
-        document.addEventListener('DOMContentLoaded', fit);
-        window.addEventListener('resize', fit);
-        window.addEventListener('orientationchange', function () { setTimeout(fit, 300); });
+        function soon() { fit(); setTimeout(fit, 150); setTimeout(fit, 600); setTimeout(fit, 1500); }
+        document.addEventListener('DOMContentLoaded', soon);
+        window.addEventListener('load', soon);
+        window.addEventListener('resize', soon);
+        window.addEventListener('pageshow', soon);
+        window.addEventListener('orientationchange', function () { setTimeout(soon, 300); });
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) soon(); });
       })();
     </script>
   </head>
