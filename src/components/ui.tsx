@@ -82,7 +82,7 @@ export function Screen({ children, header, footer, nav, top, topColor }: { child
       ) : null}
       {nav ? (
         // Docked under the scroll area, so content stops above the tabs instead of sliding behind them.
-        <View style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.line, paddingBottom: Math.max(insets.bottom, 6), zIndex: 2 }}>
+        <View testID="tabbar" style={{ backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.line, paddingBottom: Math.max(insets.bottom, 6), zIndex: 2 }}>
           <View style={[s.column, { paddingHorizontal: 8 }]}>{nav}</View>
         </View>
       ) : null}

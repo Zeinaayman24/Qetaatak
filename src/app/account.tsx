@@ -5,6 +5,7 @@ import { ConfirmSheet } from '@/components/Confirm';
 import { BottomNav } from '@/components/AppHeader';
 import { Icon, Loading, Muted, Pill, Row, Screen, T, toast } from '@/components/ui';
 import { InstallCard } from '@/components/InstallCard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
 import { SHOP_TYPES, addressLine, ar, friendlyError } from '@/lib/data';
 import { photoUrl, supabase } from '@/lib/supabase';
@@ -14,6 +15,7 @@ import { t, dir, isEn, setLang, startAlign } from '@/lib/i18n';
 /** Temporary: the sizes the phone reports, to fix the gap under the tab bar on iPhones. */
 function ScreenInfo() {
   const [, tick] = useState(0);
+  const ins = useSafeAreaInsets();
   if (typeof window === 'undefined' || typeof document === 'undefined') return null;
   const root = document.getElementById('root');
   const r = root?.getBoundingClientRect();
@@ -26,7 +28,8 @@ function ScreenInfo() {
   const line = [
     `screen ${window.screen.width}x${window.screen.height}`, `inner ${window.innerWidth}x${window.innerHeight}`,
     `vv ${Math.round(window.visualViewport?.height ?? 0)}`, `root ${Math.round(r?.top ?? -1)}-${Math.round(r?.bottom ?? -1)} b=${root?.style.bottom}`,
-    `vh+safe ${Math.round(vh)} t${cs.paddingTop} b${cs.paddingBottom}`, `sa ${String(nav.standalone)} dm ${window.matchMedia('(display-mode: standalone)').matches}`,
+    `vh+safe ${Math.round(vh)}`, `insets t${Math.round(ins.top)} b${Math.round(ins.bottom)}`,
+    `tabs ${(() => { const d = [...document.querySelectorAll('[data-testid="tabbar"]')].pop(); const q = d?.getBoundingClientRect(); return q ? Math.round(q.top) + '-' + Math.round(q.bottom) : '?'; })()}`, `sa ${String(nav.standalone)} dm ${window.matchMedia('(display-mode: standalone)').matches}`,
   ].join(' | ');
   return <Pressable onPress={() => tick((n) => n + 1)}><Muted center size={11}>{line}</Muted></Pressable>;
 }

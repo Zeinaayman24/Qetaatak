@@ -6,9 +6,9 @@ import { Alexandria_900Black } from '@expo-google-fonts/alexandria/900Black';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { I18nManager, Platform, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaInsetsContext, SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/lib/auth';
 import { LockGate } from '@/components/LockGate';
 import { Intro } from '@/components/Intro';
@@ -60,15 +60,35 @@ export default function RootLayout() {
     <View style={{ flex: 1, backgroundColor: intro ? brand.navy : colors.ground }}>
       {ready ? (
         <SafeAreaProvider>
-          <AuthProvider>
-            <StatusBar style="dark" />
-            <View style={{ flex: 1, direction: dir(), backgroundColor: colors.ground }}>
-              <LockGate><Slot /></LockGate>
-            </View>
-          </AuthProvider>
+          <InsetsFix>
+            <AuthProvider>
+              <StatusBar style="dark" />
+              <View style={{ flex: 1, direction: dir(), backgroundColor: colors.ground }}>
+                <LockGate><Slot /></LockGate>
+              </View>
+            </AuthProvider>
+          </InsetsFix>
         </SafeAreaProvider>
       ) : null}
       {intro ? <Intro onDone={introDone} /> : null}
     </View>
   );
+}
+
+/**
+ * iPhone home-screen app fix: when iOS gives the page a viewport shorter than the screen, index.html stretches
+ * the app to the real screen bottom. The safe-area library then counts that stretch as extra bottom space
+ * (pushing the tab bar up), so take it back off here.
+ */
+function InsetsFix({ children }: { children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return <>{children}</>;
+  // the real home-bar space, straight from the browser
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;visibility:hidden;padding-bottom:env(safe-area-inset-bottom,0px)';
+  document.body.appendChild(probe);
+  const env = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+  probe.remove();
+  if (insets.bottom <= env + 1) return <>{children}</>;
+  return <SafeAreaInsetsContext.Provider value={{ ...insets, bottom: env }}>{children}</SafeAreaInsetsContext.Provider>;
 }
