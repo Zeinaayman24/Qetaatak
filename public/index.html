@@ -49,7 +49,13 @@
         function apply() {
           var root = document.getElementById('root');
           if (!root) return;
-          var full = window.screen.height + 'px';
+          if (window.innerWidth > window.innerHeight) {
+            // turned sideways: the stretch is only for the upright screen
+            document.documentElement.style.height = ''; document.body.style.height = '';
+            root.style.position = ''; root.style.height = ''; root.style.bottom = '0px';
+            return;
+          }
+          var full = Math.max(window.screen.height, window.screen.width) + 'px';
           document.documentElement.style.height = full; document.body.style.height = full;
           root.style.position = 'absolute'; root.style.bottom = 'auto'; root.style.height = full;
           window.scrollTo(0, 0);
