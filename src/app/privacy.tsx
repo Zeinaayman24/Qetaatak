@@ -1,7 +1,7 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { Switch, View } from 'react-native';
-import { BackBar, Btn, Card, Muted, Row, Screen, T, toast } from '@/components/ui';
+import { View } from 'react-native';
+import { BackBar, Btn, Card, Muted, Row, Screen, T, toast, Toggle } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { friendlyError } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
@@ -40,7 +40,7 @@ export default function Privacy() {
             <T w="semibold" size={15}>{t('ابعتولي عروض وخصومات من ضغطة')}</T>
             <Muted size={12.5}>{t('تقدر تقفلها في أي وقت.')}</Muted>
           </View>
-          <Switch value={on} onValueChange={toggle} disabled={busy} trackColor={{ true: colors.primary, false: colors.line }} thumbColor="#fff" accessibilityLabel={t('ابعتولي عروض وخصومات من ضغطة')} />
+          <Toggle value={on} onValueChange={toggle} disabled={busy} onColor={colors.primary} offColor="#C3CCD8" accessibilityLabel={t('ابعتولي عروض وخصومات من ضغطة')} />
         </Row>
       </Card>
       <Card>

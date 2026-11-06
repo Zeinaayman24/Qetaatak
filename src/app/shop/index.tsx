@@ -1,12 +1,12 @@
 import { PushPrompt } from '@/components/PushPrompt';
 import { Redirect, router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { BottomNav, rememberRole } from '@/components/AppHeader';
 import { Bell } from '@/components/Bell';
 import { shopPill, shopState, type ShopState } from '@/components/status';
 import { OrderRow, RowList, StatusTabs, bucketOf, type Bucket } from '@/components/OrderRows';
-import { Btn, Empty, Icon, Labeled, Loading, Muted, Notice, Pill, Press, Row, Screen, Seg, Select, T } from '@/components/ui';
+import { Btn, Empty, Icon, Labeled, Loading, Muted, Notice, Pill, Press, Row, Screen, Seg, Select, T, Toggle } from '@/components/ui';
 import { Pressable, TextInput } from 'react-native';
 import { InstallCard } from '@/components/InstallCard';
 import { ptShort } from '@/lib/catalogue';
@@ -113,7 +113,7 @@ export default function ShopInbox() {
             <Row gap={10} style={{ backgroundColor: 'rgba(255,255,255,.08)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 }}>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: accepting ? colors.good : colors.faint }} />
               <T w="semibold" size={14} color="#fff" style={{ flex: 1 }}>{accepting ? 'مستقبل طلبات' : 'مقفول دلوقتي'}</T>
-              <Switch value={accepting} disabled={switching} onValueChange={toggleOpen} trackColor={{ true: colors.good, false: 'rgba(255,255,255,.25)' }} thumbColor="#fff" accessibilityLabel={accepting ? 'مستقبل طلبات' : 'مقفول دلوقتي'} />
+              <Toggle value={accepting} disabled={switching} onValueChange={toggleOpen} onColor={colors.good} offColor={'rgba(255,255,255,.25)'} accessibilityLabel={accepting ? 'مستقبل طلبات' : 'مقفول دلوقتي'} />
             </Row>
           ) : null}
           <Row gap={8}>

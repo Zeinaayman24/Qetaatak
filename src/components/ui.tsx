@@ -592,3 +592,26 @@ export function TabPills<V extends string>({ items, value, onPick }: {
     </ScrollView>
   );
 }
+
+/**
+ * On/off switch, drawn the same on every platform (the built-in one looks broken in the web app).
+ * The knob sits at the end side when on: right in English, left in Arabic, like iPhone settings.
+ */
+export function Toggle({ value, onValueChange, disabled, onColor = colors.primary, offColor = "#C3CCD8", accessibilityLabel }: {
+  value: boolean; onValueChange: (v: boolean) => void; disabled?: boolean; onColor?: string; offColor?: string; accessibilityLabel?: string;
+}) {
+  const pos = useRef(new Animated.Value(value ? 1 : 0)).current;
+  useEffect(() => { Animated.timing(pos, { toValue: value ? 1 : 0, duration: 180, useNativeDriver: Platform.OS !== 'web' }).start(); }, [value, pos]);
+  const W = 51, H = 31, K = 27, travel = W - K - 4;
+  const sign = dir() === 'rtl' ? -1 : 1;
+  return (
+    <Pressable onPress={() => !disabled && onValueChange(!value)} disabled={disabled} hitSlop={8}
+      accessibilityRole="switch" accessibilityState={{ checked: value, disabled: !!disabled }} accessibilityLabel={accessibilityLabel}
+      style={{ width: W, height: H, borderRadius: H / 2, backgroundColor: value ? onColor : offColor, justifyContent: 'center', opacity: disabled ? 0.5 : 1, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: W, height: H, justifyContent: 'center', alignItems: sign > 0 ? 'flex-start' : 'flex-end', paddingHorizontal: 2, direction: 'ltr' }}>
+        <Animated.View style={{ width: K, height: K, borderRadius: K / 2, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 3, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+          transform: [{ translateX: pos.interpolate({ inputRange: [0, 1], outputRange: [0, sign * travel] }) }] }} />
+      </View>
+    </Pressable>
+  );
+}

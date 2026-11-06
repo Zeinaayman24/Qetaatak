@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { GOVERNORATES, addressLine, toLatin, validPhone, type DeliveryAddress, type Profile, type SavedAddress } from '@/lib/data';
 import { supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { RadioCard } from './Payment';
-import { Card, Chips, Field, Icon, Muted, Row, Select, T } from './ui';
+import { Card, Chips, Field, Icon, Muted, Row, Select, T, Toggle } from './ui';
 import { t } from '@/lib/i18n';
 
 export type AddressChoice = { address: DeliveryAddress; savedId: string | null; save: boolean; label: string };
@@ -72,7 +72,7 @@ export function AddressPicker({ profile, value, onChange }: { profile: Profile; 
             <>
               <Row gap={10} style={{ justifyContent: 'space-between' }}>
                 <T size={14} style={{ flex: 1 }}>{t('احفظ العنوان ده للمرة الجاية')}</T>
-                <Switch value={value.save} onValueChange={(v) => onChange({ ...value, save: v })} trackColor={{ true: colors.primary, false: colors.line }} thumbColor="#fff" accessibilityLabel={t('احفظ العنوان ده للمرة الجاية')} />
+                <Toggle value={value.save} onValueChange={(v) => onChange({ ...value, save: v })} onColor={colors.primary} offColor="#C3CCD8" accessibilityLabel={t('احفظ العنوان ده للمرة الجاية')} />
               </Row>
               {value.save ? (
                 <View style={{ gap: 6 }}>
