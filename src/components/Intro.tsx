@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { brand } from '@/lib/theme';
 import { t as tr } from '@/lib/i18n';
+import { playSfx, prepareSfx, soundOn, unlockSfx } from '@/lib/sfx';
 import { introSeen, introTarget, markIntroSeen, setIntroRunning, type IntroTarget } from '@/lib/intro';
 
 /**
@@ -67,8 +68,10 @@ export function Intro({ onDone }: { onDone: () => void }) {
   const [t, setT] = useState(0);
   const clock = useRef({ start: 0, speed: 1, skip: 0 });
   const landing = useRef<IntroTarget | null | undefined>(undefined);
+  const sounds = useRef({ click: false, car: false, unlocked: false });
 
   useEffect(() => {
+    prepareSfx();
     let raf = 0, alive = true;
     const finish = () => { if (!alive) return; alive = false; setIntroRunning(false); markIntroSeen(); onDone(); };
     (async () => {
@@ -81,6 +84,14 @@ export function Intro({ onDone }: { onDone: () => void }) {
         const c = clock.current;
         const now = ((Date.now() - c.start) / 1000) * c.speed + c.skip;
         setT(now);
+        // sound effects, in step with the picture: the press clicks, then the car passes as the logo flies home
+        const sd = sounds.current, PASS = 1.45;
+        if (!sd.click && now >= 1.72) { sd.click = true; if (now < 1.95) playSfx('click', 0.9); }
+        if (!sd.car && now >= 2.0) {
+          sd.car = true;
+          const from = PASS - PASS / c.speed + Math.max(0, now - 2.0) / c.speed;
+          if (now < 3.6) playSfx('car', 0.75, from);
+        }
         if (now >= END) return finish();
         raf = requestAnimationFrame(tick);
       };
@@ -89,6 +100,11 @@ export function Intro({ onDone }: { onDone: () => void }) {
     return () => { alive = false; cancelAnimationFrame(raf); };
   }, [onDone]);
 
+  // a tap lets sound play (phones block it until then); if sound was already on, a tap skips ahead
+  const tap = () => {
+    if (!sounds.current.unlocked) { sounds.current.unlocked = true; const wasOn = soundOn(); unlockSfx(); if (!wasOn) return; }
+    skip();
+  };
   const skip = () => { const c = clock.current; const now = ((Date.now() - c.start) / 1000) * c.speed + c.skip; if (now < FLY) c.skip += FLY - now; };
 
   // ---- the frame at time t (same timing as the approved preview video)
@@ -130,7 +146,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
   const COPIES = 5;
 
   return (
-    <Pressable onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} onPress={skip} accessibilityRole="image" accessibilityLabel={tr('ضغطة')} style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
+    <Pressable onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} onPress={tap} accessibilityRole="image" accessibilityLabel={tr('ضغطة')} style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
       <StatusBar style="light" />
       <Svg width={W} height={H}>
         <Defs>
