@@ -45,27 +45,24 @@
          real bottom of the screen. Only in the home-screen app, only portrait, only for a small difference. */
       (function () {
         if (!window.navigator.standalone && !(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) return;
-        function fit() {
+        var stretched = false;
+        function apply() {
           var root = document.getElementById('root');
           if (!root) return;
-          // measure the box the app really gets (iOS can report a full window height while giving less)
-          document.documentElement.style.height = ''; document.body.style.height = '';
-          root.style.position = ''; root.style.height = ''; root.style.bottom = '0px';
-          var h = root.getBoundingClientRect().height;
-          var portrait = h > window.innerWidth;
-          var gap = portrait ? window.screen.height - h : 0;
-          var html = document.documentElement, body = document.body;
-          if (gap > 0 && gap < 120) {
-            // iPhone does not draw fixed elements past its short viewport, so lay the app out as a normal page
-            // exactly as tall as the screen; the page itself can't scroll (body overflow is hidden)
-            var full = window.screen.height + 'px';
-            html.style.height = full; body.style.height = full;
-            root.style.position = 'absolute'; root.style.bottom = 'auto'; root.style.height = full;
-            window.scrollTo(0, 0);
-          } else {
-            html.style.height = ''; body.style.height = '';
-            root.style.position = ''; root.style.height = '';
-          }
+          var full = window.screen.height + 'px';
+          document.documentElement.style.height = full; document.body.style.height = full;
+          root.style.position = 'absolute'; root.style.bottom = 'auto'; root.style.height = full;
+          window.scrollTo(0, 0);
+        }
+        function fit() {
+          // once a short viewport is seen, keep the stretch: stretching makes iOS report the full height again,
+          // and undoing it on that reading would make the app flip back and forth
+          if (stretched) return apply();
+          var root = document.getElementById('root');
+          if (!root) return;
+          var h = Math.min(root.getBoundingClientRect().height, window.innerHeight);
+          var gap = h > window.innerWidth ? window.screen.height - h : 0;
+          if (gap > 0 && gap < 120) { stretched = true; apply(); }
         }
         // put the page back if the keyboard pushed it up
         document.addEventListener('focusout', function () { setTimeout(function () { window.scrollTo(0, 0); }, 50); });
