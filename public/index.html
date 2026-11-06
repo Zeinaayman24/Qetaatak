@@ -44,7 +44,7 @@
          status-bar height), leaving an empty band at the bottom. When that happens, stretch the app down to the
          real bottom of the screen. Only in the home-screen app, only portrait, only for a small difference. */
       (function () {
-        if (!window.navigator.standalone) return;
+        if (!window.navigator.standalone && !(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) return;
         function fit() {
           var root = document.getElementById('root');
           if (!root) return;
