@@ -49,12 +49,26 @@
           var root = document.getElementById('root');
           if (!root) return;
           // measure the box the app really gets (iOS can report a full window height while giving less)
-          root.style.bottom = '0px';
+          document.documentElement.style.height = ''; document.body.style.height = '';
+          root.style.position = ''; root.style.height = ''; root.style.bottom = '0px';
           var h = root.getBoundingClientRect().height;
           var portrait = h > window.innerWidth;
           var gap = portrait ? window.screen.height - h : 0;
-          root.style.bottom = gap > 0 && gap < 120 ? -gap + 'px' : '0px';
+          var html = document.documentElement, body = document.body;
+          if (gap > 0 && gap < 120) {
+            // iPhone does not draw fixed elements past its short viewport, so lay the app out as a normal page
+            // exactly as tall as the screen; the page itself can't scroll (body overflow is hidden)
+            var full = window.screen.height + 'px';
+            html.style.height = full; body.style.height = full;
+            root.style.position = 'absolute'; root.style.bottom = 'auto'; root.style.height = full;
+            window.scrollTo(0, 0);
+          } else {
+            html.style.height = ''; body.style.height = '';
+            root.style.position = ''; root.style.height = '';
+          }
         }
+        // put the page back if the keyboard pushed it up
+        document.addEventListener('focusout', function () { setTimeout(function () { window.scrollTo(0, 0); }, 50); });
         function soon() { fit(); setTimeout(fit, 150); setTimeout(fit, 600); setTimeout(fit, 1500); }
         document.addEventListener('DOMContentLoaded', soon);
         window.addEventListener('load', soon);
