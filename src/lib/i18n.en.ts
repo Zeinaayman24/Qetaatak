@@ -1199,4 +1199,6 @@ export const EN: Record<string, string> = {
   "لسه مفيش محل بيركّب بعت عرض. ممكن تستنى، أو تشتري القطعة وتطلب تركيبها من محل تاني من صفحة الأوردر.": "No shop that installs has sent an offer yet. You can wait, or buy the part and request installation from another shop on the order page.",
   "لف الموبايل": "Turn your phone upright",
   "ضغطة شغّال والموبايل واقف": "Daghta works with the phone held upright",
+  "ترحيب بالصوت": "Voice welcome",
+  "بنقولك أهلاً باسمك أول ما تفتح ضغطة، مرة في اليوم": "We say hello with your name when you open Daghta, once a day",
 };

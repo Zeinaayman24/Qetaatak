@@ -1,15 +1,37 @@
 import { Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
 import { ConfirmSheet } from '@/components/Confirm';
 import { BottomNav } from '@/components/AppHeader';
-import { Icon, Loading, Muted, Pill, Row, Screen, T, toast } from '@/components/ui';
+import { Icon, Loading, Muted, Pill, Row, Screen, T, toast, Toggle } from '@/components/ui';
 import { InstallCard } from '@/components/InstallCard';
+import { greetOn, greetParts, setGreetOn, speakGreeting } from '@/lib/greet';
 import { useAuth } from '@/lib/auth';
 import { SHOP_TYPES, addressLine, ar, friendlyError } from '@/lib/data';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { t, dir, isEn, setLang, startAlign } from '@/lib/i18n';
+
+/** Voice welcome on/off (lib/greet.ts). */
+function GreetRow() {
+  const [on, setOn] = useState(true);
+  const { profile } = useAuth();
+  useEffect(() => { greetOn().then(setOn); }, []);
+  const change = (v: boolean) => {
+    setOn(v); setGreetOn(v);
+    if (v) speakGreeting(greetParts((profile?.full_name || '').split(' ')[0]));  // a sample, so the person hears it (this runs inside the tap)
+  };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56, paddingVertical: 10, paddingHorizontal: 16 }}>
+      <Icon name="volume-high-outline" size={22} color={colors.ink} />
+      <View style={{ flex: 1, gap: 1 }}>
+        <T w="medium" size={15}>{t('ترحيب بالصوت')}</T>
+        <Muted size={13}>{t('بنقولك أهلاً باسمك أول ما تفتح ضغطة، مرة في اليوم')}</Muted>
+      </View>
+      <Toggle value={on} onValueChange={change} accessibilityLabel={t('ترحيب بالصوت')} />
+    </View>
+  );
+}
 
 function Item({ icon, title, sub, onPress, danger }: { icon: string; title: string; sub?: string; onPress: () => void; danger?: boolean }) {
   return (
@@ -74,6 +96,8 @@ export default function Account() {
 
       <Group>
         <Item icon="language-outline" title={isEn() ? 'اللغة: العربية' : 'Language: English'} sub={t('اللغة دلوقتي: العربية')} onPress={() => setLang(isEn() ? 'ar' : 'en')} />
+        <Line />
+        <GreetRow />
         <Line />
         <Item icon="shield-outline" title={t('الخصوصية والشروط')} sub={t('الشروط، الخصوصية، الإلغاء، بياناتك')} onPress={() => router.push('/privacy')} />
       </Group>

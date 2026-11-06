@@ -13,6 +13,7 @@ import { AuthProvider } from '@/lib/auth';
 import { LockGate } from '@/components/LockGate';
 import { Intro } from '@/components/Intro';
 import { RotateNotice } from '@/components/RotateNotice';
+import { Greeter } from '@/components/Greeter';
 import { introWanted, setIntroRunning } from '@/lib/intro';
 import { brand, colors } from '@/lib/theme';
 import { dir, lang, loadLang } from '@/lib/i18n';
@@ -64,6 +65,7 @@ export default function RootLayout() {
           <InsetsFix>
             <AuthProvider>
               <StatusBar style="dark" />
+              <Greeter />
               <View style={{ flex: 1, direction: dir(), backgroundColor: colors.ground }}>
                 <LockGate><Slot /></LockGate>
               </View>
