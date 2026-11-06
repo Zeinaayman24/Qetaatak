@@ -1,14 +1,20 @@
+import React, { useRef } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Polygon, Rect } from 'react-native-svg';
 import { brand, colors } from '@/lib/theme';
 import { T } from './ui';
+import { setIntroTarget, useIntroRunning } from '@/lib/intro';
 
 /**
  * The ضغطة mark: a gear (car parts) around a button being pressed (one tap),
  * with speed lines (it comes fast). Drawn as vectors so it is sharp at any size.
  * `bg` is the colour behind the mark; gear and hand use `fg`.
  */
-export function Mark({ size = 40, bg = brand.navy, fg = '#FFFFFF' }: { size?: number; bg?: string; fg?: string }) {
+export function Mark({ size = 40, bg = brand.navy, fg = '#FFFFFF', intro }: { size?: number; bg?: string; fg?: string; intro?: boolean }) {
+  // the opening animation lands on this mark: report where it is, and stay hidden until it lands
+  const box = useRef<React.ComponentRef<typeof View>>(null);
+  const playing = useIntroRunning();
+  const measure = () => box.current?.measureInWindow((x: number, y: number, w: number) => { if (w > 0) setIntroTarget({ x, y, size: w, fg, bg }); });
   const teeth = [0, 45, 135, 180, 225, 270, 315];
   const hand = (fill: string, stroke?: string) => (
     <G transform="translate(46 47.5) scale(.95) translate(-47.5 -42)" fill={fill} stroke={stroke} strokeWidth={stroke ? 5 / 0.95 : 0} strokeLinejoin="round">
@@ -26,7 +32,7 @@ export function Mark({ size = 40, bg = brand.navy, fg = '#FFFFFF' }: { size?: nu
       <Path d="M69 57 H88 Q91 57 89.6 59.8 L88.4 62.2 Q87 65 84 65 H65 Z" />
     </G>
   );
-  return (
+  const svg = (
     <Svg width={size} height={size} viewBox="0 0 100 100">
       <G fill={fg}>
         <Circle cx={44} cy={50} r={33} />
@@ -45,17 +51,19 @@ export function Mark({ size = 40, bg = brand.navy, fg = '#FFFFFF' }: { size?: nu
       {hand(fg)}
     </Svg>
   );
+  if (!intro) return svg;
+  return <View ref={box} onLayout={measure} style={{ opacity: playing ? 0 : 1 }}>{svg}</View>;
 }
 
 /** Mark + the ضغطة wordmark. `on` is the ground it sits on. */
-export function Logo({ size = 26, on = 'light', ground }: { size?: number; on?: 'light' | 'dark'; ground?: string }) {
+export function Logo({ size = 26, on = 'light', ground, intro }: { size?: number; on?: 'light' | 'dark'; ground?: string; intro?: boolean }) {
   const dark = on === 'dark';
   const bg = ground ?? (dark ? brand.navy : colors.ground);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: size * 0.3 }}>
       {/* the word first so, right-to-left, the mark sits on its left and the speed lines lead into it */}
       <T size={size} color={dark ? '#FFFFFF' : brand.navy} style={{ fontFamily: 'Alexandria_900Black', lineHeight: size * 1.45 }}>ضغطة</T>
-      <Mark size={size * 1.55} bg={bg} fg={dark ? '#FFFFFF' : brand.navy} />
+      <Mark size={size * 1.55} bg={bg} fg={dark ? '#FFFFFF' : brand.navy} intro={intro} />
     </View>
   );
 }

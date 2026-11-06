@@ -6,12 +6,14 @@ import { Alexandria_900Black } from '@expo-google-fonts/alexandria/900Black';
 import { useFonts } from 'expo-font';
 import { Slot } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { I18nManager, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '@/lib/auth';
 import { LockGate } from '@/components/LockGate';
-import { colors } from '@/lib/theme';
+import { Intro } from '@/components/Intro';
+import { introWanted, setIntroRunning } from '@/lib/intro';
+import { brand, colors } from '@/lib/theme';
 import { dir, lang, loadLang } from '@/lib/i18n';
 
 // Arabic-first, right to left; English (chosen in the account page) lays out left to right.
@@ -24,6 +26,10 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     NotoNaskhArabic_400Regular, NotoNaskhArabic_500Medium, NotoNaskhArabic_600SemiBold, NotoNaskhArabic_700Bold, Alexandria_900Black,
   });
+
+  // the opening animation plays over the app while it loads underneath
+  const [intro, setIntro] = useState(() => { const w = introWanted(); setIntroRunning(w); return w; });
+  const introDone = useCallback(() => setIntro(false), []);
 
   // don't hold the whole app on the fonts: show it after at most 1.2 s, the fonts swap in when ready
   const [waited, setWaited] = useState(false);
@@ -41,16 +47,21 @@ export default function RootLayout() {
     }
   }, []);
 
-  if ((!loaded && !waited) || !langReady) return <View style={{ flex: 1, backgroundColor: colors.ground }} />;
+  const ready = (loaded || waited) && langReady;
 
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar style="dark" />
-        <View style={{ flex: 1, direction: dir(), backgroundColor: colors.ground }}>
-          <LockGate><Slot /></LockGate>
-        </View>
-      </AuthProvider>
-    </SafeAreaProvider>
+    <View style={{ flex: 1, backgroundColor: intro ? brand.navy : colors.ground }}>
+      {ready ? (
+        <SafeAreaProvider>
+          <AuthProvider>
+            <StatusBar style="dark" />
+            <View style={{ flex: 1, direction: dir(), backgroundColor: colors.ground }}>
+              <LockGate><Slot /></LockGate>
+            </View>
+          </AuthProvider>
+        </SafeAreaProvider>
+      ) : null}
+      {intro ? <Intro onDone={introDone} /> : null}
+    </View>
   );
 }

@@ -45,7 +45,7 @@ export default function Login() {
     <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 28, borderBottomRightRadius: 28, paddingBottom: 72, overflow: 'hidden' }}>
       <View style={{ position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: colors.accent, opacity: 0.18, top: -80, left: -70 }} />
       <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 22, paddingTop: 22, gap: 22 }}>
-        <Logo size={30} on="dark" />
+        <Logo size={30} on="dark" intro />
         <View style={{ gap: 10 }}>
           <T w="bold" size={32} color="#fff" style={{ lineHeight: 44, letterSpacing: -0.5 }}>{t('صوّر القطعة.')}{'\n'}{t('المحلات تتسابق على سعرك.')}</T>
           <T size={15} color="rgba(255,255,255,.7)">{t('أسعار من محلات موثوقة خلال ساعة، والقطعة لازم تكون زي الوصف، وتوصيل لحد البيت.')}</T>

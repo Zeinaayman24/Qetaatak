@@ -69,7 +69,7 @@ export default function CustomerHome() {
     <View style={{ backgroundColor: colors.ink, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}>
       <View style={{ width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 26, gap: 16 }}>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Logo size={22} on="dark" />
+          <Logo size={22} on="dark" intro />
           <Bell light />
         </Row>
         <View style={{ gap: 0 }}>
