@@ -5,34 +5,11 @@ import { ConfirmSheet } from '@/components/Confirm';
 import { BottomNav } from '@/components/AppHeader';
 import { Icon, Loading, Muted, Pill, Row, Screen, T, toast } from '@/components/ui';
 import { InstallCard } from '@/components/InstallCard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/lib/auth';
 import { SHOP_TYPES, addressLine, ar, friendlyError } from '@/lib/data';
 import { photoUrl, supabase } from '@/lib/supabase';
 import { colors } from '@/lib/theme';
 import { t, dir, isEn, setLang, startAlign } from '@/lib/i18n';
-
-/** Temporary: the sizes the phone reports, to fix the gap under the tab bar on iPhones. */
-function ScreenInfo() {
-  const [, tick] = useState(0);
-  const ins = useSafeAreaInsets();
-  if (typeof window === 'undefined' || typeof document === 'undefined') return null;
-  const root = document.getElementById('root');
-  const r = root?.getBoundingClientRect();
-  const probe = document.createElement('div');
-  probe.style.cssText = 'position:fixed;top:0;height:100vh;width:1px;visibility:hidden;padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top)';
-  document.body.appendChild(probe);
-  const vh = probe.getBoundingClientRect().height, cs = getComputedStyle(probe);
-  probe.remove();
-  const nav = window.navigator as Navigator & { standalone?: boolean };
-  const line = [
-    `screen ${window.screen.width}x${window.screen.height}`, `inner ${window.innerWidth}x${window.innerHeight}`,
-    `vv ${Math.round(window.visualViewport?.height ?? 0)}`, `root ${Math.round(r?.top ?? -1)}-${Math.round(r?.bottom ?? -1)} b=${root?.style.bottom}`,
-    `vh+safe ${Math.round(vh)}`, `insets t${Math.round(ins.top)} b${Math.round(ins.bottom)}`,
-    `tabs ${(() => { const d = [...document.querySelectorAll('[data-testid="tabbar"]')].pop(); const q = d?.getBoundingClientRect(); return q ? Math.round(q.top) + '-' + Math.round(q.bottom) : '?'; })()}`, `sa ${String(nav.standalone)} dm ${window.matchMedia('(display-mode: standalone)').matches}`,
-  ].join(' | ');
-  return <Pressable onPress={() => tick((n) => n + 1)}><Muted center size={11}>{line}</Muted></Pressable>;
-}
 
 function Item({ icon, title, sub, onPress, danger }: { icon: string; title: string; sub?: string; onPress: () => void; danger?: boolean }) {
   return (
@@ -106,7 +83,6 @@ export default function Account() {
         <T w="medium" size={15} color={colors.bad}>{t('تسجيل خروج')}</T>
       </Pressable>
       <Muted center size={12}>{t('ضغطة · نسخة')}{' '}{APP_VERSION}</Muted>
-      <ScreenInfo />
     </Screen>
   );
 }

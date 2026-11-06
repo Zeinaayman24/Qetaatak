@@ -12,6 +12,7 @@ import { SafeAreaInsetsContext, SafeAreaProvider, useSafeAreaInsets } from 'reac
 import { AuthProvider } from '@/lib/auth';
 import { LockGate } from '@/components/LockGate';
 import { Intro } from '@/components/Intro';
+import { RotateNotice } from '@/components/RotateNotice';
 import { introWanted, setIntroRunning } from '@/lib/intro';
 import { brand, colors } from '@/lib/theme';
 import { dir, lang, loadLang } from '@/lib/i18n';
@@ -71,6 +72,7 @@ export default function RootLayout() {
         </SafeAreaProvider>
       ) : null}
       {intro ? <Intro onDone={introDone} /> : null}
+      <RotateNotice />
     </View>
   );
 }

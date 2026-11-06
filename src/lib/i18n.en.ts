@@ -1197,4 +1197,6 @@ export const EN: Record<string, string> = {
   "اطلب تركيب من محلات قريبة، وابعتلهم إن القطعة معاك.": "Request installation from nearby shops and tell them you have the part.",
   "اطلب تركيب": "Request installation",
   "لسه مفيش محل بيركّب بعت عرض. ممكن تستنى، أو تشتري القطعة وتطلب تركيبها من محل تاني من صفحة الأوردر.": "No shop that installs has sent an offer yet. You can wait, or buy the part and request installation from another shop on the order page.",
+  "لف الموبايل": "Turn your phone upright",
+  "ضغطة شغّال والموبايل واقف": "Daghta works with the phone held upright",
 };
