@@ -207,6 +207,14 @@ export default function OrderPage() {
       </Card>
 
       <InstallBox o={o} />
+      {!o.install_status && o.status !== 'cancelled' && parts.length ? (
+        <View style={{ backgroundColor: parts.some((p) => p.wants_install) ? colors.primarySoft : colors.surface, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14, gap: 8 }}>
+          <T w="semibold" size={15}>{t('محتاج حد يركّب القطعة؟')}</T>
+          <Muted size={13}>{t('اطلب تركيب من محلات قريبة، وابعتلهم إن القطعة معاك.')}</Muted>
+          <Btn kind="secondary" icon="construct-outline" title={t('اطلب تركيب')}
+            onPress={() => router.push({ pathname: '/install/new', params: { desc: parts.map((p) => p.part).join(t('، ')).slice(0, 300) } })} />
+        </View>
+      ) : null}
       {o.status !== 'cancelled' ? <ReceiptButton orderId={o.id} /> : null}
 
       {warrantyEnd ? (

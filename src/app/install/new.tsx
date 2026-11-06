@@ -15,12 +15,12 @@ import { colors } from '@/lib/theme';
 /** «معايا القطعة بالفعل»: the customer has the part and wants a shop to install it. Shops that install send prices. */
 export default function NewInstall() {
   const { ready, session, profile } = useAuth();
-  const params = useLocalSearchParams<{ shop?: string; service?: string }>();
+  const params = useLocalSearchParams<{ shop?: string; service?: string; desc?: string }>();
   const services = useInstallServices();
   const uid = session?.user.id;
   const [service, setService] = useState<string>(params.service ?? '');
   const [carKey, setCarKey] = useState('main');
-  const [desc, setDesc] = useState('');
+  const [desc, setDesc] = useState(params.desc ?? '');
   const [notes, setNotes] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

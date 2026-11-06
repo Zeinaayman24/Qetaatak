@@ -277,6 +277,12 @@ export default function PriceRequest() {
                   onPick={() => pick(p, q)} onChat={() => router.push(`/chat/${p.id}/${q.shop_id}`)} />
               ))}
             </View>
+            {p.wants_install && qs.length && !qs.some((q) => q.install_available) ? (
+              <Row gap={8} style={{ alignItems: 'flex-start', backgroundColor: colors.primarySoft, borderRadius: 14, padding: 12 }}>
+                <Icon name="construct-outline" size={18} color={colors.primary} />
+                <T size={13} style={{ flex: 1 }}>{t('لسه مفيش محل بيركّب بعت عرض. ممكن تستنى، أو تشتري القطعة وتطلب تركيبها من محل تاني من صفحة الأوردر.')}</T>
+              </Row>
+            ) : null}
             {dec?.n ? <Muted size={12.5}>{dec.n > 1 ? t('{0} محلات قالوا إنها مش عندهم.', ar(dec.n)) : t('محل قال إنها مش عنده.')}</Muted> : null}
           </>
         ) : dec?.n && dec.n >= d.shopCount ? (

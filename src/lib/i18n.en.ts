@@ -1193,4 +1193,8 @@ export const EN: Record<string, string> = {
   "تقدر تضيف التركيب بعدين لو المحل بيركّب.": "You can add installation later if the shop installs.",
   "مش معاك القطعة؟": "Don't have the part?",
   "اطلب القطعة والتركيب مع بعض من نفس المحل": "Order the part and installation together from the same shop",
+  "محتاج حد يركّب القطعة؟": "Need someone to install the part?",
+  "اطلب تركيب من محلات قريبة، وابعتلهم إن القطعة معاك.": "Request installation from nearby shops and tell them you have the part.",
+  "اطلب تركيب": "Request installation",
+  "لسه مفيش محل بيركّب بعت عرض. ممكن تستنى، أو تشتري القطعة وتطلب تركيبها من محل تاني من صفحة الأوردر.": "No shop that installs has sent an offer yet. You can wait, or buy the part and request installation from another shop on the order page.",
 };
