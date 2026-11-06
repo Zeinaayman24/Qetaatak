@@ -43,9 +43,16 @@ export default function RootLayout() {
       document.documentElement.dir = dir();
       document.documentElement.lang = lang;
       document.title = lang === 'en' ? 'Daghta' : 'ضغطة';
-      document.body.style.backgroundColor = colors.ground;
     }
   }, []);
+  // what shows behind the app at the screen edges: navy under the opening animation, then white like the tab bar
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const c = intro ? brand.navy : '#FFFFFF';
+      document.documentElement.style.backgroundColor = c;
+      document.body.style.backgroundColor = c;
+    }
+  }, [intro]);
 
   const ready = (loaded || waited) && langReady;
 

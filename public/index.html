@@ -20,7 +20,7 @@
       body {
         height: 100%;
         margin: 0;
-        background: #F6F7F9;
+        background: #041D3F;
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
@@ -39,6 +39,24 @@
         left: 0;
       }
     </style>
+    <script>
+      /* iOS 26 home-screen apps: Safari can give the page a viewport shorter than the screen (by about the
+         status-bar height), leaving an empty band at the bottom. When that happens, stretch the app down to the
+         real bottom of the screen. Only in the home-screen app, only portrait, only for a small difference. */
+      (function () {
+        if (!window.navigator.standalone) return;
+        function fit() {
+          var root = document.getElementById('root');
+          if (!root) return;
+          var portrait = window.innerHeight > window.innerWidth;
+          var gap = portrait ? window.screen.height - window.innerHeight : 0;
+          root.style.bottom = gap > 0 && gap < 120 ? -gap + 'px' : '0px';
+        }
+        document.addEventListener('DOMContentLoaded', fit);
+        window.addEventListener('resize', fit);
+        window.addEventListener('orientationchange', function () { setTimeout(fit, 300); });
+      })();
+    </script>
   </head>
 
   <body>

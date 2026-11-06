@@ -60,7 +60,10 @@ function Ticks() {
 }
 
 export function Intro({ onDone }: { onDone: () => void }) {
-  const { width: W, height: H } = useWindowDimensions();
+  // the real size of the app area (on some iPhones it reaches lower than the window size says)
+  const win = useWindowDimensions();
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  const W = box?.w ?? win.width, H = box?.h ?? win.height;
   const [t, setT] = useState(0);
   const clock = useRef({ start: 0, speed: 1, skip: 0 });
   const landing = useRef<IntroTarget | null | undefined>(undefined);
@@ -127,7 +130,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
   const COPIES = 5;
 
   return (
-    <Pressable onPress={skip} accessibilityRole="image" accessibilityLabel={tr('ضغطة')} style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
+    <Pressable onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} onPress={skip} accessibilityRole="image" accessibilityLabel={tr('ضغطة')} style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
       <StatusBar style="light" />
       <Svg width={W} height={H}>
         <Defs>
